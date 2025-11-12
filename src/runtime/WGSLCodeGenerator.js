@@ -20,88 +20,84 @@ export class WGSLCodeGenerator {
     /**
      * 從解析後的著色器資訊 (IR) 組裝一個最終的 WGSL 著色器模組。
      * @param {import('./Parser.js').WGFXShaderInfo} shaderInfo - 解析後的著色器資訊。
-     * @returns {string} 生成的 WGSL 著色器程式碼作為單一字串。
+     * @returns {Array<{ wgslCode: string, passIndex: number, resources: { textures: import('./Parser.js').WGFXTexture[], samplers: import('./Parser.js').WGFXSampler[], parameters: import('./Parser.js').WGFXParameter[] } }>} 生成的 WGSL 著色器程式碼作為單一字串。
      */
     generate(shaderInfo) {
-        let wgsl = `// 由 WGFX 組裝器生成\n\n`;
-        const resourceBindings = new Map();
-        let bindingIndex = 0;
+        const generatedModules = [];
 
-        /**
-         * 為命名資源獲取或建立一個唯一的、連續的綁定索引。
-         * @param {string} name - 資源的名稱 (例如，紋理或 "uniforms")。
-         * @returns {number} 綁定索引。
-         */
-        const getBinding = (name) => {
-            if (!resourceBindings.has(name)) {
-                resourceBindings.set(name, {index: bindingIndex++});
-            }
-            return resourceBindings.get(name).index;
-        };
+        // 注入通用程式碼區塊。
+        const commonCode = shaderInfo.commonCode ? `// --- 通用程式碼 ---\n${shaderInfo.commonCode.replace(/type\s+/g, 'alias ')}\n\n` : '';
 
-        // 1. 生成統一緩衝區結構和綁定
-        // 所有參數都打包到綁定 0 的單個統一緩衝區中。
+        // 生成統一緩衝區結構和綁定 (如果有的話)
+        let uniformBufferCode = '';
         if (shaderInfo.parameters.length > 0) {
-            const uniformBinding = getBinding('uniforms'); // 應該是 0
-            wgsl += `struct Uniforms {
-`;
+            uniformBufferCode += `struct Uniforms {\n`;
             shaderInfo.parameters.forEach(p => {
                 const type = p.type === 'int' ? 'i32' : 'f32';
-                wgsl += `    ${p.name}: ${type},\n`;
+                uniformBufferCode += `    ${p.name}: ${type},\n`;
             });
-            wgsl += `};
+            uniformBufferCode += `};
 `;
-            wgsl += `@group(0) @binding(${uniformBinding}) var<uniform> uniforms: Uniforms;\n\n`;
+            // Uniforms 始終綁定到 group 0, binding 0
+            uniformBufferCode += `@group(0) @binding(0) var<uniform> uniforms: Uniforms;\n\n`;
         }
 
-        // 2. 預先宣告所有紋理和取樣器以建立其綁定索引。
-        // 這確保了整個著色器模組中綁定佈局的一致性。
-        shaderInfo.textures.forEach(tex => getBinding(tex.name));
-        shaderInfo.samplers.forEach(samp => getBinding(samp.name));
-
-        // 3. 為所有紋理和取樣器寫入 WGSL 宣告及其分配的綁定。
-        shaderInfo.textures.forEach(tex => {
-            const binding = getBinding(tex.name);
-            // 如果紋理曾被用作輸出，則將其視為「儲存」紋理。
-            const isStorage = shaderInfo.passes.some(p => p.out.includes(tex.name));
-
-            if (isStorage) {
-                // 將 IR 中的格式映射到有效的 WGSL 儲存紋理格式。
-                const format = (tex.format || 'rgba8unorm').toLowerCase().replace(/_/g, '');
-                wgsl += `@group(0) @binding(${binding}) var ${tex.name}: texture_storage_2d<${format}, write>;\n`;
-            } else {
-                // 否則，它是採樣紋理。
-                wgsl += `@group(0) @binding(${binding}) var ${tex.name}: texture_2d<f32>;\n`;
-            }
-        });
-
-        shaderInfo.samplers.forEach(samp => {
-            const binding = getBinding(samp.name);
-            wgsl += `@group(0) @binding(${binding}) var ${samp.name}: sampler;\n`;
-        });
-        wgsl += '\n';
-
-        // 4. 注入通用程式碼區塊。
-        if (shaderInfo.commonCode) {
-            wgsl += `// --- 通用程式碼 ---\n`;
-            wgsl += `${shaderInfo.commonCode}\n\n`;
-        }
-
-        // 5. 為每個通道生成入口點函數。
         shaderInfo.passes.forEach(pass => {
+            let wgsl = `// 由 WGFX 組裝器生成 - 獨特註解: ${Date.now()} - Pass ${pass.index}\n\n`;
+            wgsl += commonCode;
+            wgsl += uniformBufferCode;
+
+            const passResources = {
+                textures: [],
+                samplers: [],
+                parameters: shaderInfo.parameters // Parameters are global for now
+            };
+
+            // 為此通道的紋理和取樣器分配綁定
+            let bindingIndex = (shaderInfo.parameters.length > 0) ? 1 : 0; // 如果有 uniforms，從 binding 1 開始
+
+            // 收集此通道使用的紋理和取樣器
+            const usedTextureNames = new Set([...pass.in, ...pass.out]);
+            const usedSamplerNames = new Set(pass.in.filter(name => shaderInfo.samplers.some(s => s.name === name))); // Samplers are only 'in'
+
+            // 宣告此通道使用的紋理
+            shaderInfo.textures.forEach(tex => {
+                if (usedTextureNames.has(tex.name)) {
+                    const isStorage = pass.out.includes(tex.name) || shaderInfo.passes.some(p => p.out.includes(tex.name) && p.index < pass.index && usedTextureNames.has(tex.name));
+                    const format = (tex.format || 'rgba8unorm').toLowerCase().replace(/_/g, '');
+
+                    if (isStorage) {
+                        wgsl += `@group(0) @binding(${bindingIndex}) var ${tex.name}: texture_storage_2d<${format}, write>;\n`;
+                    } else {
+                        wgsl += `@group(0) @binding(${bindingIndex}) var ${tex.name}: texture_2d<f32>;\n`;
+                    }
+                    passResources.textures.push({ ...tex, binding: bindingIndex, group: 0, isStorage: isStorage });
+                    bindingIndex++;
+                }
+            });
+
+            // 宣告此通道使用的取樣器
+            shaderInfo.samplers.forEach(samp => {
+                if (usedSamplerNames.has(samp.name)) {
+                    wgsl += `@group(0) @binding(${bindingIndex}) var ${samp.name}: sampler;\n`;
+                    passResources.samplers.push({ ...samp, binding: bindingIndex, group: 0 });
+                    bindingIndex++;
+                }
+            });
+            wgsl += '\n';
+
+            // 將通道的 WGSL 程式碼附加到模組中
             wgsl += `// --- 通道 ${pass.index} ---\n`;
-            const workgroupSize = pass.numThreads || [1, 1, 1];
-            wgsl += `@compute @workgroup_size(${workgroupSize.join(', ')})\n`;
-            wgsl += `fn pass_${pass.index}(@builtin(global_invocation_id) global_id: vec3<u32>) {\n`;
+            const passCode = pass.code.replace(/\/!.*\n/g, ''); // 移除任何剩餘的 //! 指令
+            wgsl += `${passCode}\n\n`;
 
-            // 通道程式碼假定為 WGSL。我們只刪除任何剩餘的 `//!` 指令。
-            const passCode = pass.code.replace(/\/!.*\n/g, '');
-
-            // 縮排並將使用者的通道程式碼添加到函數主體中。
-            wgsl += `    ${passCode.split('\n').join('\n    ')}\n`;
-            wgsl += `}\n\n`;
+            generatedModules.push({
+                wgslCode: wgsl.replace(/\r\n/g, '\n'),
+                passIndex: pass.index,
+                resources: passResources
+            });
         });
 
-        return wgsl;
+        return generatedModules;
     }
 }

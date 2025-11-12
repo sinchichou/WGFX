@@ -22,10 +22,9 @@ let runtimeInstance = null;
  * @returns {Promise<void>} 編譯完成時解析的 Promise。
  */
 export async function compile(effectCode, device) {
-    if (!runtimeInstance) {
-        runtimeInstance = new WGFXRuntime(device);
-    }
+    runtimeInstance = new WGFXRuntime(device);
     await runtimeInstance.compile(effectCode);
+    return runtimeInstance.shaderInfo;
 }
 
 /**

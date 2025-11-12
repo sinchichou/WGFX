@@ -5,8 +5,6 @@
  * 此類別提供一個簡單的 API，用於在運行時更改統一值。
  */
 
-import * as WebGPUMock from './WebGPU-mock.js';
-
 let GPUDevice;
 
 try {

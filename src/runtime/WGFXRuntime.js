@@ -11,26 +11,15 @@ import {ResourceManager} from './ResourceManager.js';
 import {PipelineManager} from './PipelineManager.js';
 import {WGSLCodeGenerator} from './WGSLCodeGenerator.js';
 import {UniformBinder} from './UniformBinder.js';
-import * as WebGPUMock from './WebGPU-mock.js';
-
-let GPUDevice;
-
-try {
-    if (globalThis.GPUDevice) {
-        GPUDevice = globalThis.GPUDevice;
-    } else {
-        GPUDevice = WebGPUMock.GPUDevice;
-    }
-} catch (e) {
-    GPUDevice = WebGPUMock.GPUDevice;
-}
-
 export class WGFXRuntime {
     /**
-     * @param {GPUDevice} [device] - 作用中的 WebGPU 裝置。
+     * @param {GPUDevice} device - 作用中的 WebGPU 裝置。
      */
     constructor(device) {
-        this.device = device || new GPUDevice();
+        if (!device) {
+            throw new Error("WGFXRuntime 需要一個有效的 WebGPU 裝置。未提供裝置。");
+        }
+        this.device = device;
 
         // 實例化所有必要的子模組。
         this.parser = new ShaderParser();
@@ -60,9 +49,9 @@ export class WGFXRuntime {
         console.log("WGFXRuntime: 已解析 ShaderInfo (IR):", this.shaderInfo);
 
         // 2. 從 IR 生成單個 WGSL 著色器模組。
-        const wgslCode = this.wgslCodeGenerator.generate(this.shaderInfo);
+        const generatedModules = this.wgslCodeGenerator.generate(this.shaderInfo);
         if (this.parser.debug) {
-            console.log("WGFXRuntime: 已生成 WGSL:\n", wgslCode);
+            console.log("WGFXRuntime: 已生成 WGSL 模組:", generatedModules);
         }
 
         // 3. 根據 IR 初始化所有 GPU 資源 (紋理、取樣器、緩衝區)。
@@ -70,7 +59,7 @@ export class WGFXRuntime {
         console.log("WGFXRuntime: 資源已初始化。");
 
         // 4. 為每個通道建立計算管線。
-        await this.pipelineManager.createPipelines(this.shaderInfo, wgslCode);
+        await this.pipelineManager.createPipelines(this.shaderInfo, generatedModules);
         console.log("WGFXRuntime: 管線已建立。");
 
         console.log("WGFXRuntime: 編譯完成。");

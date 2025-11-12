@@ -189,7 +189,10 @@ fn Pass1(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 //!NUM_THREADS 64
 
 @compute @workgroup_size(64, 1, 1)
-fn Pass2(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
+fn Pass2(
+    @builtin(workgroup_id) workgroup_id: uint3,
+    @builtin(local_invocation_id) local_id: uint3
+) {
     let gxy: uint2 = Rmp8x8(threadId.x) + blockStart;
     let inputSize: uint2 = GetInputSize();
 

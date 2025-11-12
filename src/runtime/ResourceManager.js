@@ -6,10 +6,7 @@
  * 提供一個中心位置，可以按名稱存取這些資源。
  */
 
-import * as WebGPUMock from './WebGPU-mock.js';
-
-let
-    GPUDevice, GPUTextureUsage, GPUBufferUsage;
+let GPUDevice, GPUTextureUsage, GPUBufferUsage;
 
 // 在 Node.js 環境中，WebGPU 物件不存在。我們建立模擬物件
 // 以允許程式碼在沒有實際 GPU 的情況下執行。

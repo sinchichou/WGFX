@@ -6,40 +6,30 @@
  * 包括管線佈局、管線和綁定組。
  */
 
-import * as WebGPUMock from './WebGPU-mock.js';
-
-let
-    GPUDevice, GPUShaderStage;
-
-try {
-    if (globalThis.GPUDevice) {
-        GPUDevice = globalThis.GPUDevice;
-        GPUShaderStage = globalThis.GPUShaderStage;
-    } else {
-        GPUDevice = WebGPUMock.GPUDevice;
-        GPUShaderStage = WebGPUMock.GPUShaderStage;
-    }
-} catch (e) {
-    GPUDevice = WebGPUMock.GPUDevice;
-    GPUShaderStage = WebGPUMock.GPUShaderStage;
-}
-
-
 export class PipelineManager {
     /**
-     * @param {GPUDevice} [device] - 作用中的 WebGPU 裝置。
+     * @param {GPUDevice} device - 作用中的 WebGPU 裝置。
      * @param {import('./ResourceManager.js').ResourceManager} resourceManager - 資源管理器的實例。
      */
     constructor(device, resourceManager) {
-        this.device = device || new GPUDevice();
+        this.device = device;
         this.resourceManager = resourceManager;
 
-        /** @type {Map<number, import('./WebGPU-mock.js').GPUComputePipeline>} */
+        /**
+         * @type {Map<number, {
+         *   shaderModule: GPUShaderModule,
+         *   bindGroupLayout: GPUBindGroupLayout,
+         *   pipelineLayout: GPUPipelineLayout,
+         *   computePipeline: GPUComputePipeline,
+         *   resources: {
+         *     textures: import('./Parser.js').WGFXTexture[],
+         *     samplers: import('./Parser.js').WGFXSampler[],
+         *     parameters: import('./Parser.js').WGFXParameter[]
+         *   },
+         *   passInfo: import('./Parser.js').WGFXPass
+         * }>}
+         */
         this.pipelines = new Map();
-        /** @type {Map<number, import('./WebGPU-mock.js').GPUBindGroup>} */
-        this.bindGroups = new Map(); // 注意：目前在每次調度時重新建立。
-        /** @type {Map<number, import('./WebGPU-mock.js').GPUBindGroupLayout>} */
-        this.bindGroupLayouts = new Map();
     }
 
     /**
@@ -47,80 +37,82 @@ export class PipelineManager {
      * @param {import('./Parser.js').WGFXShaderInfo} shaderInfo - 解析後的著色器資訊 (IR)。
      * @param {string} compiledWGSL - 完整、生成的 WGSL 著色器程式碼。
      */
-    async createPipelines(shaderInfo, compiledWGSL) {
-        const shaderModule = this.device.createShaderModule({
-            label: 'WGFX 著色器模組',
-            code: compiledWGSL,
-        });
+    async createPipelines(shaderInfo, generatedModules) {
+        this.pipelines.clear(); // Clear any existing pipelines
 
-        // 為簡化起見，此實作對所有通道使用單一、共享的綁定組佈局。
-        // 它包含著色器中宣告的每個資源。更優化的方法可能會
-        // 根據每個通道使用的特定資源建立不同的佈局。
-        const layoutEntries = [];
-        let bindingIndex = 0;
+        for (const module of generatedModules) {
+            const pass = shaderInfo.passes.find(p => p.index === module.passIndex);
+            if (!pass) {
+                console.warn(`WGFXRuntime: Pass with index ${module.passIndex} not found in shaderInfo.`);
+                continue;
+            }
 
-        // uniform 緩衝區的條目 (如果存在)。
-        if (this.resourceManager.getUniformBuffer()) {
-            layoutEntries.push({
-                binding: bindingIndex++,
-                visibility: GPUShaderStage.COMPUTE,
-                buffer: {type: 'uniform'},
+            // 1. Create GPUShaderModule
+            const shaderModule = this.device.createShaderModule({
+                code: module.wgslCode,
+                label: `Pass ${module.passIndex} Shader Module`
             });
-        }
 
-        // 紋理的條目。
-        // 警告：此簡化實作依賴於綁定的固定、排序順序。
-        // 穩健的解決方案應在程式碼生成器和此管理器之間使用共享綁定映射。
-        const sortedTextureNames = [...this.resourceManager.textures.keys()].sort();
-        sortedTextureNames.forEach(name => {
-            const texInfo = shaderInfo.textures.find(t => t.name === name) || {name};
-            const isStorage = shaderInfo.passes.some(p => p.out.includes(name));
-            layoutEntries.push({
-                binding: bindingIndex++,
-                visibility: GPUShaderStage.COMPUTE,
-                ...(isStorage
-                        ? {
-                            storageTexture: {
-                                access: 'write-only',
-                                format: (texInfo.format || 'rgba8unorm').toLowerCase().replace(/_/g, '')
-                            }
-                        }
-                        : {texture: {}}
-                ),
+            // 2. Create GPUBindGroupLayout
+            const bindGroupLayoutEntries = [];
+
+            // Uniforms (always binding 0 if present)
+            if (module.resources.parameters.length > 0) {
+                bindGroupLayoutEntries.push({
+                    binding: 0,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: { type: 'uniform' }
+                });
+            }
+
+            // Textures
+            module.resources.textures.forEach(tex => {
+                bindGroupLayoutEntries.push({
+                    binding: tex.binding,
+                    visibility: GPUShaderStage.COMPUTE,
+                    ...(tex.isStorage ? { storageTexture: { format: tex.format, access: 'write-only' } } : { texture: { sampleType: 'float' } })
+                });
             });
-        });
 
-        // 取樣器的條目。
-        const sortedSamplerNames = [...this.resourceManager.samplers.keys()].sort();
-        sortedSamplerNames.forEach(name => {
-            layoutEntries.push({
-                binding: bindingIndex++,
-                visibility: GPUShaderStage.COMPUTE,
-                sampler: {},
+            // Samplers
+            module.resources.samplers.forEach(samp => {
+                bindGroupLayoutEntries.push({
+                    binding: samp.binding,
+                    visibility: GPUShaderStage.COMPUTE,
+                    sampler: { type: 'filtering' }
+                });
             });
-        });
 
-        const bindGroupLayout = this.device.createBindGroupLayout({
-            label: 'WGFX 主綁定組佈局',
-            entries: layoutEntries,
-        });
+            const bindGroupLayout = this.device.createBindGroupLayout({
+                entries: bindGroupLayoutEntries,
+                label: `Pass ${module.passIndex} Bind Group Layout`
+            });
 
-        const pipelineLayout = this.device.createPipelineLayout({
-            bindGroupLayouts: [bindGroupLayout],
-        });
+            // 3. Create GPUPipelineLayout
+            const pipelineLayout = this.device.createPipelineLayout({
+                bindGroupLayouts: [bindGroupLayout],
+                label: `Pass ${module.passIndex} Pipeline Layout`
+            });
 
-        // 為 IR 中定義的每個通道建立計算管線。
-        for (const pass of shaderInfo.passes) {
-            const pipeline = await this.device.createComputePipelineAsync({
-                label: `WGFX 通道 ${pass.index} 的管線`,
+            // 4. Create GPUComputePipeline
+            const computePipeline = await this.device.createComputePipelineAsync({
                 layout: pipelineLayout,
                 compute: {
                     module: shaderModule,
-                    entryPoint: `pass_${pass.index}`, // 入口點名稱與 WGSLCodeGenerator 中的名稱匹配。
+                    entryPoint: 'main_cs', // Assuming 'main_cs' is the entry point for all compute shaders
                 },
+                label: `Pass ${module.passIndex} Compute Pipeline`
             });
-            this.pipelines.set(pass.index, pipeline);
-            this.bindGroupLayouts.set(pass.index, bindGroupLayout); // 儲存佈局以供調度時使用。
+
+            // Store the pipeline components
+            this.pipelines.set(module.passIndex, {
+                shaderModule,
+                bindGroupLayout,
+                pipelineLayout,
+                computePipeline,
+                resources: module.resources, // Store resources for bind group creation later
+                passInfo: pass // Store original pass info for dispatching
+            });
         }
     }
 
@@ -130,49 +122,59 @@ export class PipelineManager {
      * @param {GPUCommandEncoder} commandEncoder - 當前幀的命令編碼器。
      */
     dispatchPass(passInfo, commandEncoder) {
-        const pipeline = this.pipelines.get(passInfo.index);
-        if (!pipeline) {
+        const storedPipeline = this.pipelines.get(passInfo.index);
+        if (!storedPipeline) {
             throw new Error(`找不到通道 ${passInfo.index} 的管線。是否已編譯？`);
         }
 
-        // 為此調度即時建立 BindGroup。
-        // 如果資源視圖保證在調度之間不變，則可以快取此操作。
-        const bindGroupLayout = this.bindGroupLayouts.get(passInfo.index);
-        const entries = [];
+        const { computePipeline, bindGroupLayout, resources, passInfo: originalPassInfo } = storedPipeline;
+
+        const bindGroupEntries = [];
         let bindingIndex = 0;
 
-        // 綁定 uniform 緩衝區 (如果存在)。
-        const uniformBuffer = this.resourceManager.getUniformBuffer();
-        if (uniformBuffer) {
-            entries.push({binding: bindingIndex++, resource: {buffer: uniformBuffer}});
+        // Uniforms (binding 0 if present)
+        if (resources.parameters.length > 0) {
+            const uniformBuffer = this.resourceManager.getUniformBuffer();
+            if (!uniformBuffer) {
+                throw new Error("Uniform buffer not found in ResourceManager.");
+            }
+            bindGroupEntries.push({ binding: bindingIndex++, resource: { buffer: uniformBuffer } });
         }
 
-        // 以用於佈局的相同排序順序綁定紋理和取樣器。
-        const sortedTextureNames = [...this.resourceManager.textures.keys()].sort();
-        sortedTextureNames.forEach(name => {
-            entries.push({binding: bindingIndex++, resource: this.resourceManager.getTexture(name).createView()});
+        // Textures
+        resources.textures.forEach(tex => {
+            const texture = this.resourceManager.getTexture(tex.name);
+            if (!texture) {
+                throw new Error(`Texture ${tex.name} not found in ResourceManager.`);
+            }
+            bindGroupEntries.push({ binding: bindingIndex++, resource: texture.createView() });
         });
 
-        const sortedSamplerNames = [...this.resourceManager.samplers.keys()].sort();
-        sortedSamplerNames.forEach(name => {
-            entries.push({binding: bindingIndex++, resource: this.resourceManager.getSampler(name)});
+        // Samplers
+        resources.samplers.forEach(samp => {
+            const sampler = this.resourceManager.getSampler(samp.name);
+            if (!sampler) {
+                throw new Error(`Sampler ${samp.name} not found in ResourceManager.`);
+            }
+            bindGroupEntries.push({ binding: bindingIndex++, resource: sampler });
         });
 
         const bindGroup = this.device.createBindGroup({
             layout: bindGroupLayout,
-            entries,
+            entries: bindGroupEntries,
+            label: `Pass ${passInfo.index} Bind Group`
         });
 
         // 編碼計算通道命令。
         const passEncoder = commandEncoder.beginComputePass();
-        passEncoder.setPipeline(pipeline);
+        passEncoder.setPipeline(computePipeline);
         passEncoder.setBindGroup(0, bindGroup);
 
         // 計算要調度的工作組數量。
         // 這基於主要輸出紋理的大小和工作組大小。
-        const outputTextureName = passInfo.out[0]; // 假定第一個輸出是主要輸出，用於確定大小。
+        const outputTextureName = originalPassInfo.out[0]; // 假定第一個輸出是主要輸出，用於確定大小。
         const outputTexture = this.resourceManager.getTexture(outputTextureName);
-        const workgroupSize = passInfo.numThreads; // 例如，[8, 8, 1]
+        const workgroupSize = originalPassInfo.numThreads; // 例如，[8, 8, 1]
 
         const dispatchX = Math.ceil(outputTexture.width / workgroupSize[0]);
         const dispatchY = Math.ceil(outputTexture.height / workgroupSize[1]);
@@ -186,8 +188,6 @@ export class PipelineManager {
      */
     dispose() {
         this.pipelines.clear();
-        this.bindGroups.clear();
-        this.bindGroupLayouts.clear();
         console.log("PipelineManager: 已清除所有儲存的管線狀態。");
     }
 }

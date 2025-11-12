@@ -2,7 +2,7 @@
 
 /**
  * @fileoverview WGFX 著色器檔案的核心解析器。
- * 此解析器讀取 .fx 檔案字串，並將其轉換為結構化的
+ * 此解析器讀取 .wgsl 檔案字串，並將其轉換為結構化的
  * 中介表示 (IR) 物件，即 `WGFXShaderInfo`。
  * 它遵循 README 中定義的基於區塊的指令系統 (`//! DIRECTIVE`)。
  */
@@ -153,14 +153,27 @@ export class ShaderParser {
             } else if (currentBlock === 'PASS') {
                 passCodeBuffer.push(line);
             } else if (trimmedLine && !trimmedLine.startsWith('//')) {
-                // 這是一行宣告 (例如，"float Strength;")。
-                // 它為當前區塊提供 `type` 和 `name`。
+                // 這是一行宣告 (例如，"float Strength;" 或 "var myTex: texture_2d<f32>;")
                 if (currentData) {
-                    const declMatch = trimmedLine.match(/(\w+)\s+(\w+);/);
+                    // 嘗試 HLSL 風格：Texture2D MyTex; 或 float Strength;
+                    let declMatch = trimmedLine.match(/(\w+)\s+(\w+);/);
                     if (declMatch) {
                         const [, type, name] = declMatch;
                         currentData.type = type;
                         currentData.name = name;
+                        if (!currentData.id) {
+                            currentData.id = name;
+                        }
+                    } else {
+                        // 嘗試 WGSL 風格：var my_tex: texture_2d<f32>;
+                        declMatch = trimmedLine.match(/var\s+(\w+)\s*:/);
+                        if (declMatch) {
+                            const [, name] = declMatch;
+                            currentData.name = name;
+                            if (!currentData.id) {
+                                currentData.id = name;
+                            }
+                        }
                     }
                 }
             }
@@ -211,6 +224,14 @@ export class ShaderParser {
             case 'max':
             case 'step':
                 data[lowerDirective] = parseFloat(value);
+                break;
+            case 'format':
+                // 翻譯不支援的格式
+                if (value.toLowerCase() === 'r16g16b16a16_float') {
+                    data[lowerDirective] = 'rgba16float';
+                } else {
+                    data[lowerDirective] = value;
+                }
                 break;
             default:
                 data[lowerDirective] = value;
