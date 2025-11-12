@@ -257,15 +257,15 @@ fn Pass2(
     let nh2: MF4 = max(-h2, MF4(0.0));
     let ni2: MF4 = max(-i2, MF4(0.0));
 
-    var a2 =  max(a2, MF4(0.0));
-    var b2 =  max(b2, MF4(0.0));
-    var c2 =  max(c2, MF4(0.0));
-    var d2 =  max(d2, MF4(0.0));
-    var e2 =  max(e2, MF4(0.0));
-    var f2 =  max(f2, MF4(0.0));
-    var g2 =  max(g2, MF4(0.0));
-    var h2 =  max(h2, MF4(0.0));
-    var i2 =  max(i2, MF4(0.0));
+    a2 =  max(a2, MF4(0.0));
+    b2 =  max(b2, MF4(0.0));
+    c2 =  max(c2, MF4(0.0));
+    d2 =  max(d2, MF4(0.0));
+    e2 =  max(e2, MF4(0.0));
+    f2 =  max(f2, MF4(0.0));
+    g2 =  max(g2, MF4(0.0));
+    h2 =  max(h2, MF4(0.0));
+    i2 =  max(i2, MF4(0.0));
 
     var a3: MF4 = textureSampleLevel(tex3, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
     var b3: MF4 = textureSampleLevel(tex3, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
@@ -287,15 +287,15 @@ fn Pass2(
     let nh3: MF4 = max(-h3, MF4(0.0));
     let ni3: MF4 = max(-i3, MF4(0.0));
 
-    var a3 =  max(a3, MF4(0.0));
-    var b3 =  max(b3, MF4(0.0));
-    var c3 =  max(c3, MF4(0.0));
-    var d3 =  max(d3, MF4(0.0));
-    var e3 =  max(e3, MF4(0.0));
-    var f3 =  max(f3, MF4(0.0));
-    var g3 =  max(g3, MF4(0.0));
-    var h3 =  max(h3, MF4(0.0));
-    var i3 =  max(i3, MF4(0.0));
+    a3 =  max(a3, MF4(0.0));
+    b3 =  max(b3, MF4(0.0));
+    c3 =  max(c3, MF4(0.0));
+    d3 =  max(d3, MF4(0.0));
+    e3 =  max(e3, MF4(0.0));
+    f3 =  max(f3, MF4(0.0));
+    g3 =  max(g3, MF4(0.0));
+    h3 =  max(h3, MF4(0.0));
+    i3 =  max(i3, MF4(0.0));
 
     let target1: MF4 = MF4(-0.17880301, 0.20980668, -0.013683405, -0.015587634);
     target1 = (a1 * MF4x4(-0.09962672, -0.09808486, 0.14167309, 0.050132442, 0.10861549, -0.03472704, -0.13705672, -0.029933043, 0.09841877, 0.07278074, -0.017292077, -0.027848938, 0.07552298, 0.076578915, -0.023463586, 0.052939452) + target1);
