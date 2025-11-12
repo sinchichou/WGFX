@@ -5,20 +5,40 @@
  * 此類別接收著色器 IR 和 WGSL 程式碼，以建立執行所需的 GPU 狀態，
  * 包括管線佈局、管線和綁定組。
  */
+
+import * as WebGPUMock from './WebGPU-mock.js';
+
+let
+    GPUDevice, GPUShaderStage;
+
+try {
+    if (globalThis.GPUDevice) {
+        GPUDevice = globalThis.GPUDevice;
+        GPUShaderStage = globalThis.GPUShaderStage;
+    } else {
+        GPUDevice = WebGPUMock.GPUDevice;
+        GPUShaderStage = WebGPUMock.GPUShaderStage;
+    }
+} catch (e) {
+    GPUDevice = WebGPUMock.GPUDevice;
+    GPUShaderStage = WebGPUMock.GPUShaderStage;
+}
+
+
 export class PipelineManager {
     /**
-     * @param {GPUDevice} device - 作用中的 WebGPU 裝置。
+     * @param {GPUDevice} [device] - 作用中的 WebGPU 裝置。
      * @param {import('./ResourceManager.js').ResourceManager} resourceManager - 資源管理器的實例。
      */
     constructor(device, resourceManager) {
-        this.device = device;
+        this.device = device || new GPUDevice();
         this.resourceManager = resourceManager;
 
-        /** @type {Map<number, GPUComputePipeline>} */
+        /** @type {Map<number, import('./WebGPU-mock.js').GPUComputePipeline>} */
         this.pipelines = new Map();
-        /** @type {Map<number, GPUBindGroup>} */
+        /** @type {Map<number, import('./WebGPU-mock.js').GPUBindGroup>} */
         this.bindGroups = new Map(); // 注意：目前在每次調度時重新建立。
-        /** @type {Map<number, GPUBindGroupLayout>} */
+        /** @type {Map<number, import('./WebGPU-mock.js').GPUBindGroupLayout>} */
         this.bindGroupLayouts = new Map();
     }
 

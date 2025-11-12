@@ -99,49 +99,58 @@ export class ShaderParser {
         let currentData = null;  // 為當前區塊建立的物件。
         let passCodeBuffer = []; // 用於在 PASS 區塊內累積程式碼行的緩衝區。
 
+        const globalDirectives = ['MAGPIE EFFECT', 'VERSION', 'SORT_NAME', 'USE', 'CAPABILITY'];
+        const blockStartDirectives = ['PARAMETER', 'TEXTURE', 'SAMPLER', 'COMMON', 'PASS'];
+
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const trimmedLine = line.trim();
 
-            // 這行是指令嗎？
             if (trimmedLine.startsWith('//!')) {
-                // 如果我們在 PASS 區塊中，則其程式碼在此結束。
+                // 指令總是結束 PASS 程式碼區塊
                 if (currentBlock === 'PASS' && passCodeBuffer.length > 0) {
                     currentData.code = passCodeBuffer.join('\n');
                     passCodeBuffer = [];
                 }
-                // 新指令總是提交前一個區塊的資料。
-                if (currentData) {
-                    this._commitBlock(info, currentBlock, currentData);
-                    currentData = null;
-                }
 
-                // 解析指令本身。
                 const [directive, ...args] = trimmedLine.substring(3).trim().split(/\s+/);
                 const value = args.join(' ');
 
-                // 這是頂層區塊指令嗎？
-                if (!currentBlock || ['PARAMETER', 'TEXTURE', 'SAMPLER', 'COMMON', 'PASS'].includes(directive)) {
+                // 如果是區塊起始指令，我們必須提交前一個區塊。
+                if (blockStartDirectives.includes(directive)) {
+                    if (currentData) {
+                        this._commitBlock(info, currentBlock, currentData);
+                    }
                     currentBlock = directive;
                     if (currentBlock === 'COMMON') {
-                        // COMMON 區塊很特殊；它只收集原始行。
-                        currentData = {lines: []};
+                        currentData = { lines: [] };
                     } else {
-                        // 其他區塊以 ID 開頭。
-                        currentData = {id: value};
+                        currentData = { id: value };
                         if (currentBlock === 'PASS') {
                             currentData.index = parseInt(value, 10);
                         }
                     }
-                } else {
-                    // 這是當前區塊的子指令 (例如，PARAMETER 的 //! MIN)。
+                }
+                // 如果是全域指令，我們也提交，但立即處理它。
+                else if (globalDirectives.includes(directive)) {
+                    if (currentData) {
+                        this._commitBlock(info, currentBlock, currentData);
+                    }
+                    // 這些不是開始一個“區塊”，它們是自包含的。
+                    this._commitBlock(info, directive, { id: value });
+                    currentBlock = null;
+                    currentData = null;
+                }
+                // 否則，它是當前區塊的子指令。
+                else {
+                    if (!currentData) {
+                        throw new Error(`指令 '//! ${directive}' 不能在此處使用，因為它不在有效的區塊內 (例如, //! TEXTURE 或 //! PARAMETER)。`);
+                    }
                     this._parseSubDirective(currentData, directive, value);
                 }
             } else if (currentBlock === 'COMMON') {
-                // 如果我們在 COMMON 區塊中，只需附加該行。
                 currentData.lines.push(line);
             } else if (currentBlock === 'PASS') {
-                // 如果我們在 PASS 區塊中，將該行附加到其程式碼緩衝區。
                 passCodeBuffer.push(line);
             } else if (trimmedLine && !trimmedLine.startsWith('//')) {
                 // 這是一行宣告 (例如，"float Strength;")。
@@ -257,7 +266,26 @@ export class ShaderParser {
      */
     _validate(info) {
         if (info.metadata.version === undefined) {
-            throw new Error("`//! VERSION` 是必需的。 উত্ত");
+            throw new Error("`//! VERSION` 是必需的。");
+        }
+
+        // 驗證參數
+        for (const param of info.parameters) {
+            if (param.default === undefined || param.min === undefined || param.max === undefined || param.step === undefined) {
+                throw new Error(`參數 "${param.name}" 缺少一個或多個必要指令：DEFAULT, MIN, MAX, STEP。`);
+            }
+            if (param.min > param.max) {
+                throw new Error(`參數 "${param.name}" 的 MIN (${param.min}) 不能大於 MAX (${param.max})。`);
+            }
+            if (param.default < param.min || param.default > param.max) {
+                throw new Error(`參數 "${param.name}" 的 DEFAULT (${param.default}) 必須在 MIN (${param.min}) 和 MAX (${param.max}) 之間。`);
+            }
+        }
+
+        // 驗證通道
+        if (info.passes.length === 0) {
+            console.warn("警告：在著色器中未定義任何通道。");
+            return;
         }
 
         // 驗證通道索引是否連續。
@@ -267,11 +295,31 @@ export class ShaderParser {
             if (info.passes[i].index !== i + expectedStartIndex) {
                 throw new Error(`通道索引必須連續。預期為 ${i + expectedStartIndex}，但找到 ${info.passes[i].index}。`);
             }
-        }
 
-        // TODO: 添加 README 中的更多驗證檢查，例如：
-        // - PARAMETER 的必需欄位 (DEFAULT, MIN, MAX, STEP)。
-        // - 通道 IN/OUT 規則。
-        // - 非 PS 樣式的 BLOCK_SIZE/NUM_THREADS 規則。
+            const pass = info.passes[i];
+            if (!pass.in || !pass.out) {
+                throw new Error(`通道 ${pass.index} 必須同時指定 IN 和 OUT 紋理。`);
+            }
+
+            const style = pass.style?.toUpperCase() || 'CS';
+            if (style === 'CS') {
+                if (!pass.blockSize || !pass.numThreads) {
+                    throw new Error(`計算著色器通道 ${pass.index} 必須指定 BLOCK_SIZE 和 NUM_THREADS。`);
+                }
+            }
+
+            // 驗證中間通道的輸出
+            const isLastPass = i === info.passes.length - 1;
+            if (!isLastPass) {
+                if (pass.out.includes('INPUT') || pass.out.includes('OUTPUT')) {
+                    throw new Error(`中間通道 ${pass.index} 的輸出不能是 'INPUT' 或 'OUTPUT'。`);
+                }
+            } else {
+                // 驗證最後一個通道的輸出
+                if (!pass.out.includes('OUTPUT')) {
+                    throw new Error(`最後一個通道 ${pass.index} 的輸出必須是 'OUTPUT'。`);
+                }
+            }
+        }
     }
 }
