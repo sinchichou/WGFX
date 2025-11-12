@@ -15,6 +15,7 @@
 ```
 WGFX/
 ├─ package.json              # Node.js 專案設定、依賴管理
+├─ package-lock.json         # Node.js 依賴鎖定檔案
 ├─ README.md                 # 專案說明、使用指南
 ├─ src/
 │   ├─ index.js              # 專案對外的主要接口 (API Entry Point)
@@ -38,6 +39,9 @@ WGFX/
 │       ├─ FunctionOverloadResolver.js # 函數重載解析
 │       ├─ MacroExpander.js    # 巨集 (Macro) 展開
 │       └─ FileUtils.js      # 檔案讀寫與 Zip 處理
+│
+├─ test/                     # 測試檔案
+│   └─ test_runtime.js       # Runtime API 測試範例
 │
 └─ examples/                 # 範例
     ├─ demo.wgsl             # 範例特效檔案
