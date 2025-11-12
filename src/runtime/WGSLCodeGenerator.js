@@ -151,15 +151,14 @@ export class WGSLCodeGenerator {
 
             // Replace fn PassX with fn main_cs
             // This regex captures the parameters to preserve them
-            const passFunctionSignatureRegex = new RegExp(`fn Pass${pass.index}\\s*\\(([^)]*)\\)\\s*\\{`);
+            const passFunctionSignatureRegex = new RegExp(`fn Pass${pass.index}`);
             processedPassCode = processedPassCode.replace(
                 passFunctionSignatureRegex,
-                `fn main_cs($1) {` // Use $1 to re-insert captured parameters
+                `fn main_cs ` // Use $1 to re-insert captured parameters
             );
 
             // Prepend the @compute @workgroup_size attributes
-            processedPassCode = `@compute @workgroup_size(${numThreads[0]}, ${numThreads[1]}, ${numThreads[2]})
-${processedPassCode}`;
+            processedPassCode = `@compute @workgroup_size(${numThreads[0]}, ${numThreads[1]}, ${numThreads[2]}) ${processedPassCode}`;
 
             wgsl += processedPassCode;
 
