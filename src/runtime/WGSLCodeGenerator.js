@@ -17,6 +17,46 @@ export class WGSLCodeGenerator {
         // 不需要複雜的轉譯邏輯。
     }
 
+    _preprocessPassCode(passCode, passIndex) {
+        let processedCode = passCode;
+
+        // Replace threadId.x with local_id.x
+        processedCode = processedCode.replace(/threadId\.x/g, 'local_id.x');
+
+        // Apply gxy fixes based on passIndex
+        if (passIndex === 1) {
+            // Pass1: let gxy = (Rmp8x8(local_id.x) << 1u) + workgroup_id.xy;
+            // Change to: let gxy = (Rmp8x8(local_id.x) * 2u) + workgroup_id.xy;
+            processedCode = processedCode.replace(
+                /let gxy = \(Rmp8x8\(local_id\.x\) << 1u\) \+ workgroup_id\.xy;/,
+                'let gxy = (Rmp8x8(local_id.x) * 2u) + workgroup_id.xy;'
+            );
+        } else if (passIndex >= 2 && passIndex <= 7) {
+            // Pass2-Pass7: let gxy: uint2 = Rmp8x8(local_id.x) + blockStart;
+            // Change to: let gxy: uint2 = Rmp8x8(local_id.x) + workgroup_id.xy * 8u;
+            processedCode = processedCode.replace(
+                /let gxy: uint2 = Rmp8x8\(local_id\.x\) \+ blockStart;/,
+                'let gxy: uint2 = Rmp8x8(local_id.x) + workgroup_id.xy * 8u;'
+            );
+        } else if (passIndex === 8) {
+            // Pass8: let gxy: uint2 = Rmp8x8(local_id.x) + workgroup_id.xy;
+            // Change to: let gxy: uint2 = Rmp8x8(local_id.x) + workgroup_id.xy * 8u;
+            processedCode = processedCode.replace(
+                /let gxy: uint2 = Rmp8x8\(local_id\.x\) \+ workgroup_id\.xy;/,
+                'let gxy: uint2 = Rmp8x8(local_id.x) + workgroup_id.xy * 8u;'
+            );
+        }
+
+        // Fix variable redeclarations within a pass for specific patterns
+        // This targets lines like 'var a1 = max(a1, MF4(0.0));' where the variable is already declared.
+        processedCode = processedCode.replace(
+            /var\s+(a1|b1|c1|d1|e1|f1|g1|h1|i1|na1|nb1|nc1|nd1|ne1|nf1|ng1|nh1|ni1|na2|nb2|nc2|nd2|ne2|nf2|ng2|nh2|ni2|na3|nb3|nc3|nd3|ne3|nf3|ng3|nh3|ni3)\s+=\s+max\(\1,\s+MF4\(0\.0\)\);/g,
+            '$1 = max($1, MF4(0.0));'
+        );
+
+        return processedCode;
+    }
+
     /**
      * 從解析後的著色器資訊 (IR) 組裝一個最終的 WGSL 著色器模組。
      * @param {import('./Parser.js').WGFXShaderInfo} shaderInfo - 解析後的著色器資訊。
@@ -89,7 +129,7 @@ export class WGSLCodeGenerator {
             // 將通道的 WGSL 程式碼附加到模組中
             wgsl += `// --- 通道 ${pass.index} ---\n`;
             const passCode = pass.code.replace(/\/!.*\n/g, ''); // 移除任何剩餘的 //! 指令
-            wgsl += `${passCode}\n\n`;
+            wgsl += `${this._preprocessPassCode(passCode, pass.index)}\n\n`;
 
             generatedModules.push({
                 wgslCode: wgsl.replace(/\r\n/g, '\n'),
