@@ -11,20 +11,33 @@ import {ResourceManager} from './ResourceManager.js';
 import {PipelineManager} from './PipelineManager.js';
 import {WGSLCodeGenerator} from './WGSLCodeGenerator.js';
 import {UniformBinder} from './UniformBinder.js';
+import * as WebGPUMock from './WebGPU-mock.js';
+
+let GPUDevice;
+
+try {
+    if (globalThis.GPUDevice) {
+        GPUDevice = globalThis.GPUDevice;
+    } else {
+        GPUDevice = WebGPUMock.GPUDevice;
+    }
+} catch (e) {
+    GPUDevice = WebGPUMock.GPUDevice;
+}
 
 export class WGFXRuntime {
     /**
-     * @param {GPUDevice} device - 作用中的 WebGPU 裝置。
+     * @param {GPUDevice} [device] - 作用中的 WebGPU 裝置。
      */
     constructor(device) {
-        this.device = device;
+        this.device = device || new GPUDevice();
 
         // 實例化所有必要的子模組。
         this.parser = new ShaderParser();
-        this.resourceManager = new ResourceManager(device);
-        this.pipelineManager = new PipelineManager(device, this.resourceManager);
+        this.resourceManager = new ResourceManager(this.device);
+        this.pipelineManager = new PipelineManager(this.device, this.resourceManager);
         this.wgslCodeGenerator = new WGSLCodeGenerator();
-        this.uniformBinder = new UniformBinder(device, this.resourceManager);
+        this.uniformBinder = new UniformBinder(this.device, this.resourceManager);
 
         /**
          * 當前編譯著色器的中介表示。

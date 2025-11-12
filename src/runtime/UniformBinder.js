@@ -4,13 +4,28 @@
  * @fileoverview 處理統一緩衝區的動態更新。
  * 此類別提供一個簡單的 API，用於在運行時更改統一值。
  */
+
+import * as WebGPUMock from './WebGPU-mock.js';
+
+let GPUDevice;
+
+try {
+    if (globalThis.GPUDevice) {
+        GPUDevice = globalThis.GPUDevice;
+    } else {
+        GPUDevice = WebGPUMock.GPUDevice;
+    }
+} catch (e) {
+    GPUDevice = WebGPUMock.GPUDevice;
+}
+
 export class UniformBinder {
     /**
-     * @param {GPUDevice} device - 作用中的 WebGPU 裝置。
+     * @param {GPUDevice} [device] - 作用中的 WebGPU 裝置。
      * @param {import('./ResourceManager.js').ResourceManager} resourceManager - 資源管理器的實例。
      */
     constructor(device, resourceManager) {
-        this.device = device;
+        this.device = device || new GPUDevice();
         this.resourceManager = resourceManager;
     }
 

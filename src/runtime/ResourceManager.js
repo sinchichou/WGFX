@@ -5,25 +5,54 @@
  * 此類別根據著色器 IR 處理 GPUTexture、GPUSampler 和 GPUBuffer 物件，
  * 提供一個中心位置，可以按名稱存取這些資源。
  */
+
+import * as WebGPUMock from './WebGPU-mock.js';
+
+let
+    GPUDevice, GPUTextureUsage, GPUBufferUsage;
+
+// 在 Node.js 環境中，WebGPU 物件不存在。我們建立模擬物件
+// 以允許程式碼在沒有實際 GPU 的情況下執行。
+try {
+    // 嘗試在全域範圍內找到真實的 WebGPU 物件 (例如，在瀏覽器中)。
+    if (globalThis.GPUDevice) {
+        GPUDevice = globalThis.GPUDevice;
+        GPUTextureUsage = globalThis.GPUTextureUsage;
+        GPUBufferUsage = globalThis.GPUBufferUsage;
+    } else {
+        GPUDevice = WebGPUMock.GPUDevice;
+        GPUTextureUsage = WebGPUMock.GPUTextureUsage;
+        GPUBufferUsage = WebGPUMock.GPUBufferUsage;
+    }
+} catch (e) {
+    // 回退到模擬
+    GPUDevice = WebGPUMock.GPUDevice;
+    GPUTextureUsage = WebGPUMock.GPUTextureUsage;
+    GPUBufferUsage = WebGPUMock.GPUBufferUsage;
+}
+
+
+// --- 資源管理器實作 ---
+
 export class ResourceManager {
     /**
-     * @param {GPUDevice} device - 作用中的 WebGPU 裝置。
+     * @param {GPUDevice} [device] - 作用中的 WebGPU 裝置。如果未提供，將使用模擬裝置。
      */
     constructor(device) {
         /** @type {GPUDevice} */
-        this.device = device;
-        /** @type {Map<string, GPUTexture>} */
+        this.device = device || new GPUDevice();
+        /** @type {Map<string, import('./WebGPU-mock.js').GPUTexture>} */
         this.textures = new Map();
-        /** @type {Map<string, GPUSampler>} */
+        /** @type {Map<string, import('./WebGPU-mock.js').GPUSampler>} */
         this.samplers = new Map();
         /**
          * 儲存每個 uniform 的元資料，包括其在主緩衝區中的偏移量和大小。
-         * @type {Map<string, {buffer: GPUBuffer, offset: number, size: number}>}
+         * @type {Map<string, {buffer: import('./WebGPU-mock.js').GPUBuffer, offset: number, size: number}>}
          */
         this.uniforms = new Map();
         /**
          * 用於儲存所有 uniform 參數的單一 GPU 緩衝區。
-         * @type {GPUBuffer}
+         * @type {import('./WebGPU-mock.js').GPUBuffer}
          */
         this.uniformBuffer = null;
 
@@ -35,7 +64,7 @@ export class ResourceManager {
             usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
         });
         this.createTexture('OUTPUT', {
-            size: [1, 1], // 預設大小，應由實際輸出覆蓋
+            size: [1, 1], // 預設大小，應由實際輸入覆蓋
             format: 'rgba8unorm',
             usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING,
         });
