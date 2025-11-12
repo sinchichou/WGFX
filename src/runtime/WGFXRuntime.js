@@ -11,6 +11,7 @@ import {ResourceManager} from './ResourceManager.js';
 import {PipelineManager} from './PipelineManager.js';
 import {WGSLCodeGenerator} from './WGSLCodeGenerator.js';
 import {UniformBinder} from './UniformBinder.js';
+
 export class WGFXRuntime {
     /**
      * @param {GPUDevice} device - 作用中的 WebGPU 裝置。

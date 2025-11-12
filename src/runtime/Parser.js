@@ -29,6 +29,7 @@
  * @property {string} [format] - 紋理格式 (例如："R8G8B8A8_UNORM")。
  * @property {string} [width] - 寬度表達式 (例如："INPUT_WIDTH")。
  * @property {string} [height] - 高度表達式 (例如："INPUT_HEIGHT")。
+ * @property {number} [binding] - 綁定槽位。
  */
 
 /**
@@ -38,6 +39,7 @@
  * @property {string} id - 取樣器區塊的識別符 (例如："LinearSampler")。
  * @property {'LINEAR' | 'POINT'} filter - 濾波模式。
  * @property {'CLAMP' | 'WRAP'} [address] - 位址模式。
+ * @property {number} [binding] - 綁定槽位。
  */
 
 /**
@@ -174,6 +176,12 @@ export class ShaderParser {
                                 currentData.id = name;
                             }
                         }
+                    }
+
+                    // 提取 @binding 資訊
+                    const bindingMatch = trimmedLine.match(/@binding\((\d+)\)/);
+                    if (bindingMatch) {
+                        currentData.binding = parseInt(bindingMatch[1], 10);
                     }
                 }
             }
