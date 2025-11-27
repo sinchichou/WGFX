@@ -24,7 +24,7 @@ type MF3x4 = mat4x3<f32>;
 type MF4x2 = mat2x4<f32>;
 type MF4x3 = mat3x4<f32>;
 
- fn GetInputSize() -> uint2 {
+fn GetInputSize() -> uint2 {
     return uint2(0, 0);
 }
 
@@ -34,11 +34,6 @@ fn GetInputPt() -> MF2 {
 
 fn Rmp8x8(idx: u32) -> uint2 {
     return uint2(idx / 8u, idx % 8u);
-}
-
-struct Texture {
-    sampled: texture_2d<f32>,
-    storaged: texture_storage_2d<rgba32float, read_write>
 }
 
 //!TEXTURE
@@ -53,68 +48,72 @@ struct Texture {
 //!WIDTH INPUT_WIDTH
 //!HEIGHT INPUT_HEIGHT
 //!FORMAT R16G16B16A16_FLOAT
-@group(0) @binding(2) var tex1_sampled: texture_2d<f32>;
-@group(0) @binding(3) var tex1_storaged: texture_storage_2d<rgba16float, read_write>;
-const tex1: Texture = Texture(tex1_sampled, tex1_storaged);
+@group(1) @binding(0) var tex1_sampled: texture_2d<f32>;
+@group(2) @binding(0) var tex1_storaged: texture_storage_2d<rgba16float, read_write>;
 
 //!TEXTURE
 //!WIDTH INPUT_WIDTH
 //!HEIGHT INPUT_HEIGHT
 //!FORMAT R16G16B16A16_FLOAT
-@group(0) @binding(3) var tex2: texture_storage_2d<rgba16float, read_write>;
+@group(1) @binding(1) var tex2_sampled: texture_2d<f32>;
+@group(2) @binding(1) var tex2_storaged: texture_storage_2d<rgba16float, read_write>;
 
 //!TEXTURE
 //!WIDTH INPUT_WIDTH
 //!HEIGHT INPUT_HEIGHT
 //!FORMAT R16G16B16A16_FLOAT
-@group(0) @binding(4) var tex3: texture_storage_2d<rgba16float, read_write>;
+@group(1) @binding(2) var tex3_sampled: texture_2d<f32>;
+@group(2) @binding(2) var tex3_storaged: texture_storage_2d<rgba16float, read_write>;
 
 //!TEXTURE
 //!WIDTH INPUT_WIDTH
 //!HEIGHT INPUT_HEIGHT
 //!FORMAT R16G16B16A16_FLOAT
-@group(0) @binding(5) var tex4: texture_storage_2d<rgba16float, read_write>;
+@group(1) @binding(3) var tex4_sampled: texture_2d<f32>;
+@group(2) @binding(3) var tex4_storaged: texture_storage_2d<rgba16float, read_write>;
 
 //!TEXTURE
 //!WIDTH INPUT_WIDTH
 //!HEIGHT INPUT_HEIGHT
 //!FORMAT R16G16B16A16_FLOAT
-@group(0) @binding(6) var tex5: texture_storage_2d<rgba16float, read_write>;
+@group(1) @binding(4) var tex5_sampled: texture_2d<f32>;
+@group(2) @binding(4) var tex5_storaged: texture_storage_2d<rgba16float, read_write>;
 
 //!TEXTURE
 //!WIDTH INPUT_WIDTH
 //!HEIGHT INPUT_HEIGHT
 //!FORMAT R16G16B16A16_FLOAT
-@group(0) @binding(7) var tex6: texture_storage_2d<rgba16float, read_write>;
+@group(1) @binding(5) var tex6_sampled: texture_2d<f32>;
+@group(2) @binding(5) var tex6_storaged: texture_storage_2d<rgba16float, read_write>;
 
 //!TEXTURE
 //!WIDTH INPUT_WIDTH
 //!HEIGHT INPUT_HEIGHT
 //!FORMAT R16G16B16A16_FLOAT
-@group(0) @binding(8) var tex7: texture_storage_2d<rgba16float, read_write>;
+@group(1) @binding(6) var tex7_sampled: texture_2d<f32>;
+@group(2) @binding(6) var tex7_storaged: texture_storage_2d<rgba16float, read_write>;
 
 //!TEXTURE
 //!WIDTH INPUT_WIDTH
 //!HEIGHT INPUT_HEIGHT
 //!FORMAT R16G16B16A16_FLOAT
-@group(0) @binding(9) var tex8: texture_storage_2d<rgba16float, read_write>;
+@group(1) @binding(7) var tex8_sampled: texture_2d<f32>;
+@group(2) @binding(7) var tex8_storaged: texture_storage_2d<rgba16float, read_write>;
+
 
 //!SAMPLER
 //!FILTER POINT
 @group(0) @binding(10) var sam: sampler;
 
-
-
-
 //!PASS 1
 //!DESC Conv-4x3x3x3
 //!IN INPUT
-//!OUT tex1, tex2, tex3
+//!OUT tex1_sampled, tex2_sampled, tex3_sampled, tex1_storaged, tex2_storaged, tex3_storaged
 //!BLOCK_SIZE 16
 //!NUM_THREADS 64
 
 @compute @workgroup_size(64, 1, 1)
-fn Pass1(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3, tex1: Texture) {
+fn Pass1(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
     let gxy = (Rmp8x8(local_id.x) << 1u) + workgroup_id.xy;
     let inputSize = GetInputSize();
     if (gxy.x >= inputSize.x || gxy.y >= inputSize.y) {
@@ -183,9 +182,9 @@ fn Pass1(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 			target3 = (src[i + 1][j] * MF3x4(-0.25331625, -0.14193451, 0.04879846, -0.077393495, 0.0104558095, 0.37905747, -0.07880302, -0.09453499, -0.1426901, -0.19738746, -0.28036812, 0.03675319) + target3);
 			target3 = (src[i + 1][j + 1] * MF3x4(-0.08954212, -0.47161737, -0.12388452, -0.08005436, 0.04682568, 0.048485547, 0.31411946, -0.31375095, -0.22892538, 0.16906887, 0.16802602, 0.18711087) + target3);
 
-			textureStore(tex1.storaged, destPos, target1);
-			textureStore(tex2, destPos, target2);
-			textureStore(tex3, destPos, target3);
+			textureStore(tex1_storaged, destPos, target1);
+			textureStore(tex2_storaged, destPos, target2);
+			textureStore(tex3_storaged, destPos, target3);
 		}
 	}
 }
@@ -202,7 +201,7 @@ fn Pass2(
     @builtin(workgroup_id) workgroup_id: uint3,
     @builtin(local_invocation_id) local_id: uint3
 ) {
-    let gxy: uint2 = Rmp8x8(threadId.x) + blockStart;
+    let gxy: uint2 = Rmp8x8(local_id.x) + blockStart;
     let inputSize: uint2 = GetInputSize();
 
     // 邊界檢查
@@ -216,15 +215,15 @@ fn Pass2(
 	// [ a, d, g ]
 	// [ b, e, h ]
 	// [ c, f, i ]
-    var a1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex1, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex1_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na1: MF4 = max(-a1, MF4(0.0));
     let nb1: MF4 = max(-b1, MF4(0.0));
@@ -246,15 +245,15 @@ fn Pass2(
     var h1 =  max(h1, MF4(0.0));
     var i1 =  max(i1, MF4(0.0));
 
-    var a2: MF4 = textureSampleLevel(tex2, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b2: MF4 = textureSampleLevel(tex2, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c2: MF4 = textureSampleLevel(tex2, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d2: MF4 = textureSampleLevel(tex2, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e2: MF4 = textureSampleLevel(tex2, sam, pos, 0.0);
-    var f2: MF4 = textureSampleLevel(tex2, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g2: MF4 = textureSampleLevel(tex2, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h2: MF4 = textureSampleLevel(tex2, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i2: MF4 = textureSampleLevel(tex2, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e2: MF4 = textureSampleLevel(tex2_sampled, sam, pos, 0.0);
+    var f2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na2: MF4 = max(-a2, MF4(0.0));
     let nb2: MF4 = max(-b2, MF4(0.0));
@@ -276,15 +275,15 @@ fn Pass2(
     h2 =  max(h2, MF4(0.0));
     i2 =  max(i2, MF4(0.0));
 
-    var a3: MF4 = textureSampleLevel(tex3, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b3: MF4 = textureSampleLevel(tex3, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c3: MF4 = textureSampleLevel(tex3, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d3: MF4 = textureSampleLevel(tex3, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e3: MF4 = textureSampleLevel(tex3, sam, pos, 0.0);
-    var f3: MF4 = textureSampleLevel(tex3, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g3: MF4 = textureSampleLevel(tex3, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h3: MF4 = textureSampleLevel(tex3, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i3: MF4 = textureSampleLevel(tex3, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e3: MF4 = textureSampleLevel(tex3_sampled, sam, pos, 0.0);
+    var f3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na3: MF4 = max(-a3, MF4(0.0));
     let nb3: MF4 = max(-b3, MF4(0.0));
@@ -475,9 +474,9 @@ fn Pass2(
 	target3 = (nh3 * MF4x4(-0.17315285, 0.061304655, 0.23295666, 0.004587563, 0.025884068, -0.20429865, -0.17807725, 0.04610146, -0.16748384, 0.03548062, 0.36901402, 0.040421892, 0.0732819, -0.06323222, 0.17438933, 0.10541013) + target3);
 	target3 = (ni3 * MF4x4(0.11953197, -0.041181084, -0.05777039, -0.0713763, -0.07250408, 0.00030710385, -0.12310962, 0.05047857, 0.07764678, 0.048569802, -0.07179031, -0.13407484, 0.18644087, -0.08796725, 0.09215986, 0.03264275) + target3);
 
-    textureStore(tex4, gxy, target1);
-    textureStore(tex5, gxy, target2);
-    textureStore(tex6, gxy, target3);
+    textureStore(tex4_storaged, gxy, target1);
+    textureStore(tex5_storaged, gxy, target2);
+    textureStore(tex6_storaged, gxy, target3);
 
 }
 
@@ -489,7 +488,7 @@ fn Pass2(
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
 fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
-	let gxy: uint2 = Rmp8x8(threadId.x) + blockStart;
+	let gxy: uint2 = Rmp8x8(local_id.x) + blockStart;
 	let inputSize: uint2 = GetInputSize();
 	if (gxy.x >= inputSize.x || gxy.y >= inputSize.y) {
 		return;
@@ -501,15 +500,15 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	// [ a, d, g ]
 	// [ b, e, h ]
 	// [ c, f, i ]
-    var a1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex4, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex4_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na1: MF4 = max(-a1, MF4(0.0));
     let nb1: MF4 = max(-b1, MF4(0.0));
@@ -531,15 +530,15 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h1 =  max(h1, MF4(0.0));
     var i1 =  max(i1, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex5, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex5_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na2: MF4 = max(-a2, MF4(0.0));
     let nb2: MF4 = max(-b2, MF4(0.0));
@@ -561,15 +560,15 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h2 =  max(h2, MF4(0.0));
     var i2 =  max(i2, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex6, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex6_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na3: MF4 = max(-a3, MF4(0.0));
     let nb3: MF4 = max(-b3, MF4(0.0));
@@ -759,9 +758,9 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target3 = (nh3 * MF4x4(-0.103790514, -0.062080752, -0.04171218, -0.22629078, 0.058754075, 0.010274649, 0.012631916, 0.0884306, 0.10843063, 0.11566254, 0.16639906, -0.05603101, 0.03344291, -0.009285547, 0.22062606, -0.18537858) + target3);
 	target3 = (ni3 * MF4x4(-0.010970425, 0.06433602, -0.010908282, 0.21255766, -0.124487005, -0.18626499, 0.017554395, 0.022440141, -0.043080032, 0.13329363, -0.019777333, -0.13920292, -0.057512637, -0.07950961, 0.0008059128, 0.08286962) + target3);
 
-    textureStore(tex1, gxy, target1);
-    textureStore(tex2, gxy, target2);
-    textureStore(tex3, gxy, target3);
+    textureStore(tex1_storaged, gxy, target1);
+    textureStore(tex2_storaged, gxy, target2);
+    textureStore(tex3_storaged, gxy, target3);
 }
 
 //!PASS 4
@@ -772,7 +771,7 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
 fn Pass4(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
-	let gxy: uint2= Rmp8x8(threadId.x) + blockStart;
+	let gxy: uint2= Rmp8x8(local_id.x) + blockStart;
 	let inputSize: uint2 = GetInputSize();
 	if (gxy.x >= inputSize.x || gxy.y >= inputSize.y) {
 		return;
@@ -784,15 +783,15 @@ fn Pass4(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	// [ a, d, g ]
 	// [ b, e, h ]
 	// [ c, f, i ]
-    var a1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex1, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex1_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na1: MF4 = max(-a1, MF4(0.0));
     let nb1: MF4 = max(-b1, MF4(0.0));
@@ -814,15 +813,15 @@ fn Pass4(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h1 =  max(h1, MF4(0.0));
     var i1 =  max(i1, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex2, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex2_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na2: MF4 = max(-a2, MF4(0.0));
     let nb2: MF4 = max(-b2, MF4(0.0));
@@ -844,15 +843,15 @@ fn Pass4(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h2 =  max(h2, MF4(0.0));
     var i2 =  max(i2, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex3, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex3_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na3: MF4 = max(-a3, MF4(0.0));
     let nb3: MF4 = max(-b3, MF4(0.0));
@@ -1042,9 +1041,9 @@ fn Pass4(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target3 = (nh3 * MF4x4(-0.009000505, -0.11456071, 0.0340094, 0.12444861, 0.07345543, -0.1419509, 0.092182405, 0.056249533, 0.063071616, -0.010534381, 0.056680985, 0.025993576, -0.13020347, 0.066157125, 0.0073951716, -0.027919816) + target3);
 	target3 = (ni3 * MF4x4(0.11827389, 0.111768976, 0.024734994, -0.008209825, -0.11939657, 0.049890216, -0.14757815, -0.0018939807, -0.108214505, -0.13791578, 0.06980697, -0.035102874, 0.0068360427, 0.15766092, -0.0094464505, 0.02528075) + target3);
 
-    textureStore(tex4, gxy, target1);
-    textureStore(tex5, gxy, target2);
-    textureStore(tex6, gxy, target3);
+    textureStore(tex4_storaged, gxy, target1);
+    textureStore(tex5_storaged, gxy, target2);
+    textureStore(tex6_storaged, gxy, target3);
 }
 
 //!PASS 5
@@ -1055,7 +1054,7 @@ fn Pass4(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
 fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
-	let gxy: uint2 = Rmp8x8(threadId.x) + blockStart;
+	let gxy: uint2 = Rmp8x8(local_id.x) + blockStart;
 	let inputSize: uint2 = GetInputSize();
 	if (gxy.x >= inputSize.x || gxy.y >= inputSize.y) {
 	    return;
@@ -1064,15 +1063,15 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	let inputPt: MF2= GetInputPt();
 	let pos = (gxy + 0.5f) * inputPt;
 
-    var a1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex4, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex4_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na1: MF4 = max(-a1, MF4(0.0));
     let nb1: MF4 = max(-b1, MF4(0.0));
@@ -1094,15 +1093,15 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h1 =  max(h1, MF4(0.0));
     var i1 =  max(i1, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex5, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex5_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na2: MF4 = max(-a2, MF4(0.0));
     let nb2: MF4 = max(-b2, MF4(0.0));
@@ -1124,15 +1123,15 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h2 =  max(h2, MF4(0.0));
     var i2 =  max(i2, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex6, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex6_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na3: MF4 = max(-a3, MF4(0.0));
     let nb3: MF4 = max(-b3, MF4(0.0));
@@ -1154,7 +1153,7 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h3 =  max(h3, MF4(0.0));
     var i3 =  max(i3, MF4(0.0));
 
-	let target1: FM4 =FM4(-0.112874866, 0.058437236, -0.011864247, -0.050339766 );
+	let target1: MF4 =MF4(-0.112874866, 0.058437236, -0.011864247, -0.050339766 );
 	target1 = (a1 * MF4x4(0.0858087, -0.091669075, -0.029618878, -0.006829049, 0.05929614, -0.10007056, -0.07165286, -0.044839766, 0.16440393, -0.013165904, 0.16345644, -0.040166497, -0.08533438, 0.033274904, 0.023744298, 0.00462745) + target1);
 	target1 = (b1 * MF4x4(-0.012197617, -0.17494427, -0.044840526, 0.09467358, 0.0670941, 0.04051791, 0.031950857, 0.043632418, 0.27560753, -0.18038619, -0.016762096, -0.18554263, -0.07514284, -0.12060545, -0.06567658, 0.095817134) + target1);
 	target1 = (c1 * MF4x4(-0.006523474, -0.08222627, -0.0071327686, 0.0019292525, 0.10427757, -0.12537085, 0.04317682, -0.073334634, 0.05154215, -0.091944076, -0.02118822, -0.056948982, -0.13910337, 0.03694039, -0.057772428, -0.04310826) + target1);
@@ -1210,7 +1209,7 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target1 = (nh3 * MF4x4(-0.07349653, -0.121248744, 0.057792176, 0.099129215, -0.20087934, -0.031952746, -0.09673813, -0.031076657, -0.03237994, -0.020143004, -0.12516364, 0.007846103, 0.17188387, -0.2825958, 0.07352815, -0.021273587) + target1);
 	target1 = (ni3 * MF4x4(0.14606737, 0.04232884, -0.04508154, 0.11619671, -0.14093883, 0.022675866, 0.004869404, -0.1476083, -0.15496063, -0.11994992, -0.07718659, 0.0023026431, 0.012474549, 0.107636444, -0.08887454, 0.23727296) + target1);
 
-	let target2: FM4 =FM4(-0.051753327, -0.07172183, 0.021211471, -0.050325148 );
+	let target2: MF4 =MF4(-0.051753327, -0.07172183, 0.021211471, -0.050325148 );
 	target2 = (a1 * MF4x4(0.016881438, -0.044336118, 0.11502204, -0.10677853, 0.08977789, -0.059579305, 0.109261245, 0.10357805, 0.3364402, 0.14823961, 0.06096494, 0.15078168, -0.11029799, 0.074738294, 0.012435908, -0.0106727) + target2);
 	target2 = (b1 * MF4x4(-0.109714404, 0.008750308, 0.1948044, -0.1396421, 0.04144051, -0.12435535, 0.07815825, 0.019051697, -0.07954506, -0.0965191, -0.2027906, 0.17172056, -0.26384082, 0.13519175, 0.04667002, 0.021707565) + target2);
 	target2 = (c1 * MF4x4(0.07089612, 0.007484666, 0.104900375, 0.04954983, -0.06030455, -0.12300262, 0.05197505, -0.041572303, 0.009151977, 0.0799586, -0.04780254, -0.13600186, 0.18708369, 0.047879692, 0.040363688, 0.042251408) + target2);
@@ -1266,7 +1265,7 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target2 = (nh3 * MF4x4(0.056699157, -0.009144585, -0.20287608, -0.17288777, -0.031525977, -0.014541391, 0.09615033, -0.020868845, -0.06501473, -0.015121819, 0.20430197, -0.04346306, -0.12766391, 0.093933746, -0.027732635, 0.11136926) + target2);
 	target2 = (ni3 * MF4x4(-0.08438437, -0.1183074, -0.12171084, -0.016565872, 0.011952218, -0.058289453, 0.13479574, -0.0013566733, 0.20290127, 0.03338366, -0.1634658, 0.11389365, -0.060460836, 0.05049821, -0.14498705, 0.016767675) + target2);
 
-	let target3: FM4 =FM4( -0.07961375, -0.07668534, 0.030482467, 0.035888318);
+	let target3: MF4 =MF4( -0.07961375, -0.07668534, 0.030482467, 0.035888318);
 	target3 = (a1 * MF4x4(-0.20980129, 0.023968311, 0.12840137, 0.10842146, 0.011306613, 0.05415782, 0.039082862, 0.16055544, -0.019953849, -0.038693313, 0.043451615, 0.29995796, -0.04229376, -0.052874412, -0.043818697, 0.12305407) + target3);
 	target3 = (b1 * MF4x4(-0.05386288, 0.060217176, 0.115249164, -0.06499263, -0.24467815, -0.038295876, 0.1099765, 0.011418658, -0.037247434, 0.022481795, -0.022084411, 0.08719741, 0.112991996, 0.0038797192, 0.0007742727, -0.12125326) + target3);
 	target3 = (c1 * MF4x4(0.14591883, 0.0059707207, 0.10084995, 0.11218308, -0.06853006, 0.056708243, 0.03836111, 0.097718365, -0.03493398, -0.025623012, -0.05587737, -0.08457079, 0.028527644, -0.12509371, 0.10159183, -0.1373413) + target3);
@@ -1329,10 +1328,10 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target4 = (ne2 * MF4x3(0.14758188, -0.052864034, -0.06617946, -0.025215192, 0.005785653, 0.02022865, -0.07359226, -0.034944568, -0.01911832, -0.059109453, 0.0018033485, -0.022261323) + target4);
 	target4 = (ne3 * MF4x3(0.079963796, 0.018210623, -0.0025736517, 0.06693135, -0.038985185, -0.04726813, -0.03559407, -0.0083629545, -0.005753532, 0.043954816, -0.022223696, -0.039470144) + target4);
 
-    textureStore(tex1, gxy, target1);
-    textureStore(tex2, gxy, target2);
-    textureStore(tex3, gxy, target3);
-    textureStore(tex7, gxy, MF4(target4, 1.0));
+    textureStore(tex1_storaged, gxy, target1);
+    textureStore(tex2_storaged, gxy, target2);
+    textureStore(tex3_storaged, gxy, target3);
+    textureStore(tex7_storaged, gxy, target, MF4(target4, 1.0));
 }
 
 //!PASS 6
@@ -1343,7 +1342,7 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
 fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
-	let gxy: uint2 = Rmp8x8(threadId.x) + blockStart;
+	let gxy: uint2 = Rmp8x8(local_id.x) + blockStart;
 	let inputSize: uint2 = GetInputSize();
 	if (gxy.x >= inputSize.x || gxy.y >= inputSize.y) {
 		return;
@@ -1355,15 +1354,15 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	// [ a, d, g ]
 	// [ b, e, h ]
 	// [ c, f, i ]
-    var a1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex1, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex1_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let nb1: MF4 = max(-b1, MF4(0.0));
     let nc1: MF4 = max(-c1, MF4(0.0));
@@ -1385,15 +1384,15 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h1 =  max(h1, MF4(0.0));
     var i1 =  max(i1, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex2, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex2_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na2: MF4 = max(-a2, MF4(0.0));
     let nb2: MF4 = max(-b2, MF4(0.0));
@@ -1415,15 +1414,15 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h2 =  max(h2, MF4(0.0));
     var i2 =  max(i2, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex3, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex3_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na3: MF4 = max(-a3, MF4(0.0));
     let nb3: MF4 = max(-b3, MF4(0.0));
@@ -1445,7 +1444,7 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h3 =  max(h3, MF4(0.0));
     var i3 =  max(i3, MF4(0.0));
 
-    let target1: FM4 =FM4(0.04207974, -0.22892998, 0.061954536, 0.076551735);
+    let target1: MF4 =MF4(0.04207974, -0.22892998, 0.061954536, 0.076551735);
 	target1 = (a1 * MF4x4(0.09584929, -0.095243275, 0.08022671, 0.075294726, 0.18445255, -0.082423694, -0.097833045, -0.021506732, -0.21379599, -0.023127496, -0.18897046, 0.023956126, -0.060177475, 0.027762169, 0.19984011, -0.20838684) + target1);
 	target1 = (b1 * MF4x4(0.012249506, -0.12688737, -0.12119437, 0.10179773, -0.09664198, -0.0030920326, -0.030286502, -0.20217018, 0.34590152, -0.05034654, 0.049923953, -0.043337423, 0.25000378, -0.028680135, 0.16001691, -0.066234544) + target1);
 	target1 = (c1 * MF4x4(-0.08372182, -0.089819506, -0.013704554, 0.04556739, -0.114813834, -0.06466441, 0.03785733, -0.0062836753, 0.047535792, 0.06347279, -0.007735239, 0.049881376, 0.20055495, 0.047256388, -0.09947006, 0.0025243685) + target1);
@@ -1501,7 +1500,7 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target1 = (nh3 * MF4x4(-0.0932687, 0.092196085, -0.31407887, 0.1343263, -0.27295715, 0.14278416, 0.08114481, -0.12019184, 0.11957917, -0.113183275, 0.039373737, 0.46590427, 0.13638581, -0.043146584, 0.072187565, 0.25355667) + target1);
 	target1 = (ni3 * MF4x4(0.123297654, 0.13584657, 0.07648451, -0.13606457, -0.16890481, 0.01590599, -0.21695235, -0.0694265, -0.2649162, 0.02908455, 0.21927917, 0.010575717, 0.0485126, 0.039509103, 0.28077808, 0.081715904) + target1);
 
-    let target2: FM4 =FM4(0.0076388572, -0.16117841, -0.21034169, -0.019341651);
+    let target2: MF4 =MF4(0.0076388572, -0.16117841, -0.21034169, -0.019341651);
 	target2 = (a1 * MF4x4(-0.017371856, 0.031500984, -0.07871794, 0.07516421, -0.047120046, -0.1499491, 0.03412159, -0.11797919, 0.24790019, -0.19525756, -0.05562878, 0.0328997, 0.21224782, -0.15311961, -0.18679233, -0.021687083) + target2);
 	target2 = (b1 * MF4x4(-0.025990961, 0.12443172, 0.0647746, -0.05208365, 0.05024424, -0.15237884, -0.12913004, -0.03974524, 0.1453159, 0.105298564, -0.17882426, 0.15200019, -0.024576407, 0.024749285, -0.114573665, 0.12468399) + target2);
 	target2 = (c1 * MF4x4(0.07534002, -0.018443566, -0.07744656, -0.049855288, 0.030816372, -0.011974315, 0.05701086, 0.083947234, -0.16585147, -0.09379088, -0.090112925, -0.110042654, -0.105956376, 0.014653304, 0.041867986, 0.24255139) + target2);
@@ -1557,7 +1556,7 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target2 = (nh3 * MF4x4(0.035608087, -0.17302564, 0.07696709, -0.18077038, -0.02534479, 0.035865046, 0.15503906, -0.07042084, 0.37430316, 0.2688597, 0.23763078, 0.26458314, 0.22778325, 0.13661247, 0.032626268, 0.10627844) + target2);
 	target2 = (ni3 * MF4x4(-0.14816584, 0.08924656, -0.02333901, 0.0735485, -0.17011848, -0.059921533, 0.045324218, 0.026974149, 0.15702479, 0.0067652813, 0.08584165, 0.09428486, 0.035495974, -0.07220769, -0.0524813, -0.008241412) + target2);
 
-	let target2: FM4 =FM4(0.11033049, -0.073737, -0.013228117, 0.01553484);
+	let target2: MF4 =MF4(0.11033049, -0.073737, -0.013228117, 0.01553484);
 	target3 = (a1 * MF4x4(0.051828694, -0.14444938, -0.06172656, -0.092529796, 0.0032331774, 0.0505327, -0.092972204, 0.054304235, 0.04113735, 0.05488947, 0.27173808, 0.008734756, -0.037090253, 0.11106639, 0.1864697, -0.1308939) + target3);
 	target3 = (b1 * MF4x4(-0.0292121, 0.09739149, -0.057740077, -0.043211482, 0.00057832256, 0.122456014, 0.14004166, -0.22281875, -0.00958859, 0.012818551, 0.21724443, 0.038053658, 0.11917748, -0.0147661995, 0.15326285, -0.007842389) + target3);
 	target3 = (c1 * MF4x4(0.028475946, -0.044710767, 0.120977476, 0.024894554, 0.034071486, 0.002889187, 0.0886379, -0.13210039, 0.0254021, -0.10800576, -0.0154256895, 0.07889771, -0.026208088, -0.1735971, 0.12414827, 0.06541947) + target3);
@@ -1621,10 +1620,10 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target4 = (ne2 * MF4x3(-0.0031128856, 0.013134638, 0.021534251, 0.049189907, -0.039677586, -0.057255603, -0.009908353, -0.0013683038, 0.0028079485, 0.0002268831, 0.012356764, 0.009817244) + target4);
 	target4 = (ne3 * MF4x3(-0.04058634, -0.01822148, -0.014306331, 0.107378654, -0.04138371, -0.058573496, 0.03701269, -0.009420217, -0.02310707, 0.039931968, 0.001769326, -0.007929419) + target4);
 
-    textureStore(tex4, gxy, target1);
-    textureStore(tex5, gxy, target2);
-    textureStore(tex6, gxy, target3);
-    textureStore(tex8, gxy, MF4(target4, 1.0));
+    textureStore(tex4_storaged, gxy, target1);
+    textureStore(tex5_sampled.storaged, gxy, target2);
+    textureStore(tex6_sampled.storaged, gxy, target3);
+    textureStore(tex8_storaged, gxy, target, MF4(target4, 1.0));
 }
 
 //!PASS 7
@@ -1635,7 +1634,7 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
 fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
-	let gxy: uint2 = Rmp8x8(threadId.x) + blockStart;
+	let gxy: uint2 = Rmp8x8(local_id.x) + blockStart;
 	let inputSize: uint2 = GetInputSize();
 	if (gxy.x >= inputSize.x || gxy.y >= inputSize.y) {
 		return;
@@ -1647,15 +1646,15 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	// [ a, d, g ]
 	// [ b, e, h ]
 	// [ c, f, i ]
-    var a1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex4, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex4, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex4_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na1: MF4 = max(-a1, MF4(0.0));
     let nb1: MF4 = max(-b1, MF4(0.0));
@@ -1677,15 +1676,15 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h1 =  max(h1, MF4(0.0));
     var i1 =  max(i1, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex5, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex5, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex5_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na2: MF4 = max(-a2, MF4(0.0));
     let nb2: MF4 = max(-b2, MF4(0.0));
@@ -1707,15 +1706,15 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h2 =  max(h2, MF4(0.0));
     var i2 =  max(i2, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex6, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex6, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex6_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na3: MF4 = max(-a3, MF4(0.0));
     let nb3: MF4 = max(-b3, MF4(0.0));
@@ -1905,7 +1904,7 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target3 = (nh3 * MF4x4(-0.27078578, -0.08153653, 0.1757881, 0.11317136, 0.27882257, -0.24042514, -0.08648888, -0.045675088, -0.10128582, -0.04766186, 0.06836051, 0.15924035, 0.04440567, -0.099891834, -0.08893405, 0.05721548) + target3);
 	target3 = (ni3 * MF4x4(0.15327021, 0.13603994, 0.17330587, 0.05625383, -0.11157126, -0.08179826, 0.05035325, -0.012668053, 0.04673393, 0.29881957, 0.019924281, -0.06682304, -0.034375366, -0.11446407, 0.055847015, 0.104117975) + target3);
 
-    let target4: MF3 = textureSampleLevel(tex8, sam, pos, 0.0).rgb;
+    let target4: MF3 = textureSampleLevel(tex8_sampled, sam, pos, 0.0).rgb;
     target4 = (e1 * MF4x3(0.027129134, 0.01044246, 0.008198051, -0.019978391, 0.014817045, 0.014294805, -0.009071333, -0.018233696, -0.020756468, -0.016967475, -0.010472854, -0.0066578956) + target4);
 	target4 = (e2 * MF4x3(0.012473992, -0.019771596, -0.02515739, -0.008238026, 0.026189122, 0.034326296, 0.01735337, -0.021417223, -0.027291182, 0.01815212, -0.012736875, -0.021111157) + target4);
 	target4 = (e3 * MF4x3(0.022218483, -0.023485998, -0.03540812, 0.016531168, -0.0033816632, -0.010179393, -0.03181473, -0.0072774286, 0.0014077872, -0.0025735856, -0.015998563, -0.016743565) + target4);
@@ -1913,10 +1912,10 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target4 = (ne2 * MF4x3(-0.0043926076, 0.019400991, 0.022581568, 0.003538965, -0.031301565, -0.0345112, -0.02405352, 0.006159623, 0.016130725, -0.0097925, 0.01677507, 0.027652735) + target4);
 	target4 = (ne3 * MF4x3(-0.03267886, 0.014923966, 0.027258545, -0.033668566, -0.010421195, -0.0026646685, 0.015094835, -0.0023233194, -0.015871005, -0.01258443, 0.00507582, 0.0053544766) + target4);
 
-    textureStore(tex1, gxy, target1);
-    textureStore(tex2, gxy, target2);
-    textureStore(tex3, gxy, target3);
-    textureStore(tex7, gxy, MF4(target4, 1.0));
+    textureStore(tex1_storaged, gxy, target1);
+    textureStore(tex2_storaged, gxy, target2);
+    textureStore(tex3_storaged, gxy, target3);
+    textureStore(tex7_storaged, gxy, target, MF4(target4, 1.0));
 }
 
 //!PASS 8
@@ -1936,15 +1935,15 @@ fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let inputPt: MF2 = GetInputPt();
     let pos: MF2 = (MF2(gxy) + 0.5) * inputPt;
 
-    var a1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex1, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex1, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex1_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na1: MF4 = max(-a1, MF4(0.0));
     let nb1: MF4 = max(-b1, MF4(0.0));
@@ -1966,15 +1965,15 @@ fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h1 =  max(h1, MF4(0.0));
     var i1 =  max(i1, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex2, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex2, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex2_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na2: MF4 = max(-a2, MF4(0.0));
     let nb2: MF4 = max(-b2, MF4(0.0));
@@ -1996,15 +1995,15 @@ fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h2 =  max(h2, MF4(0.0));
     var i2 =  max(i2, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex3, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex3, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    var a1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e1: MF4 = textureSampleLevel(tex3_sampled, sam, pos, 0.0);
+    var f1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na3: MF4 = max(-a3, MF4(0.0));
     let nb3: MF4 = max(-b3, MF4(0.0));
@@ -2026,7 +2025,7 @@ fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h3 =  max(h3, MF4(0.0));
     var i3 =  max(i3, MF4(0.0));
 
-    let target1: MF4 = FM4(0.20634188, -0.10455712, -0.031700566, -0.13400781);
+    let target1: MF4 = MF4(0.20634188, -0.10455712, -0.031700566, -0.13400781);
 	target1 = (a1 * MF4x4(-0.013182829, 0.053091962, 0.06549412, 0.09314398, 0.12759157, 0.19831958, -0.0066986284, 0.008724786, -0.008788724, -0.18448268, -0.08061004, -0.122672, 0.039246775, 0.114899494, 0.0053096768, -0.45705518) + target1);
 	target1 = (b1 * MF4x4(-0.15435986, 0.12775438, 0.033445876, 0.13065258, -0.034713954, 0.011218427, -0.056961175, -0.028291933, 0.014069658, -0.12902507, 0.09579773, -0.24455607, 0.14417914, 0.05937612, 0.2243551, -0.3940324) + target1);
 	target1 = (c1 * MF4x4(0.019673724, 0.20209175, 0.0864056, 0.062125377, -0.032693543, -0.07866025, 0.049098648, 0.09967038, 0.071991436, -0.035584584, 0.08620264, -0.3146151, 0.0016364265, -0.1282453, 0.113696136, -0.09162608) + target1);
@@ -2082,7 +2081,7 @@ fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target1 = (nh3 * MF4x4(0.056506306, 0.15181234, -0.1497428, 0.01186181, 0.02351036, 0.01086669, -0.031891935, 0.01414558, 0.27038968, -0.2806401, -0.14722337, 0.080689445, 0.07039954, -0.054969363, -0.016640754, 0.020795437) + target1);
 	target1 = (ni3 * MF4x4(-0.237999, 0.13528651, 0.005025065, -0.01291728, -0.22655746, 0.022678101, 0.07165532, 0.0073296893, 0.084639646, -0.06724732, -0.13105223, 0.10164715, -0.15071161, 0.08882156, -0.016988168, -0.013606533) + target1);
 
-	let target1: MF4 = FM4(0.15939143, -0.031111173, 0.011407361, 0.04436536);
+	let target1: MF4 = MF4(0.15939143, -0.031111173, 0.011407361, 0.04436536);
 	target2 = (a1 * MF4x4(0.1606533, 0.1120602, 0.427334, -0.056228757, -0.026887462, 0.0858575, 0.0052684247, 0.1645524, 0.021588106, -0.08577256, -0.03301297, -0.087385215, 0.17341405, 0.26737398, 0.04566977, 0.047820427) + target2);
 	target2 = (b1 * MF4x4(0.21000437, 0.05300574, 0.060565695, -0.086724475, 0.09684198, 0.12685667, -0.10724282, -0.11021523, 0.048485592, -0.0054517, 0.081800036, -0.099787444, -0.12168391, 0.07623567, 0.09177046, 0.15815327) + target2);
 	target2 = (c1 * MF4x4(0.14400747, 0.13797458, 0.11044521, 0.077145234, 0.14364728, 0.10041894, 0.0948857, 0.08613703, 0.030833652, 0.102926254, 0.029892365, -0.09385337, 0.07609406, -0.038274735, 0.22529188, -0.0905732) + target2);
@@ -2138,7 +2137,7 @@ fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target2 = (nh3 * MF4x4(0.31691772, 0.03877285, -0.31999993, 0.15607259, -0.014967208, 0.17467377, -0.021213053, 0.05274054, 0.09042282, 0.3026185, -0.19465268, -0.15643322, -0.28652924, -0.12624627, -0.123150274, -0.06579748) + target2);
 	target2 = (ni3 * MF4x4(-0.12737115, 0.21119869, 0.021830728, 0.25310937, 0.056086678, -0.10591854, -0.09623413, 0.09552772, 0.0077543957, -0.38552082, 0.105930105, 0.21966095, 0.03846968, -0.18900576, 0.13454477, 0.01323755) + target2);
 
-	let target1: MF4 = FM4(-0.09157235, -0.025660357, 0.076311104, -0.13737188);
+	let target1: MF4 = MF4(-0.09157235, -0.025660357, 0.076311104, -0.13737188);
 	target3 = (a1 * MF4x4(0.009852172, 0.067582026, -0.004946671, 0.10223505, -0.10428496, -0.025925757, -0.1812229, -0.086897664, -0.007505929, 0.11395492, -0.046959464, -0.040778246, -0.05989385, 0.2917696, 0.21723987, 0.104860075) + target3);
 	target3 = (b1 * MF4x4(0.014223285, 0.23677638, 0.18793987, 0.1604355, -0.13773453, -0.035079855, 0.1325962, -0.01843488, 0.013658427, -0.039640892, -0.049931083, -0.17938142, -0.20694439, 0.13461684, 0.15713528, 0.061465815) + target3);
 	target3 = (c1 * MF4x4(-0.045403525, 0.24799547, 0.073604435, 0.21103963, 0.18720928, -0.06703258, -0.20043622, -0.067137614, -0.19021615, -0.020830747, -0.120527774, 0.20456503, 0.07813807, -0.03798654, 0.04036844, -0.0033802337) + target3);
@@ -2195,7 +2194,7 @@ fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target3 = (ni3 * MF4x4(0.009482551, 0.12501961, 0.38921976, -0.1280031, -0.103060484, -0.027821409, 0.0720024, -0.027280543, 0.056729473, 0.048927493, -0.035154913, -0.08341783, 0.23103711, 0.046025522, 0.17039533, -0.014161812) + target3);
 
     // 最後的組合步驟
-    var result: MF3 = textureSampleLevel(tex7, pos, MF4(0.0)).rgb;
+    var result: MF3 = textureSampleLevel(tex7_sampled, pos, MF4(0.0)).rgb;
 	result = (e1 * MF4x3(0.012708346, 0.014336439, 0.012533707, -0.0019346073, -0.0070978077, -0.009478742, -0.011659758, -0.009855903, -0.008657096, 0.0098037105, 0.010785594, 0.008409619) + result);
 	result = (e2 * MF4x3(0.0056228717, 0.013483413, 0.008108323, -0.0013697809, 0.0026797573, 0.0037666177, 0.0130932415, 0.019868238, 0.01968549, 0.011160769, 0.012374028, 0.012855804) + result);
 	result = (e3 * MF4x3(0.0011662204, 0.00025071716, 0.0022244148, -0.017808594, -0.013589306, -0.01396329, -0.008117086, -0.0068251803, -0.004963602, -0.0069141523, -0.009125296, -0.008327947) + result);
