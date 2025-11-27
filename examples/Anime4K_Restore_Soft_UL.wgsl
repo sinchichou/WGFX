@@ -6,6 +6,41 @@
 //!SORT_NAME Anime4K_Restore_Soft_UL
 //!CAPABILITY FP16
 
+//! COMMON
+type uint2 = vec2<u32>;
+type uint3 = vec3<u32>;
+type int2 = vec2<i32>;
+type MF = f32;
+type MF2 = vec2<f32>;
+type MF3 = vec3<f32>;
+type MF4 = vec4<f32>;
+type MF2x2 = mat2x2<f32>;
+type MF3x3 = mat3x3<f32>;
+type MF4x4 = mat4x4<f32>;
+type MF2x3 = mat3x2<f32>;
+type MF2x4 = mat4x2<f32>;
+type MF3x2 = mat2x3<f32>;
+type MF3x4 = mat4x3<f32>;
+type MF4x2 = mat2x4<f32>;
+type MF4x3 = mat3x4<f32>;
+
+ fn GetInputSize() -> uint2 {
+    return uint2(0, 0);
+}
+
+fn GetInputPt() -> MF2 {
+    return MF2(0, 0);
+}
+
+fn Rmp8x8(idx: u32) -> uint2 {
+    return uint2(idx / 8u, idx % 8u);
+}
+
+struct Texture {
+    sampled: texture_2d<f32>,
+    storaged: texture_storage_2d<rgba32float, read_write>
+}
+
 //!TEXTURE
 @group(0) @binding(0) var INPUT: texture_2d<f32>;
 
@@ -18,7 +53,9 @@
 //!WIDTH INPUT_WIDTH
 //!HEIGHT INPUT_HEIGHT
 //!FORMAT R16G16B16A16_FLOAT
-@group(0) @binding(2) var tex1: texture_storage_2d<rgba16float, read_write>;
+@group(0) @binding(2) var tex1_sampled: texture_2d<f32>;
+@group(0) @binding(3) var tex1_storaged: texture_storage_2d<rgba16float, read_write>;
+const tex1: Texture = Texture(tex1_sampled, tex1_storaged);
 
 //!TEXTURE
 //!WIDTH INPUT_WIDTH
@@ -67,35 +104,7 @@
 @group(0) @binding(10) var sam: sampler;
 
 
-//! COMMON
-type uint2 = vec2<u32>;
-type uint3 = vec3<u32>;
-type int2 = vec2<i32>;
-type MF = f32;
-type MF2 = vec2<f32>;
-type MF3 = vec3<f32>;
-type MF4 = vec4<f32>;
-type MF2x2 = mat2x2<f32>;
-type MF3x3 = mat3x3<f32>;
-type MF4x4 = mat4x4<f32>;
-type MF2x3 = mat3x2<f32>;
-type MF2x4 = mat4x2<f32>;
-type MF3x2 = mat2x3<f32>;
-type MF3x4 = mat4x3<f32>;
-type MF4x2 = mat2x4<f32>;
-type MF4x3 = mat3x4<f32>;
 
-fn GetInputSize() -> uint2 {
-    return uint2(textureDimensions(INPUT));
-}
-
-fn GetInputPt() -> MF2 {
-    return 1.0 / MF2(textureDimensions(INPUT));
-}
-
-fn Rmp8x8(idx: u32) -> uint2 {
-    return uint2(idx % 8u, idx / 8u);
-}
 
 //!PASS 1
 //!DESC Conv-4x3x3x3
@@ -105,7 +114,7 @@ fn Rmp8x8(idx: u32) -> uint2 {
 //!NUM_THREADS 64
 
 @compute @workgroup_size(64, 1, 1)
-fn Pass1(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
+fn Pass1(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3, tex1: Texture) {
     let gxy = (Rmp8x8(local_id.x) << 1u) + workgroup_id.xy;
     let inputSize = GetInputSize();
     if (gxy.x >= inputSize.x || gxy.y >= inputSize.y) {
@@ -174,7 +183,7 @@ fn Pass1(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 			target3 = (src[i + 1][j] * MF3x4(-0.25331625, -0.14193451, 0.04879846, -0.077393495, 0.0104558095, 0.37905747, -0.07880302, -0.09453499, -0.1426901, -0.19738746, -0.28036812, 0.03675319) + target3);
 			target3 = (src[i + 1][j + 1] * MF3x4(-0.08954212, -0.47161737, -0.12388452, -0.08005436, 0.04682568, 0.048485547, 0.31411946, -0.31375095, -0.22892538, 0.16906887, 0.16802602, 0.18711087) + target3);
 
-			textureStore(tex1, destPos, target1);
+			textureStore(tex1.storaged, destPos, target1);
 			textureStore(tex2, destPos, target2);
 			textureStore(tex3, destPos, target3);
 		}

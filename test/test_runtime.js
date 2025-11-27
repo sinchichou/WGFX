@@ -39,7 +39,11 @@ async function main() {
             process.exit(1);
         }
         console.log("Requesting WebGPU device...");
-        const device = await adapter.requestDevice();
+        const device = await adapter.requestDevice({
+            requiredLimits: {
+                maxStorageTexturesPerShaderStage: 8,
+            },
+        });
         console.log("Real GPUDevice created.");
 
         // 2. Read the effect file.

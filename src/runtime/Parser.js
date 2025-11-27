@@ -256,7 +256,7 @@ export class ShaderParser {
     _commitBlock(info, blockType, data) {
         switch (blockType) {
             case 'MAGPIE': // 來自 "MAGPIE EFFECT"
-                // 這是魔術檢查，不作為資料儲存。
+                // 這是檢查，不作為資料儲存。
                 break;
             case 'VERSION':
                 info.metadata.version = parseInt(data.id, 10);
@@ -273,14 +273,14 @@ export class ShaderParser {
             case 'PARAMETER':
                 info.parameters.push(data);
                 break;
+            case 'COMMON':
+                info.commonCode = data.lines.join('\n');
+                break;
             case 'TEXTURE':
                 info.textures.push(data);
                 break;
             case 'SAMPLER':
                 info.samplers.push(data);
-                break;
-            case 'COMMON':
-                info.commonCode = data.lines.join('\n');
                 break;
             case 'PASS':
                 info.passes.push(data);
