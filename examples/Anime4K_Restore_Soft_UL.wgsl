@@ -195,8 +195,8 @@ fn Pass1(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 
 //!PASS 2
 //!DESC Conv-4x3x3x24
-//!IN tex1, tex2, tex3
-//!OUT tex4, tex5, tex6
+//!IN tex1_sampled, tex2_sampled, tex3_sampled, tex1_storaged, tex2_storaged, tex3_storaged
+//!OUT tex4_sampled, tex5_sampled, tex6_sampled, tex4_storaged, tex5_storaged, tex6_storaged
 //!BLOCK_SIZE 8
 //!NUM_THREADS 64
 
@@ -484,8 +484,8 @@ fn Pass2(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 
 //!PASS 3
 //!DESC Conv-4x3x3x24
-//!IN tex4, tex5, tex6
-//!OUT tex1, tex2, tex3
+//!IN tex4_sampled, tex5_sampled, tex6_sampled, tex4_storaged, tex5_storaged, tex6_storaged
+//!OUT tex1_sampled, tex2_sampled, tex3_sampled, tex1_storaged, tex2_storaged, tex3_storaged
 //!BLOCK_SIZE 8
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
@@ -774,8 +774,8 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 
 //!PASS 4
 //!DESC Conv-4x3x3x24
-//!IN tex1, tex2, tex3
-//!OUT tex4, tex5, tex6
+//!IN tex1_sampled, tex2_sampled, tex3_sampled, tex1_storaged, tex2_storaged, tex3_storaged
+//!OUT tex4_sampled, tex5_sampled, tex6_sampled, tex4_storaged, tex5_storaged, tex6_storaged
 //!BLOCK_SIZE 8
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
@@ -1066,8 +1066,8 @@ fn Pass4(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 
 //!PASS 5
 //!DESC Conv-4x3x3x24
-//!IN tex4, tex5, tex6
-//!OUT tex1, tex2, tex3, tex7
+//!IN tex4_sampled, tex5_sampled, tex6_sampled, tex4_storaged, tex5_storaged, tex6_storaged
+//!OUT tex1_sampled, tex2_sampled, tex3_sampled, tex1_storaged, tex2_storaged, tex3_storaged, tex7_sampled, tex7_storaged
 //!BLOCK_SIZE 8
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
@@ -1372,8 +1372,8 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 
 //!PASS 6
 //!DESC Conv-4x3x3x24
-//!IN tex1, tex2, tex3, tex7
-//!OUT tex4, tex5, tex6, tex8
+//!IN tex1_sampled, tex2_sampled, tex3_sampled, tex1_storaged, tex2_storaged, tex3_storaged, tex7_sampled, tex7_storaged
+//!OUT tex4_sampled, tex5_sampled, tex6_sampled, tex4_storaged, tex5_storaged, tex6_storaged, tex8_sampled, tex8_storaged
 //!BLOCK_SIZE 8
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
@@ -1680,8 +1680,8 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 
 //!PASS 7
 //!DESC Conv-4x3x3x24
-//!IN tex4, tex5, tex6, tex8
-//!OUT tex1, tex2, tex3, tex7
+//!IN tex4_sampled, tex5_sampled, tex6_sampled, tex4_storaged, tex5_storaged, tex6_storaged, tex8_sampled, tex8_storaged
+//!OUT tex1_sampled, tex2_sampled, tex3_sampled, tex1_storaged, tex2_storaged, tex3_storaged, tex7_sampled, tex7_storaged
 //!BLOCK_SIZE 8
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
@@ -1987,7 +1987,7 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 
 //!PASS 8
 //!DESC Conv-4x3x3x24, Conv-3x1x1x120
-//!IN INPUT, tex1, tex2, tex3, tex7
+//!IN INPUT, tex1_sampled, tex2_sampled, tex3_sampled, tex1_storaged, tex2_storaged, tex3_storaged, tex7_sampled, tex7_storaged
 //!OUT OUTPUT
 //!BLOCK_SIZE 8
 //!NUM_THREADS 64
