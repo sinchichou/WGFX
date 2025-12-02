@@ -27,17 +27,32 @@ export class OutputPackager {
      * @param {string} outputPath - 輸出 ".zip" 檔案的路徑 (將建立為目錄)。
      * @returns {Promise<void>}
      */
-    async package(wgslCode, pipelineMetadata, generalMetadata, outputPath) {
+    async package(generatedModules, pipelineMetadata, generalMetadata, outputPath) {
         console.log("OutputPackager: 正在打包建置產物...");
 
-        // 定義套件的內容。
-        const filesToPackage = [
-            {name: 'shader.wgsl', content: wgslCode},
-            {name: 'pipeline.json', content: JSON.stringify(pipelineMetadata, null, 2)},
-            {name: 'metadata.json', content: JSON.stringify(generalMetadata, null, 2)},
-        ];
+        const filesToPackage = [];
 
-        // 使用 FileUtils 寫入套件。
+        // Add individual WGSL files for each pass
+        generatedModules.forEach(module => {
+            filesToPackage.push({
+                name: `pass_${module.passIndex}.wgsl`,
+                content: module.wgslCode
+            });
+        });
+
+        // Add pipeline metadata (now includes resource bindings)
+        filesToPackage.push({
+            name: 'pipeline.json',
+            content: JSON.stringify(pipelineMetadata, null, 2)
+        });
+
+        // Add general metadata
+        filesToPackage.push({
+            name: 'metadata.json',
+            content: JSON.stringify(generalMetadata, null, 2)
+        });
+
+        // Use FileUtils to write the package.
         await FileUtils.zipFiles(filesToPackage, outputPath);
 
         console.log("OutputPackager: 打包完成。");

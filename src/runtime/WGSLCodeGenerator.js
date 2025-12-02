@@ -69,7 +69,9 @@ export class WGSLCodeGenerator {
         const generatedModules = [];
 
         // 注入通用程式碼區塊。
-        const commonCode = shaderInfo.commonCode ? `// --- 通用程式碼 ---\n${shaderInfo.commonCode.replace(/type\s+/g, 'alias ')}\n\n` : '';
+        const commonCode = shaderInfo.commonCode
+            ? `// --- 通用程式碼 ---\n${shaderInfo.commonCode}\n\n`
+            : '';
 
         // 生成統一緩衝區結構和綁定 (如果有的話)
         let uniformBufferCode = '';

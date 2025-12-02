@@ -67,22 +67,28 @@ async function main() {
         const shaderInfo = shaderParser.parse(fxCode);
 
         // 3. Generate WGSL code from the IR using the runtime generator directly.
-        console.log("Generating WGSL code...");
+        console.log("Generating WGSL code and pass-specific resource bindings...");
         const codeGenerator = new WGSLCodeGenerator();
-        // The runtime generator produces an array of modules. We'll concatenate them for the output package.
+        // The runtime generator produces an array of modules, each containing WGSL code and its bound resources.
         const generatedModules = codeGenerator.generate(shaderInfo);
-        const wgslCode = generatedModules.map(m => m.wgslCode).join('\n\n/* --- SEPARATOR --- */\n\n');
-
 
         // 4. Generate metadata JSON from the IR.
         console.log("Generating pipeline metadata...");
         const metadataGenerator = new PipelineMetadataGenerator();
         const {pipeline, metadata} = metadataGenerator.generate(shaderInfo);
 
+        // Augment pipeline metadata with pass-specific resource binding information
+        pipeline.passes.forEach(p => {
+            const correspondingModule = generatedModules.find(m => m.passIndex === p.index);
+            if (correspondingModule) {
+                p.resources = correspondingModule.resources;
+            }
+        });
+
         // 5. Package all artifacts for distribution.
         console.log(`Packaging output to ${outputZipFile}...`);
         const packager = new OutputPackager();
-        await packager.package(wgslCode, pipeline, metadata, outputZipFile);
+        await packager.package(generatedModules, pipeline, metadata, outputZipFile);
 
         console.log(`
 Successfully compiled ${inputFxFile}.`);
