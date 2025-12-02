@@ -6,7 +6,10 @@
  * 提供用於編譯和運行 WGFX 效果的高級 API。
  */
 
-import {ShaderParser} from './Parser.js';
+import {createRequire} from 'module';
+
+const require = createRequire(import.meta.url);
+const shaderParser = require('./ShaderParser.cjs');
 import {ResourceManager} from './ResourceManager.js';
 import {PipelineManager} from './PipelineManager.js';
 import {WGSLCodeGenerator} from './WGSLCodeGenerator.js';
@@ -23,7 +26,7 @@ export class WGFXRuntime {
         this.device = device;
 
         // 實例化所有必要的子模組。
-        this.parser = new ShaderParser();
+        // this.parser = new ShaderParser(); // No longer needed
         this.resourceManager = new ResourceManager(this.device);
         this.pipelineManager = new PipelineManager(this.device, this.resourceManager);
         this.wgslCodeGenerator = new WGSLCodeGenerator();
@@ -31,7 +34,7 @@ export class WGFXRuntime {
 
         /**
          * 當前編譯著色器的中介表示。
-         * @type {import('./Parser.js').WGFXShaderInfo | null}
+         * @type {import('./ShaderParser.js').WGFXShaderInfo | null}
          */
         this.shaderInfo = null;
     }
@@ -46,14 +49,14 @@ export class WGFXRuntime {
         console.log("WGFXRuntime: 開始效果編譯...");
 
         // 1. 解析 FX 檔案以獲取中介表示 (IR)。
-        this.shaderInfo = this.parser.parse(effectCode);
+        this.shaderInfo = shaderParser.parse(effectCode);
         console.log("WGFXRuntime: 已解析 ShaderInfo (IR):", this.shaderInfo);
 
         // 2. 從 IR 生成單個 WGSL 著色器模組。
         const generatedModules = this.wgslCodeGenerator.generate(this.shaderInfo);
-        if (this.parser.debug) {
-            console.log("WGFXRuntime: 已生成 WGSL 模組:", generatedModules);
-        }
+        // if (this.parser.debug) { // Old debug check removed
+        //     console.log("WGFXRuntime: 已生成 WGSL 模組:", generatedModules);
+        // }
 
         // 3. 根據 IR 初始化所有 GPU 資源 (紋理、取樣器、緩衝區)。
         this.resourceManager.initialize(this.shaderInfo);

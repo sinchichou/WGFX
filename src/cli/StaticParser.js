@@ -1,34 +1,29 @@
-// src/cli/StaticParser.js
+/**
+ * @fileoverview A static parser for WGFX shader files.
+ * This parser is used at build time (by the CLI) to create a static
+ * representation of a shader's structure.
+ * It uses the Peggy-generated parser.
+ */
+import {createRequire} from 'module';
+
+const require = createRequire(import.meta.url);
+const shaderParser = require('../runtime/ShaderParser.cjs');
 
 /**
- * @fileoverview A parser for the CLI context.
- * This parser is intended for static, compile-time analysis of FX files.
- * It inherits from the main ShaderParser but could be extended with
- * CLI-specific validation or logic.
+ * The static parser for WGFX files.
  */
-
-import {ShaderParser} from '../runtime/Parser.js';
-
-/**
- * Represents the parser used in the command-line interface.
- * For now, it is identical to the runtime ShaderParser. It could be
- * extended to enforce stricter rules, such as disallowing dynamic
- * expressions or ensuring all parameters have constant default values.
- */
-export class StaticParser extends ShaderParser {
+export class StaticParser {
     /**
-     * @param {boolean} [debug=false] - If true, logs parsing steps to the console.
+     * @param {string} shaderCode The shader code to parse.
+     * @returns {any} The parsed shader information object (IR).
      */
-    constructor(debug = false) {
-        super(debug);
-        if (debug) {
-            console.log("StaticParser initialized. This parser is used for static analysis and may have stricter rules than the runtime parser.");
+    parse(shaderCode) {
+        // Peggy parser might throw its own error type
+        try {
+            return shaderParser.parse(shaderCode);
+        } catch (e) {
+            // Re-throw with a more generic error or format it if needed
+            throw new Error(`Parsing failed: ${e.message}`);
         }
     }
-
-    // No overrides are necessary for now, as the parsing logic is shared.
-    // Future CLI-specific validation could be added here.
-    // For example, a static parser might throw an error if a `//! PARAMETER`
-    // is missing a `//! DEFAULT` value, whereas a runtime parser might allow it
-    // if the value is expected to be provided dynamically.
 }

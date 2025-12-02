@@ -120,7 +120,8 @@ export class WGSLCodeGenerator {
 
             // 宣告此通道使用的紋理
             shaderInfo.textures.forEach(tex => {
-                if (usedTextureNames.has(tex.name)) {
+                const isUsed = [...usedTextureNames].some(usedName => tex.name === usedName || tex.name.startsWith(usedName + "_"));
+                if (isUsed) {
                     const isStorage = pass.out.includes(tex.name) || shaderInfo.passes.some(p => p.out.includes(tex.name) && p.index < pass.index && usedTextureNames.has(tex.name));
                     const format = (tex.format || 'rgba8unorm').toLowerCase().replace(/_/g, '');
                     const currentBinding = bindingIndex++; // Assign dynamic binding
