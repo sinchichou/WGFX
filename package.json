@@ -8,8 +8,11 @@
   },
   "private": true,
   "dependencies": {
-    "webgpu": "^0.3.8",
-    "archiver": "^7.0.1"
+    "archiver": "^7.0.1",
+    "webgpu": "^0.3.8"
   },
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "peggy": "^5.0.6"
+  }
 }
