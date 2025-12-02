@@ -35,7 +35,7 @@ export class WGSLCodeGenerator {
             // Pass2-Pass7: let gxy: uint2 = Rmp8x8(local_id.x) + blockStart;
             // Change to: let gxy: uint2 = Rmp8x8(local_id.x) + workgroup_id.xy * 8u;
             processedCode = processedCode.replace(
-                /let gxy: uint2 = Rmp8x8\(local_id\.x\) \+ blockStart;/,
+                /let gxy: uint2\s*=\s*Rmp8x8\(local_id\.x\) \+ blockStart;/,
                 'let gxy: uint2 = Rmp8x8(local_id.x) + workgroup_id.xy * 8u;'
             );
         } else if (passIndex === 8) {
@@ -122,10 +122,24 @@ export class WGSLCodeGenerator {
             shaderInfo.textures.forEach(tex => {
                 const isUsed = [...usedTextureNames].some(usedName => tex.name === usedName || tex.name.startsWith(usedName + "_"));
                 if (isUsed) {
-                    const isStorage = pass.out.includes(tex.name) || shaderInfo.passes.some(p => p.out.includes(tex.name) && p.index < pass.index && usedTextureNames.has(tex.name));
+                    const isStorage = tex.name.endsWith('_storaged') || tex.name === 'OUTPUT';
                     const format = (tex.format || 'rgba8unorm').toLowerCase().replace(/_/g, '');
+                    let textureType;
+                    if (tex.name.endsWith('_sampled')) { // Heuristic: sampled textures are texture_2d<f32>
+                        textureType = 'texture_2d<f32>';
+                    } else if (tex.name.endsWith('_storaged')) { // Heuristic: storaged textures are texture_storage_2d
+                        textureType = `texture_storage_2d<${format}, write>`;
+                    } else if (tex.name === 'INPUT') {
+                        textureType = 'texture_2d<f32>';
+                    } else if (tex.name === 'OUTPUT') {
+                        textureType = `texture_storage_2d<${format}, write>`;
+                    } else {
+                        // Fallback, if no clear naming convention, use isStorage flag from pass usage
+                        textureType = isStorage ? `texture_storage_2d<${format}, write>` : `texture_2d<f32>`;
+                    }
+
                     const currentBinding = bindingIndex++; // Assign dynamic binding
-                    wgsl += `@group(0) @binding(${currentBinding}) var ${tex.name}: ${isStorage ? `texture_storage_2d<${format}, write>` : `texture_2d<f32>`};\n`;
+                    wgsl += `@group(0) @binding(${currentBinding}) var ${tex.name}: ${textureType};\n`;
                     passResources.textures.push({ ...tex, binding: currentBinding, group: 0, isStorage: isStorage });
                 }
             });
