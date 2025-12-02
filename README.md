@@ -22,7 +22,8 @@ WGFX/
 │   │
 │   ├─ runtime/              # Runtime 核心邏輯
 │   │   ├─ WGFXRuntime.js    # Runtime 核心流程控制器
-│   │   ├─ Parser.js         # 特效檔案格式的核心解析器
+│   │   ├─ Parser.js         # shader 解析成 AST
+│   │   ├─ AST2IR.js          # AST → 結構化 IR (WGFXShaderInfo)
 │   │   ├─ ResourceManager.js  # GPU 資源 (Texture, Buffer, Sampler) 管理器
 │   │   ├─ PipelineManager.js  # Render/Compute Pipeline 與 Bind Group 管理器
 │   │   ├─ WGSLCodeGenerator.js # 從中間表示 (IR) 生成 WGSL Shader Code
