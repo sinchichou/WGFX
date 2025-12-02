@@ -64,9 +64,10 @@ async function main() {
 
         // 5. Dispatch all passes of the effect.
         for (const pass of shaderInfo.passes) {
-            console.log(`Dispatching pass: '${pass.name}'`);
-            dispatchPass(pass.name, commandEncoder);
-            console.log(`Pass '${pass.name}' dispatched.`);
+            const passName = `PASS_${pass.index}`;
+            console.log(`Dispatching pass: '${passName}'`);
+            dispatchPass(passName, commandEncoder);
+            console.log(`Pass '${passName}' dispatched.`);
         }
 
         // 6. Get the output texture view.

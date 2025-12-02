@@ -79,7 +79,7 @@ export class PipelineManager {
                             bindGroupLayoutEntries.push({
                                 binding: tex.binding,
                                 visibility: GPUShaderStage.COMPUTE,
-                                ...(tex.isStorage ? { storageTexture: { format: tex.format, access: 'write-only' } } : { texture: { sampleType: 'float' } })
+                                ...(tex.isStorage ? { storageTexture: { format: tex.format || 'rgba8unorm', access: 'write-only' } } : { texture: { sampleType: 'float' } })
                             });
                         });
             
