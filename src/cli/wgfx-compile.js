@@ -9,12 +9,17 @@
  * To run from the project root:
  * node src/cli/wgfx-compile.js --input examples/demo.fx --output build/demo.zip
  */
+import {createRequire} from 'module';
 
-import {StaticParser} from './StaticParser.js';
-import {WGSLCodeGeneratorCLI} from './WGSLCodeGeneratorCLI.js';
+const require = createRequire(import.meta.url);
+
+import {WGSLCodeGenerator} from '../runtime/WGSLCodeGenerator.js';
 import {PipelineMetadataGenerator} from './PipelineMetadataGenerator.js';
 import {OutputPackager} from './OutputPackager.js';
 import {FileUtils} from '../utils/FileUtils.js';
+
+// Directly use the runtime parser.
+const shaderParser = require('../runtime/ShaderParser.cjs');
 
 /**
  * A simple command-line argument parser.
@@ -57,15 +62,17 @@ async function main() {
         console.log(`Reading FX file: ${inputFxFile}`);
         const fxCode = await FileUtils.readFile(inputFxFile);
 
-        // 2. Parse the file into an Intermediate Representation (IR).
+        // 2. Parse the file into an Intermediate Representation (IR) using the runtime parser directly.
         console.log("Parsing FX file...");
-        const staticParser = new StaticParser();
-        const shaderInfo = staticParser.parse(fxCode);
+        const shaderInfo = shaderParser.parse(fxCode);
 
-        // 3. Generate WGSL code from the IR.
+        // 3. Generate WGSL code from the IR using the runtime generator directly.
         console.log("Generating WGSL code...");
-        const codeGenerator = new WGSLCodeGeneratorCLI();
-        const wgslCode = codeGenerator.generate(shaderInfo);
+        const codeGenerator = new WGSLCodeGenerator();
+        // The runtime generator produces an array of modules. We'll concatenate them for the output package.
+        const generatedModules = codeGenerator.generate(shaderInfo);
+        const wgslCode = generatedModules.map(m => m.wgslCode).join('\n\n/* --- SEPARATOR --- */\n\n');
+
 
         // 4. Generate metadata JSON from the IR.
         console.log("Generating pipeline metadata...");
@@ -86,4 +93,4 @@ Successfully compiled ${inputFxFile}.`);
     }
 }
 
-main();
+export {main as mainCLI};

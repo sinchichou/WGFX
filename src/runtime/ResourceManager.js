@@ -8,24 +8,22 @@
 
 let GPUDevice, GPUTextureUsage, GPUBufferUsage;
 
-// 在 Node.js 環境中，WebGPU 物件不存在。我們建立模擬物件
-// 以允許程式碼在沒有實際 GPU 的情況下執行。
+// In a Node.js environment, native WebGPU objects don't exist.
+// We check for their existence on the global scope. If they don't exist,
+// they will remain `undefined`, which is safe for the CLI code path
+// as it doesn't instantiate or use any GPU-related objects.
 try {
-    // 嘗試在全域範圍內找到真實的 WebGPU 物件 (例如，在瀏覽器中)。
+    // This will only succeed in a browser-like environment with WebGPU support.
     if (globalThis.GPUDevice) {
         GPUDevice = globalThis.GPUDevice;
         GPUTextureUsage = globalThis.GPUTextureUsage;
         GPUBufferUsage = globalThis.GPUBufferUsage;
-    } else {
-        GPUDevice = WebGPUMock.GPUDevice;
-        GPUTextureUsage = WebGPUMock.GPUTextureUsage;
-        GPUBufferUsage = WebGPUMock.GPUBufferUsage;
     }
+    // In Node.js or a non-WebGPU environment, these will remain undefined.
+    // This is safe because the CLI path does not use this functionality.
 } catch (e) {
-    // 回退到模擬
-    GPUDevice = WebGPUMock.GPUDevice;
-    GPUTextureUsage = WebGPUMock.GPUTextureUsage;
-    GPUBufferUsage = WebGPUMock.GPUBufferUsage;
+    // Ignore any errors during this detection phase.
+    // The variables will simply remain undefined.
 }
 
 

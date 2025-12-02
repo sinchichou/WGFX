@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "bin": {
+    "wgfx": "index.js"
+  },
   "scripts": {
     "test": "node test/test_runtime.js"
   },

@@ -7,14 +7,18 @@
 
 let GPUDevice;
 
+// In a Node.js environment, native WebGPU objects don't exist.
+// We check for their existence on the global scope. If they don't exist,
+// `GPUDevice` will remain `undefined`, which is safe for the CLI code path
+// as it doesn't instantiate or use any GPU-related objects.
 try {
+    // This will only succeed in a browser-like environment with WebGPU support.
     if (globalThis.GPUDevice) {
         GPUDevice = globalThis.GPUDevice;
-    } else {
-        GPUDevice = WebGPUMock.GPUDevice;
     }
+    // In Node.js or a non-WebGPU environment, this will remain undefined.
 } catch (e) {
-    GPUDevice = WebGPUMock.GPUDevice;
+    // Ignore any errors during this detection phase.
 }
 
 export class UniformBinder {
