@@ -44,7 +44,6 @@ WGFX/
 │   │
 │   └─ utils/                # Common utility functions
 │       ├─ FunctionOverloadResolver.js # Function overload resolution
-│       ├─ MacroExpander.js    # Macro expansion
 │       └─ FileUtils.js      # File reading/writing and Zip processing
 │
 ├─ test/                     # Test files

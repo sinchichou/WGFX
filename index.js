@@ -3,9 +3,13 @@
 // index.js
 
 /**
- * @fileoverview This is the main entry point for the WGFX package.
- * It serves as a router to either execute the command-line interface (CLI)
- * or to re-export the public API for consumption as a Node.js module.
+ * @fileoverview
+ * - EN: This is the main entry point for the WGFX package.
+ *   It serves as a router to either execute the command-line interface (CLI)
+ *   or to re-export the public API for consumption as a Node.js module.
+ * - TW: 這是 WGFX 套件的主要入口點。
+ *   它作為一個路由器，可以執行命令列介面 (CLI)，
+ *   或者重新匯出公共 API 供 Node.js 模組使用。
  */
 
 // Check if any command-line arguments are passed.

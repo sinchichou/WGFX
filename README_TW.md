@@ -40,7 +40,6 @@ WGFX/
 │   │
 │   └─ utils/                # 共用工具函式
 │       ├─ FunctionOverloadResolver.js # 函數重載解析
-│       ├─ MacroExpander.js    # 巨集 (Macro) 展開
 │       └─ FileUtils.js      # 檔案讀寫與 Zip 處理
 │
 ├─ test/                     # 測試檔案
