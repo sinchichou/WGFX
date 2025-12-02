@@ -35,6 +35,7 @@ fn GetInputPt() -> MF2 {
 fn Rmp8x8(idx: u32) -> uint2 {
     return uint2(idx / 8u, idx % 8u);
 }
+//!END COMMON
 
 //!TEXTURE
 @group(0) @binding(0) var INPUT: texture_2d<f32>;
@@ -100,10 +101,12 @@ fn Rmp8x8(idx: u32) -> uint2 {
 @group(1) @binding(7) var tex8_sampled: texture_2d<f32>;
 @group(2) @binding(7) var tex8_storaged: texture_storage_2d<rgba16float, read_write>;
 
+//!END TEXTURE
 
 //!SAMPLER
 //!FILTER POINT
 @group(0) @binding(10) var sam: sampler;
+//!END SAMPLER
 
 //!PASS 1
 //!DESC Conv-4x3x3x3
@@ -188,6 +191,7 @@ fn Pass1(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 		}
 	}
 }
+//!END PASS 1
 
 //!PASS 2
 //!DESC Conv-4x3x3x24
@@ -309,7 +313,7 @@ fn Pass2(
     target1 = (a1 * MF4x4(-0.09962672, -0.09808486, 0.14167309, 0.050132442, 0.10861549, -0.03472704, -0.13705672, -0.029933043, 0.09841877, 0.07278074, -0.017292077, -0.027848938, 0.07552298, 0.076578915, -0.023463586, 0.052939452) + target1);
    	target1 = (b1 * MF4x4(0.0010984733, -0.17330085, -0.08229318, -0.2175911, 0.08144593, 0.059445348, -0.15086831, -0.10372944, 0.117648594, -0.12558225, -0.11103407, -0.0701386, -0.05065664, -0.07396901, -0.11938091, 0.039866682) + target1);
    	target1 = (c1 * MF4x4(0.15428792, 0.23440446, 0.21962269, 0.2650896, -0.03476033, 0.15719226, -0.12486064, 0.2167058, -0.023046771, -0.20562397, 0.10107006, -0.01569021, 0.16730824, -0.01259593, 0.053364236, -0.04500823) + target1);
-	target1 = (d1 * MF4x4(0.030429626, -0.13110232, 0.057990804, 0.011675255, -0.05295247, -0.15326303, 0.22707884, -0.07973966, 0.0439027, -0.13198115, 0.07837125, -0.07131822, 0.05269012, -0.2104038, 0.048907652, -0.020645073) + target1);
+	  target1 = (d1 * MF4x4(0.030429626, -0.13110232, 0.057990804, 0.011675255, -0.05295247, -0.15326303, 0.22707884, -0.07973966, 0.0439027, -0.13198115, 0.07837125, -0.07131822, 0.05269012, -0.2104038, 0.048907652, -0.020645073) + target1);
    	target1 = (e1 * MF4x4(0.0031781355, -0.021097122, -0.26952672, -0.3207644, 0.08375256, -0.14136748, 0.18542029, 0.15215854, 0.091964215, 0.26967737, 0.0587766, -0.07700872, 0.16575423, 0.35469708, -0.0051588053, -0.0006740279) + target1);
    	target1 = (f1 * MF4x4(-0.08884001, 0.14041351, 0.17474355, 0.4161406, 0.023943432, 0.003970282, 0.29985484, 0.10266973, -0.25273883, -0.14029191, 0.11345857, 0.31820163, -0.38953283, 0.2583901, 0.009964725, 0.058217626) + target1);
   	target1 = (g1 * MF4x4(-0.2032424, -0.07082582, 0.1580928, -0.048965808, 0.2141858, -0.041104354, -0.034682848, -0.15914723, 0.04790725, -0.024282899, 0.07099358, 0.16498338, -0.112657525, -0.0616071, -0.008030092, -0.016227499) + target1);
@@ -479,6 +483,7 @@ fn Pass2(
     textureStore(tex6_storaged, gxy, target3);
 
 }
+//!END PASS 2
 
 //!PASS 3
 //!DESC Conv-4x3x3x24
@@ -762,6 +767,7 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     textureStore(tex2_storaged, gxy, target2);
     textureStore(tex3_storaged, gxy, target3);
 }
+//!END PASS 3
 
 //!PASS 4
 //!DESC Conv-4x3x3x24
@@ -1045,6 +1051,7 @@ fn Pass4(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     textureStore(tex5_storaged, gxy, target2);
     textureStore(tex6_storaged, gxy, target3);
 }
+//!END PASS 4
 
 //!PASS 5
 //!DESC Conv-4x3x3x24
@@ -1333,6 +1340,8 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     textureStore(tex3_storaged, gxy, target3);
     textureStore(tex7_storaged, gxy, target, MF4(target4, 1.0));
 }
+//!END PASS 5
+
 
 //!PASS 6
 //!DESC Conv-4x3x3x24
@@ -1625,6 +1634,7 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     textureStore(tex6_sampled.storaged, gxy, target3);
     textureStore(tex8_storaged, gxy, target, MF4(target4, 1.0));
 }
+//!END PASS 6
 
 //!PASS 7
 //!DESC Conv-4x3x3x24
@@ -1917,6 +1927,7 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     textureStore(tex3_storaged, gxy, target3);
     textureStore(tex7_storaged, gxy, target, MF4(target4, 1.0));
 }
+//!END PASS 7
 
 //!PASS 8
 //!DESC Conv-4x3x3x24, Conv-3x1x1x120
@@ -2212,3 +2223,4 @@ fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	result += textureSampleLevel(INPUT, sam, pos, 0.0).rgb;
 	textureStore(OUTPUT, gxy, MF4(result, 1.0));
 }
+//!END PASS 8
