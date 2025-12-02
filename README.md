@@ -1,78 +1,86 @@
-# **WGFX 專案完整技術規格與開發指南**
+### [中文版本 (Chinese Version)](README_TW.md)
 
-## **開發狀態**
+# WGFX Project: Complete Technical Specification and Development Guide
 
-**狀態：** `未完成`
+## Development Status
 
-本專案的所有模組（包括運行時和 CLI 工具）均已根據本文件中概述的技術規格實現。每個檔案都已添加註釋，以闡明其功能和職責。該專案現在功能齊全，可供使用。
+**Status:** `Testing`
 
-本文件旨在提供 WGFX 專案的完整架構、`.wgsl` 特效檔案格式的詳細規格、Runtime 執行流程，以及從既有 HLSL (Magpie) 遷移至 WGSL 的核心轉換指南。
+All modules (including runtime and CLI tools) in this project have been implemented according to the technical
+specifications outlined in this document. Each file has been commented to clarify its functionality and
+responsibilities. The project is now fully functional and ready for use.
 
-## **1. 專案架構與檔案職責**
+This document aims to provide the complete architecture of the WGFX project, detailed specifications for the `.wgsl`
+effect file format, the Runtime execution flow, and core conversion guidelines for migrating from existing HLSL (Magpie)
+to WGSL.
 
-專案遵循單一職責原則，確保模組化與可維護性。以下為核心檔案及其職責：
+## 1. Project Architecture and File Responsibilities
+
+The project follows the Single Responsibility Principle, ensuring modularity and maintainability. Below are the core
+files and their responsibilities:
 
 ```
 WGFX/
-├─ package.json              # Node.js 專案設定、依賴管理
-├─ package-lock.json         # Node.js 依賴鎖定檔案
-├─ README.md                 # 專案說明、使用指南
+├─ package.json              # Node.js Project settings, dependency management
+├─ package-lock.json         # Node.js dependency lock file
+├─ README.md                 # Project description, usage guide
 ├─ src/
-│   ├─ index.js              # 專案對外的主要接口 (API Entry Point)
+│   ├─ index.js              # Main project interface (API Entry Point)
 │   │
-│   ├─ runtime/              # Runtime 核心邏輯
-│   │   ├─ WGFXRuntime.js    # Runtime 核心流程控制器
-│   │   ├─ Parser.js         # shader 解析成 AST
-│   │   ├─ AST2IR.js          # AST → 結構化 IR (WGFXShaderInfo)
-│   │   ├─ ResourceManager.js  # GPU 資源 (Texture, Buffer, Sampler) 管理器
-│   │   ├─ PipelineManager.js  # Render/Compute Pipeline 與 Bind Group 管理器
-│   │   ├─ WGSLCodeGenerator.js # 從中間表示 (IR) 生成 WGSL Shader Code
-│   │   └─ UniformBinder.js    # 提供更新 Uniform Buffer 的接口
+│   ├─ runtime/              # Runtime core logic
+│   │   ├─ WGFXRuntime.js    # Runtime core process controller
+│   │   ├─ Parser.js         # Shader parsing to IR
+│   │   ├─ ResourceManager.js  # GPU resource (Texture, Buffer, Sampler) manager
+│   │   ├─ PipelineManager.js  # Render/Compute Pipeline and Bind Group manager
+│   │   ├─ WGSLCodeGenerator.js # Generates WGSL Shader Code from Intermediate Representation (IR)
+│   │   └─ UniformBinder.js    # Provides interface for updating Uniform Buffer
 │   │
-│   ├─ cli/                  # 命令列工具相關
-│   │   ├─ wgfx-compile.js   # CLI 入口，處理離線編譯
-│   │   ├─ StaticParser.js   # CLI 專用靜態解析器
-│   │   ├─ WGSLCodeGeneratorCLI.js # CLI 專用 Shader 生成器
-│   │   ├─ PipelineMetadataGenerator.js # 生成 Pipeline 與 Metadata JSON
-│   │   └─ OutputPackager.js # 將編譯產物打包為 Zip
+│   ├─ cli/                  # Command Line Interface (CLI) related
+│   │   ├─ wgfx-compile.js   # CLI entry point, handles offline compilation
+│   │   ├─ StaticParser.js   # CLI-specific static parser
+│   │   ├─ WGSLCodeGeneratorCLI.js # CLI-specific Shader generator
+│   │   ├─ PipelineMetadataGenerator.js # Generates Pipeline and Metadata JSON
+│   │   └─ OutputPackager.js # Packages compiled artifacts into a Zip file
 │   │
-│   └─ utils/                # 共用工具函式
-│       ├─ FunctionOverloadResolver.js # 函數重載解析
-│       ├─ MacroExpander.js    # 巨集 (Macro) 展開
-│       └─ FileUtils.js      # 檔案讀寫與 Zip 處理
+│   └─ utils/                # Common utility functions
+│       ├─ FunctionOverloadResolver.js # Function overload resolution
+│       ├─ MacroExpander.js    # Macro expansion
+│       └─ FileUtils.js      # File reading/writing and Zip processing
 │
-├─ test/                     # 測試檔案
-│   └─ test_runtime.js       # Runtime API 測試範例
+├─ test/                     # Test files
+│   └─ test_runtime.js       # Runtime API test example
 │
-└─ examples/                 # 範例
-    ├─ demo.wgsl             # 範例特效檔案
-    └─ demo_runtime.js       # Runtime API 使用範例
+└─ examples/                 # Examples
+    ├─ demo.wgsl             # Example effect file
+    └─ demo_runtime.js       # Runtime API usage example
 ```
 
-### **1.1. 核心模組詳解**
+### 1.1. Core Module Details
 
-*   **`index.js` (Runtime 對外接口)**
-    *   **職責**: 統一管理並封裝 Runtime API，作為外部調用的唯一入口。
-    *   **提供 API**:
-        *   `compile()`: 編譯特效檔案。
-        *   `dispatchPass()`: 執行一個渲染通道 (Pass)。
-        *   `updateUniform()`: 更新一個 Uniform 參數。
-        *   `getOutput()`: 獲取最終渲染結果。
+* **`index.js` (Runtime External Interface)**
+    * **Responsibility**: Unified management and encapsulation of Runtime APIs, serving as the sole entry point for
+      external calls.
+    * **Provided APIs**:
+        * `compile()`: Compiles effect files.
+        * `dispatchPass()`: Executes a rendering pass.
+        * `updateUniform()`: Updates a Uniform parameter.
+        * `getOutput()`: Retrieves the final rendering result.
 
-*   **`WGFXRuntime.js` (Runtime 核心流程)**
-    *   **職責**: 控制整個 Runtime 的生命週期。
-    *   **流程**:
-        1.  調用 `Parser.js` 解析 `.wgsl` 檔案，生成中間表示 (IR)。
-        2.  調用 `ResourceManager.js` 根據 IR 初始化 GPU 資源 (Texture, Sampler, Uniform Buffer)。
-        3.  調用 `PipelineManager.js` 建立 Compute/Render Pipeline 與 Bind Group。
-        4.  根據 Pass 之間的依賴關係進行排序。
-        5.  管理 Workgroup 配置並執行 Pass (Dispatch)。
+* **`WGFXRuntime.js` (Runtime Core Process)**
+    * **Responsibility**: Controls the entire lifecycle of the Runtime.
+    * **Flow**:
+        1. Calls `Parser.js` to parse `.wgsl` files, generating Intermediate Representation (IR).
+        2. Calls `ResourceManager.js` to initialize GPU resources (Texture, Sampler, Uniform Buffer) based on IR.
+        3. Calls `PipelineManager.js` to create Compute/Render Pipeline and Bind Group.
+        4. Sorts passes based on dependencies.
+        5. Manages Workgroup configuration and executes Passes (Dispatch).
 
-*   **`Parser.js` (核心解析器)**
-    *   **職責**: Runtime 與 CLI 共享的核心模組，負責讀取 `.wgsl` 檔案並轉換為結構化的中間表示 (IR)。
-    *   **解析內容**: `Header`, `Parameter`, `Texture`, `Sampler`, `Common`, `Pass` 等區塊。
-    *   **資訊收集**: 收集函數多載、宏定義 (`MP_*`, `MF`, `MULADD`)。
-    *   **輸出 (IR)**:
+* **`Parser.js` (Core Parser)**
+    * **Responsibility**: A core module shared by Runtime and CLI, responsible for reading `.wgsl` files and converting
+      them into a structured Intermediate Representation (IR).
+    * **Parsing Content**: `Header`, `Parameter`, `Texture`, `Sampler`, `Common`, `Pass` blocks, etc.
+    * **Information Collection**: Collects function overloads, macro definitions (`MP_*`, `MF`, `MULADD`).
+    * **Output (IR)**:
         ```json
         {
           "commonCode": "...",
@@ -83,88 +91,93 @@ WGFX/
         }
         ```
 
-*   **`ResourceManager.js` (GPU 資源管理)**
-    *   **職責**: 處理所有與 GPU 資源創建和維護相關的任務。
-    *   **功能**: 創建 Texture, Sampler, Uniform Buffer，並維護一個名稱對應表 (e.g., `"MyTex" -> GPUTexture Object`)。
+* **`ResourceManager.js` (GPU Resource Management)**
+    * **Responsibility**: Handles all tasks related to GPU resource creation and maintenance.
+    * **Functionality**: Creates Texture, Sampler, Uniform Buffer, and maintains a name mapping table (e.g.,
+      `"MyTex" -> GPUTexture Object`).
 
-*   **`PipelineManager.js` (Pipeline 管理)**
-    *   **職責**: 負責 Pass 的依賴分析、排序，並創建執行所需的 GPU 物件。
-    *   **功能**: 創建 Pipeline Layout, Bind Group, Compute Pipeline，並分派 Shader 執行。
+* **`PipelineManager.js` (Pipeline Management)**
+    * **Responsibility**: Responsible for Pass dependency analysis, sorting, and creating necessary GPU objects for
+      execution.
+    * **Functionality**: Creates Pipeline Layout, Bind Group, Compute Pipeline, and dispatches Shader execution.
 
-*   **`WGSLCodeGenerator.js` (WGSL 程式碼生成)**
-    *   **職責**: 將 `Parser.js` 產生的 IR 轉換為合法的 WGSL Shader 程式碼。
-    *   **功能**: 插入 `Common` 區塊、展開宏、處理函數重載、根據配置決定參數是 `inline` 還是 `uniform buffer`。
+* **`WGSLCodeGenerator.js` (WGSL Code Generation)**
+    * **Responsibility**: Converts the IR generated by `Parser.js` into valid WGSL Shader code.
+    * **Functionality**: Inserts `Common` blocks, expands macros, handles function overloads, and determines whether
+      parameters are `inline` or `uniform buffer` based on configuration.
 
-*   **`UniformBinder.js` (Uniform 更新)**
-    *   **職責**: 提供 `updateUniform(name, value)` 接口，用於動態更新 Uniform Buffer 的內容。
+* **`UniformBinder.js` (Uniform Update)**
+    * **Responsibility**: Provides the `updateUniform(name, value)` interface for dynamically updating the content of
+      the Uniform Buffer.
 
-## **2. WGFX 特效檔案格式規格 (`.wgsl`)**
+## 2. WGFX Effect File Format Specification (`.wgsl`)
 
-`.wgsl` 檔案由一系列以 `//!` 開頭的指令區塊和 WGSL 程式碼片段組成。
+The `.wgsl` file consists of a series of directive blocks starting with `//!` and WGSL code snippets.
 
-### **2.1. 檔頭區塊 (Header Block)**
+### 2.1. Header Block
 
-檔頭區塊定義了檔案的元數據和全域設定。
+The header block defines the file's metadata and global settings.
 
-| 指令                             | 必需性    | 說明                                       | 範例                              |
-|:-------------------------------|:-------|:-----------------------------------------|:--------------------------------|
-| `//! MAGPIE WebGPU EFFECT`     | **必需** | 檔案的魔術字串，必須位於檔案第一行。                       | `//! Magpie WebGPU EFFECT`      |
-| `//! VERSION <number>`         | **必需** | 特效格式版本，必須與解析器內建版本匹配。                     | `//! VERSION 4`                 |
-| `//! SORT_NAME <string>`       | 可選     | 用於 UI 排序的名稱。                             | `//! SORT_NAME "My Effect"`     |
-| `//! USE <flags>`              | 可選     | 啟用特定功能。支援 `MULADD`, `_DYNAMIC` (大小寫不敏感)。 | `//! USE MULADD`                |
-| `//! CAPABILITY <flags>`       | 可選     | 聲明所需硬體能力。支援 `FP16` (大小寫不敏感)。             | `//! CAPABILITY FP16`           |
-| `#include <...>`               | 允許     | 解析器會識別並跳過 `#include` 指令行。                | `#include "common_functions.h"` |
+| Directive                  | Required | Description                                                                  | Example                         |
+|:---------------------------|:---------|:-----------------------------------------------------------------------------|:--------------------------------|
+| `//! MAGPIE WebGPU EFFECT` | **Yes**  | Magic string for the file, must be on the first line.                        | `//! Magpie WebGPU EFFECT`      |
+| `//! VERSION <number>`     | **Yes**  | Effect format version, must match the parser's built-in version.             | `//! VERSION 4`                 |
+| `//! SORT_NAME <string>`   | Optional | Name used for UI sorting.                                                    | `//! SORT_NAME "My Effect"`     |
+| `//! USE <flags>`          | Optional | Enables specific features. Supports `MULADD`, `_DYNAMIC` (case-insensitive). | `//! USE MULADD`                |
+| `//! CAPABILITY <flags>`   | Optional | Declares required hardware capabilities. Supports `FP16` (case-insensitive). | `//! CAPABILITY FP16`           |
+| `#include <...>`           | Allowed  | The parser identifies and skips `#include` directive lines.                  | `#include "common_functions.h"` |
 
-### **2.2. 參數區塊 (Parameter Block)**
+### 2.2. Parameter Block
 
-定義可在 UI 中調整的 Uniform 參數。
+Defines Uniform parameters that can be adjusted in the UI.
 
-| 指令                     | 必需性    | 說明                                          | 範例                         |
-|:-----------------------|:-------|:--------------------------------------------|:---------------------------|
-| `//! PARAMETER <name>` | **選擇** | 宣告一個參數區塊的開始及其在程式碼中的識別符，如無，則下列皆不須            | `//! PARAMETER Brightness` |
-| `//! DEFAULT <value>`  | **必需** | 參數的預設值。                                     | `//! DEFAULT 1.0`          |
-| `//! MIN <value>`      | **必需** | 參數的最小值。                                     | `//! MIN 0.0`              |
-| `//! MAX <value>`      | **必需** | 參數的最大值。                                     | `//! MAX 2.0`              |
-| `//! STEP <value>`     | **必需** | 參數在 UI 中調整的步進值。                             | `//! STEP 0.01`            |
-| `//! LABEL <string>`   | 可選     | 在 UI 上顯示的標籤名稱。                              | `//! LABEL "Brightness"`   |
-| `type name;`           | **必需** | 區塊結尾必須是 HLSL 格式的變數宣告。類型僅支援 `float` 或 `int`。 | `float Brightness;`        |
+| Directive              | Required     | Description                                                                                                             | Example                    |
+|:-----------------------|:-------------|:------------------------------------------------------------------------------------------------------------------------|:---------------------------|
+| `//! PARAMETER <name>` | **Optional** | Declares the start of a parameter block and its identifier in the code. If omitted, none of the following are required. | `//! PARAMETER Brightness` |
+| `//! DEFAULT <value>`  | **Yes**      | Default value for the parameter.                                                                                        | `//! DEFAULT 1.0`          |
+| `//! MIN <value>`      | **Yes**      | Minimum value for the parameter.                                                                                        | `//! MIN 0.0`              |
+| `//! MAX <value>`      | **Yes**      | Maximum value for the parameter.                                                                                        | `//! MAX 2.0`              |
+| `//! STEP <value>`     | **Yes**      | Step value for parameter adjustment in the UI.                                                                          | `//! STEP 0.01`            |
+| `//! LABEL <string>`   | Optional     | Label name to display in the UI.                                                                                        | `//! LABEL "Brightness"`   |
+| `type name;`           | **Yes**      | The end of the block must be an HLSL-format variable declaration. Type only supports `float` or `int`.                  | `float Brightness;`        |
 
-* **驗證規則**:
-    *   `DEFAULT`, `MIN`, `MAX`, `STEP` 四個指令必須全部存在。
-    *   數值必須滿足 `MIN <= DEFAULT <= MAX`。
+* **Validation Rules**:
+    * All four directives `DEFAULT`, `MIN`, `MAX`, `STEP` must be present.
+    * Values must satisfy `MIN <= DEFAULT <= MAX`.
 
-### **2.3. 紋理區塊 (Texture Block)**
+### 2.3. Texture Block
 
-定義效果中使用的紋理資源。
+Defines texture resources used in the effect.
 
-| 指令                    | 必需性    | 說明                               | 範例                          |
-|:----------------------|:-------|:---------------------------------|:----------------------------|
-| `//! TEXTURE <name>`  | **必需** | 宣告一個紋理區塊的開始及其識別符。                | `//! TEXTURE MyTex`         |
-| `//! SOURCE <string>` | 可選     | 指定紋理來源於檔案。若指定此項，則不能有其他選項。        | `//! SOURCE "noise.png"`    |
-| `//! FORMAT <format>` | 多數情況必需 | 紋理格式。格式名稱需匹配預定義列表。               | `//! FORMAT R8G8B8A8_UNORM` |
-| `//! WIDTH <expr>`    | 可選     | 紋理寬度，可為數字或表達式 (如 `INPUT_WIDTH`)。 | `//! WIDTH 1920`            |
-| `//! HEIGHT <expr>`   | 可選     | 紋理高度。`WIDTH` 和 `HEIGHT` 必須成對出現。  | `//! HEIGHT INPUT_HEIGHT`   |
-| `Texture2D name;`     | **必需** | 區塊結尾必須是 HLSL 格式的紋理宣告。            | `Texture2D MyTex;`          |
+| Directive             | Required   | Description                                                                           | Example                     |
+|:----------------------|:-----------|:--------------------------------------------------------------------------------------|:----------------------------|
+| `//! TEXTURE <name>`  | **Yes**    | Declares the start of a texture block and its identifier.                             | `//! TEXTURE MyTex`         |
+| `//! SOURCE <string>` | Optional   | Specifies the texture source from a file. If specified, no other options are allowed. | `//! SOURCE "noise.png"`    |
+| `//! FORMAT <format>` | Mostly Yes | Texture format. Format name must match a predefined list.                             | `//! FORMAT R8G8B8A8_UNORM` |
+| `//! WIDTH <expr>`    | Optional   | Texture width, can be a number or expression (e.g., `INPUT_WIDTH`).                   | `//! WIDTH 1920`            |
+| `//! HEIGHT <expr>`   | Optional   | Texture height. `WIDTH` and `HEIGHT` must appear in pairs.                            | `//! HEIGHT INPUT_HEIGHT`   |
+| `Texture2D name;`     | **Yes**    | The end of the block must be an HLSL-format texture declaration.                      | `Texture2D MyTex;`          |
 
-* **特殊內建紋理**:
-    *   `INPUT`: 預設的輸入紋理 (index 0)。
-    *   `OUTPUT`: 預設的輸出紋理 (index 1)。
-    *   解析器會對這兩個名稱進行特殊處理。
+* **Special Built-in Textures**:
+    * `INPUT`: Default input texture (index 0).
+    * `OUTPUT`: Default output texture (index 1).
+    * The parser handles these two names specially.
 
-### **2.4. 採樣器區塊 (Sampler Block)**
+### 2.4. Sampler Block
 
-定義紋理採樣的行為。
+Defines the behavior of texture sampling.
 
-| 指令                   | 必需性    | 說明                          | 範例                        |
-|:---------------------|:-------|:----------------------------|:--------------------------|
-| `//! SAMPLER <name>` | **必需** | 宣告一個採樣器區塊的開始及其識別符。          | `//! SAMPLER MySampler`   |
-| `//! FILTER <mode>`  | **必需** | 過濾模式。支援 `LINEAR` 或 `POINT`。 | `//! FILTER LINEAR`       |
-| `//! ADDRESS <mode>` | 可選     | 尋址模式。支援 `CLAMP` 或 `WRAP`。   | `//! ADDRESS CLAMP`       |
-| `SamplerState name;` | **必需** | 區塊結尾必須是 HLSL 格式的採樣器宣告。      | `SamplerState MySampler;` |
+| Directive            | Required | Description                                                      | Example                   |
+|:---------------------|:---------|:-----------------------------------------------------------------|:--------------------------|
+| `//! SAMPLER <name>` | **Yes**  | Declares the start of a sampler block and its identifier.        | `//! SAMPLER MySampler`   |
+| `//! FILTER <mode>`  | **Yes**  | Filter mode. Supports `LINEAR` or `POINT`.                       | `//! FILTER LINEAR`       |
+| `//! ADDRESS <mode>` | Optional | Addressing mode. Supports `CLAMP` or `WRAP`.                     | `//! ADDRESS CLAMP`       |
+| `SamplerState name;` | **Yes**  | The end of the block must be an HLSL-format sampler declaration. | `SamplerState MySampler;` |
 
-### **2.5. 通用程式碼區塊 (Common Block)**
+### 2.5. Common Code Block
 
-`//! COMMON` 區塊內的程式碼會被插入到每一個 `PASS` 的 Shader 之前，用於定義共用的函式、結構或常數。
+Code within the `//! COMMON` block will be inserted before the Shader of each `PASS`, used to define common functions,
+structures, or constants.
 
 ```hlsl
 //! COMMON
@@ -176,87 +189,93 @@ float3 grayscale(float3 color) {
 }
 ```
 
-### **2.6. 渲染通道區塊 (Pass Block)**
+### 2.6. Pass Block
 
-定義單次的渲染/計算操作。一個特效檔案可以包含多個 Pass。
+Defines a single rendering/computation operation. An effect file can contain multiple Passes.
 
-| 指令                        | 必需性     | 說明                                                                | 範例                                    |
-|:--------------------------|:--------|:------------------------------------------------------------------|:--------------------------------------|
-| `//! PASS <index>`        | **必需**  | 宣告一個 Pass 及其索引。索引必須從 `1` 開始且連續。                                   | `//! PASS 1`                          |
-| `//! IN <tex-list>`       | **必需**  | 指定該 Pass 的輸入紋理列表，以逗號分隔。                                           | `//! IN INPUT, MyTex`                 |
-| `//! OUT <tex-list>`      | **必需**  | 指定該 Pass 的輸出紋理列表，以逗號分隔。                                           | `//! OUT TempTex`                     |
-| `//! BLOCK_SIZE <w,h>`    | `CS` 必需 | **Compute Shader** 專用，定義區塊大小。                                     | `//! BLOCK_SIZE 16,16`                |
-| `//! NUM_THREADS <x,y,z>` | `CS` 必需 | **Compute Shader** 專用，定義每個 workgroup 的執行緒數量。                      | `//! NUM_THREADS 8,8,1`               |
-| `//! STYLE <PS\|CS>`      | 可選      | 指定 Pass 類型為 Pixel Shader (`PS`) 或 Compute Shader (`CS`)。預設為 `CS`。 | `//! STYLE CS`                        |
-| `//! DESC <string>`       | 可選      | Pass 的描述文字，可用於除錯或 UI 顯示。                                          | `//! DESC "First Gaussian Blur Pass"` |
+| Directive                 | Required | Description                                                                                | Example                               |
+|:--------------------------|:---------|:-------------------------------------------------------------------------------------------|:--------------------------------------|
+| `//! PASS <index>`        | **Yes**  | Declares a Pass and its index. Indices must start from `1` and be consecutive.             | `//! PASS 1`                          |
+| `//! IN <tex-list>`       | **Yes**  | Specifies the input texture list for this Pass, separated by commas.                       | `//! IN INPUT, MyTex`                 |
+| `//! OUT <tex-list>`      | **Yes**  | Specifies the output texture list for this Pass, separated by commas.                      | `//! OUT TempTex`                     |
+| `//! BLOCK_SIZE <w,h>`    | `CS` Yes | **Compute Shader** specific, defines block size.                                           | `//! BLOCK_SIZE 16,16`                |
+| `//! NUM_THREADS <x,y,z>` | `CS` Yes | **Compute Shader** specific, defines the number of threads per workgroup.                  | `//! NUM_THREADS 8,8,1`               |
+| `//! STYLE <PS\|CS>`      | Optional | Specifies the Pass type as Pixel Shader (`PS`) or Compute Shader (`CS`). Defaults to `CS`. | `//! STYLE CS`                        |
+| `//! DESC <string>`       | Optional | Description text for the Pass, usable for debugging or UI display.                         | `//! DESC "First Gaussian Blur Pass"` |
 
-* **驗證規則**:
-    *   `IN` 和 `OUT` 是每個 Pass 的必需指令。
-    *   若 `STYLE` 為 `CS` (或未指定)，則 `BLOCK_SIZE` 和 `NUM_THREADS` 必需提供。
-    *   最後一個 Pass 的 `OUT` 必須是 `OUTPUT`。
-    *   中間 Pass 的 `OUT` 不能是 `INPUT` 或 `OUTPUT`。
+* **Validation Rules**:
+    * `IN` and `OUT` are required directives for each Pass.
+    * If `STYLE` is `CS` (or unspecified), then `BLOCK_SIZE` and `NUM_THREADS` must be provided.
+    * The `OUT` of the last Pass must be `OUTPUT`.
+    * The `OUT` of intermediate Passes cannot be `INPUT` or `OUTPUT`.
 
-## **3. Runtime 執行流程**
+## 3. Runtime Execution Flow
 
-系統從載入 `.wgsl` 檔案到最終渲染輸出的完整流程如下：
+The complete flow from loading a `.wgsl` file to final rendering output is as follows:
 
-1.  **解析與生成 IR**:
-    *   `WGFXRuntime` 調用 `Parser.js` 讀取 `.wgsl` 檔案。
-    *   `Parser.js` 逐一解析 `Header`, `Parameter`, `Texture`, `Sampler`, `Common`, `Pass` 等區塊。
-    *   生成一份結構化的中間表示 (IR)，包含所有解析出的元數據和程式碼片段。
+1. **Parse and Generate IR**:
+    * `WGFXRuntime` calls `Parser.js` to read the `.wgsl` file.
+    * `Parser.js` parses blocks such as `Header`, `Parameter`, `Texture`, `Sampler`, `Common`, `Pass` one by one.
+    * Generates a structured Intermediate Representation (IR), containing all parsed metadata and code snippets.
 
-2.  **GPU 資源創建**:
-    *   `ResourceManager.js` 根據 IR 中的 `textures`, `samplers`, `parameters` 列表，創建對應的 `GPUTexture`, `GPUSampler`, `GPUBuffer` (for uniforms)。
-    *   建立一個從資源名稱到 GPU 物件的映射表，供後續使用。
+2. **GPU Resource Creation**:
+    * `ResourceManager.js` creates corresponding `GPUTexture`, `GPUSampler`, `GPUBuffer` (for uniforms) based on the
+      `textures`, `samplers`, `parameters` lists in the IR.
+    * Establishes a mapping table from resource names to GPU objects for subsequent use.
 
-3.  **Pipeline 建立**:
-    *   `PipelineManager.js` 遍歷 IR 中的 `passes` 列表。
-    *   對於每個 Pass，`WGSLCodeGenerator.js` 將其 HLSL 片段與 `commonCode` 結合，並轉換成完整的 WGSL Compute Shader 程式碼。
-    *   `PipelineManager.js` 根據 Pass 的 `IN` 和 `OUT` 資源，推導出 `GPUBindGroupLayout`。
-    *   使用生成的 WGSL Shader 和 Layout 創建 `GPUComputePipeline`。
+3. **Pipeline Creation**:
+    * `PipelineManager.js` iterates through the `passes` list in the IR.
+    * For each Pass, `WGSLCodeGenerator.js` combines its HLSL snippet with `commonCode` and converts it into complete
+      WGSL Compute Shader code.
+    * `PipelineManager.js` derives `GPUBindGroupLayout` based on the `IN` and `OUT` resources of the Pass.
+    * Creates `GPUComputePipeline` using the generated WGSL Shader and Layout.
 
-4.  **執行與渲染**:
-    *   當外部調用 `dispatchPass(index)` 時：
-    *   `PipelineManager.js` 根據 Pass 所需的資源，從 `ResourceManager` 獲取對應的 GPU 物件，並創建 `GPUBindGroup`。
-    *   `WGFXRuntime` 發出 `setPipeline`, `setBindGroup`, `dispatchWorkgroups` 等 GPU 命令。
-    *   GPU 執行 Compute Shader，將運算結果寫入 `OUT` 指定的紋理。
+4. **Execution and Rendering**:
+    * When `dispatchPass(index)` is called externally:
+    * `PipelineManager.js` obtains the corresponding GPU objects from `ResourceManager` based on the resources required
+      by the Pass and creates `GPUBindGroup`.
+    * `WGFXRuntime` issues GPU commands such as `setPipeline`, `setBindGroup`, `dispatchWorkgroups`.
+    * The GPU executes the Compute Shader, writing the computation results to the texture specified by `OUT`.
 
-5.  **動態更新**:
-    *   當外部調用 `updateUniform(name, value)` 時：
-    *   `UniformBinder.js` 將新值寫入對應的 `GPUBuffer` 中，實現參數的動態更新。
+5. **Dynamic Update**:
+    * When `updateUniform(name, value)` is called externally:
+    * `UniformBinder.js` writes new values to the corresponding `GPUBuffer`, achieving dynamic updates of parameters.
 
-## **4. HLSL/Magpie 至 WGSL/WebGPU 轉換指南**
+## 4. HLSL/Magpie to WGSL/WebGPU Conversion Guide
 
-### **4.1. 資源類型映射**
+### 4.1. Resource Type Mapping
 
-| HLSL / Magpie          | WGSL / WebGPU                              | 說明                              |
-|:-----------------------|:-------------------------------------------|:--------------------------------|
-| `Texture2D<T>` (SRV)   | `var tex: texture_2d<f32>;`                | 用於讀取的紋理，在 WGSL 中與 Sampler 分開綁定。 |
-| `RWTexture2D<T>` (UAV) | `var tex: texture_storage_2d<fmt, write>;` | 用於寫入的存儲紋理 (Storage Texture)。    |
-| `SamplerState`         | `var smp: sampler;`                        | 採樣器。                            |
-| `cbuffer` / `uniform`  | `var<uniform> uniforms: MyUniforms;`       | Uniform 常數緩衝區。                  |
+| HLSL / Magpie          | WGSL / WebGPU                              | Description                                                 |
+|:-----------------------|:-------------------------------------------|:------------------------------------------------------------|
+| `Texture2D<T>` (SRV)   | `var tex: texture_2d<f32>;`                | Texture for reading, bound separately from Sampler in WGSL. |
+| `RWTexture2D<T>` (UAV) | `var tex: texture_storage_2d<fmt, write>;` | Storage Texture for writing.                                |
+| `SamplerState`         | `var smp: sampler;`                        | Sampler.                                                    |
+| `cbuffer` / `uniform`  | `var<uniform> uniforms: MyUniforms;`       | Uniform constant buffer.                                    |
 
-### **4.2. 執行緒與 Workgroup**
+### 4.2. Threads and Workgroups
 
-| HLSL / Magpie           | WGSL / WebGPU                 | 說明                                         |
-|:------------------------|:------------------------------|:-------------------------------------------|
-| `[numthreads(x, y, z)]` | `@workgroup_size(x, y, z)`    | 在 Compute Shader 入口函式上的屬性，定義 workgroup 大小。 |
-| `Dispatch(X, Y, Z)`     | `dispatchWorkgroups(X, Y, Z)` | 分派的 Workgroup 網格數量。                        |
+| HLSL / Magpie           | WGSL / WebGPU                 | Description                                                         |
+|:------------------------|:------------------------------|:--------------------------------------------------------------------|
+| `[numthreads(x, y, z)]` | `@workgroup_size(x, y, z)`    | Attribute on Compute Shader entry function, defines workgroup size. |
+| `Dispatch(X, Y, Z)`     | `dispatchWorkgroups(X, Y, Z)` | Number of workgroup grids to dispatch.                              |
 
-### **4.3. 內建宏與函式**
+### 4.3. Built-in Macros and Functions
 
-*   **`MF` 宏**: 需根據 `CAPABILITY` 中的 `FP16` 標旗，轉換為 WGSL 中的 `f32` 或 `f16`。
-*   **`MULADD`**: 若 `USE MULADD` 被啟用，需要將對應的 HLSL 函式實現轉換為 WGSL 函式，或直接使用 `a * b + c` 的形式。
-*   **`MP_*` 宏**: 如 `MP_BLOCK_WIDTH` 等，需要根據 `//! BLOCK_SIZE` 等指令的值，在生成 WGSL 程式碼時直接替換為常數。
+* **`MF` Macro**: Needs to be converted to `f32` or `f16` in WGSL based on the `FP16` flag in `CAPABILITY`.
+* **`MULADD`**: If `USE MULADD` is enabled, the corresponding HLSL function implementation needs to be converted to a
+  WGSL function, or `a * b + c` can be used directly.
+* **`MP_*` Macros**: Such as `MP_BLOCK_WIDTH`, etc., need to be replaced directly with constant values when generating
+  WGSL code, based on the values of directives like `//! BLOCK_SIZE`.
 
-### **4.4. 綁定模型**
+### 4.4. Binding Model
 
-WebGPU 使用 Bind Group 模型，取代了 HLSL 的 `register(t0, u0, s0)`。
+WebGPU uses the Bind Group model, replacing HLSL's `register(t0, u0, s0)`.
 
-*   **策略**: 解析器必須為每個 Pass 的所有資源 (`IN`, `OUT`, `Samplers`, `Uniforms`) 分配一組唯一的 `@group(N) @binding(M)` 索引，並在生成 WGSL 時寫入。
-*   **範例綁定**:
+* **Strategy**: The parser must allocate a unique set of `@group(N) @binding(M)` indices for all resources (`IN`, `OUT`,
+  `Samplers`, `Uniforms`) of each Pass and write them when generating WGSL.
+* **Example Binding**:
 
-| 資源       | WGSL 綁定                   |
+| Resource | WGSL Binding              |
 |:---------|:--------------------------|
 | `INPUT`  | `@group(0) @binding(0)`   |
 | `OUTPUT` | `@group(0) @binding(1)`   |
@@ -264,7 +283,7 @@ WebGPU 使用 Bind Group 模型，取代了 HLSL 的 `register(t0, u0, s0)`。
 | ...      | ...                       |
 | `TexN`   | `@group(0) @binding(N+1)` |
 
-### **4.5. 基礎型態與函式映射**
+### 4.5. Basic Type and Function Mapping
 
 | HLSL                  | WGSL                 |
 |:----------------------|:---------------------|
@@ -284,3 +303,6 @@ WebGPU 使用 Bind Group 模型，取代了 HLSL 的 `register(t0, u0, s0)`。
 | `frac(x)`             | `fract(x)`           |
 | `ddx(v)`              | `dpdx(v)`            |
 | `ddy(v)`              | `dpdy(v)`            |
+
+***
+
