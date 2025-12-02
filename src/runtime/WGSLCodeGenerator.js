@@ -20,6 +20,9 @@ export class WGSLCodeGenerator {
     _preprocessPassCode(passCode, passIndex) {
         let processedCode = passCode;
 
+        // Fix WGSL type error: vec2<u32> + f32
+        processedCode = processedCode.replace(/\(gxy \+ 0\.5f\)/g, '(MF2(gxy) + 0.5f)');
+
         // Replace threadId.x with local_id.x
         processedCode = processedCode.replace(/threadId\.x/g, 'local_id.x');
 

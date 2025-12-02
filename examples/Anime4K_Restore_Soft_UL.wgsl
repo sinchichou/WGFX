@@ -201,10 +201,7 @@ fn Pass1(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 //!NUM_THREADS 64
 
 @compute @workgroup_size(64, 1, 1)
-fn Pass2(
-    @builtin(workgroup_id) workgroup_id: uint3,
-    @builtin(local_invocation_id) local_id: uint3
-) {
+fn Pass2(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
     let gxy: uint2 = Rmp8x8(local_id.x) + blockStart;
     let inputSize: uint2 = GetInputSize();
 
@@ -505,6 +502,7 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	// [ a, d, g ]
 	// [ b, e, h ]
 	// [ c, f, i ]
+    // --- Pass 1 (tex4) ---
     var a1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
     var b1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
     var c1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
@@ -525,25 +523,27 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh1: MF4 = max(-h1, MF4(0.0));
     let ni1: MF4 = max(-i1, MF4(0.0));
 
-    var a1 =  max(a1, MF4(0.0));
-    var b1 =  max(b1, MF4(0.0));
-    var c1 =  max(c1, MF4(0.0));
-    var d1 =  max(d1, MF4(0.0));
-    var e1 =  max(e1, MF4(0.0));
-    var f1 =  max(f1, MF4(0.0));
-    var g1 =  max(g1, MF4(0.0));
-    var h1 =  max(h1, MF4(0.0));
-    var i1 =  max(i1, MF4(0.0));
+    a1 =  max(a1, MF4(0.0));
+    b1 =  max(b1, MF4(0.0));
+    c1 =  max(c1, MF4(0.0));
+    d1 =  max(d1, MF4(0.0));
+    e1 =  max(e1, MF4(0.0));
+    f1 =  max(f1, MF4(0.0));
+    g1 =  max(g1, MF4(0.0));
+    h1 =  max(h1, MF4(0.0));
+    i1 =  max(i1, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex5_sampled, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    // --- Pass 2 (tex5) ---
+    // FIXED: Changed 'a1 =' to 'var a2: MF4 ='
+    var a2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e2: MF4 = textureSampleLevel(tex5_sampled, sam, pos, 0.0);
+    var f2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na2: MF4 = max(-a2, MF4(0.0));
     let nb2: MF4 = max(-b2, MF4(0.0));
@@ -555,25 +555,27 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh2: MF4 = max(-h2, MF4(0.0));
     let ni2: MF4 = max(-i2, MF4(0.0));
 
-    var a2 =  max(a2, MF4(0.0));
-    var b2 =  max(b2, MF4(0.0));
-    var c2 =  max(c2, MF4(0.0));
-    var d2 =  max(d2, MF4(0.0));
-    var e2 =  max(e2, MF4(0.0));
-    var f2 =  max(f2, MF4(0.0));
-    var g2 =  max(g2, MF4(0.0));
-    var h2 =  max(h2, MF4(0.0));
-    var i2 =  max(i2, MF4(0.0));
+    a2 =  max(a2, MF4(0.0));
+    b2 =  max(b2, MF4(0.0));
+    c2 =  max(c2, MF4(0.0));
+    d2 =  max(d2, MF4(0.0));
+    e2 =  max(e2, MF4(0.0));
+    f2 =  max(f2, MF4(0.0));
+    g2 =  max(g2, MF4(0.0));
+    h2 =  max(h2, MF4(0.0));
+    i2 =  max(i2, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex6_sampled, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    // --- Pass 3 (tex6) ---
+    // FIXED: Changed 'a1 =' to 'var a3: MF4 ='
+    var a3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e3: MF4 = textureSampleLevel(tex6_sampled, sam, pos, 0.0);
+    var f3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na3: MF4 = max(-a3, MF4(0.0));
     let nb3: MF4 = max(-b3, MF4(0.0));
@@ -585,15 +587,16 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh3: MF4 = max(-h3, MF4(0.0));
     let ni3: MF4 = max(-i3, MF4(0.0));
 
-    var a3 =  max(a3, MF4(0.0));
-    var b3 =  max(b3, MF4(0.0));
-    var c3 =  max(c3, MF4(0.0));
-    var d3 =  max(d3, MF4(0.0));
-    var e3 =  max(e3, MF4(0.0));
-    var f3 =  max(f3, MF4(0.0));
-    var g3 =  max(g3, MF4(0.0));
-    var h3 =  max(h3, MF4(0.0));
-    var i3 =  max(i3, MF4(0.0));
+    // Changed these to simple assignments (=) because they are already declared as 'var' above
+    a3 =  max(a3, MF4(0.0));
+    b3 =  max(b3, MF4(0.0));
+    c3 =  max(c3, MF4(0.0));
+    d3 =  max(d3, MF4(0.0));
+    e3 =  max(e3, MF4(0.0));
+    f3 =  max(f3, MF4(0.0));
+    g3 =  max(g3, MF4(0.0));
+    h3 =  max(h3, MF4(0.0));
+    i3 =  max(i3, MF4(0.0));
 
     var target1: MF4 = MF4(0.0026275632, -0.111531265, -0.027438803, 0.048715387);
     target1 = (a1 * MF4x4(0.2369839, -0.0792359, -0.12919348, 0.002247716, 0.04581234, 0.119436085, -0.039395507, -0.035233624, -0.031238249, 0.068567455, 0.021003028, -0.07353918, -0.12103854, -0.21112324, -0.0063801156, -0.04487009) + target1);
@@ -789,6 +792,7 @@ fn Pass4(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	// [ a, d, g ]
 	// [ b, e, h ]
 	// [ c, f, i ]
+    // --- Pass 1 (tex1) ---
     var a1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
     var b1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
     var c1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
@@ -809,25 +813,28 @@ fn Pass4(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh1: MF4 = max(-h1, MF4(0.0));
     let ni1: MF4 = max(-i1, MF4(0.0));
 
-    var a1 =  max(a1, MF4(0.0));
-    var b1 =  max(b1, MF4(0.0));
-    var c1 =  max(c1, MF4(0.0));
-    var d1 =  max(d1, MF4(0.0));
-    var e1 =  max(e1, MF4(0.0));
-    var f1 =  max(f1, MF4(0.0));
-    var g1 =  max(g1, MF4(0.0));
-    var h1 =  max(h1, MF4(0.0));
-    var i1 =  max(i1, MF4(0.0));
+    // Update existing variables
+    a1 = max(a1, MF4(0.0));
+    b1 = max(b1, MF4(0.0));
+    c1 = max(c1, MF4(0.0));
+    d1 = max(d1, MF4(0.0));
+    e1 = max(e1, MF4(0.0));
+    f1 = max(f1, MF4(0.0));
+    g1 = max(g1, MF4(0.0));
+    h1 = max(h1, MF4(0.0));
+    i1 = max(i1, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex2_sampled, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    // --- Pass 2 (tex2) ---
+    // FIXED: Changed 'var a1' to 'var a2'
+    var a2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e2: MF4 = textureSampleLevel(tex2_sampled, sam, pos, 0.0);
+    var f2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na2: MF4 = max(-a2, MF4(0.0));
     let nb2: MF4 = max(-b2, MF4(0.0));
@@ -839,25 +846,28 @@ fn Pass4(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh2: MF4 = max(-h2, MF4(0.0));
     let ni2: MF4 = max(-i2, MF4(0.0));
 
-    var a2 =  max(a2, MF4(0.0));
-    var b2 =  max(b2, MF4(0.0));
-    var c2 =  max(c2, MF4(0.0));
-    var d2 =  max(d2, MF4(0.0));
-    var e2 =  max(e2, MF4(0.0));
-    var f2 =  max(f2, MF4(0.0));
-    var g2 =  max(g2, MF4(0.0));
-    var h2 =  max(h2, MF4(0.0));
-    var i2 =  max(i2, MF4(0.0));
+    // Update existing variables
+    a2 = max(a2, MF4(0.0));
+    b2 = max(b2, MF4(0.0));
+    c2 = max(c2, MF4(0.0));
+    d2 = max(d2, MF4(0.0));
+    e2 = max(e2, MF4(0.0));
+    f2 = max(f2, MF4(0.0));
+    g2 = max(g2, MF4(0.0));
+    h2 = max(h2, MF4(0.0));
+    i2 = max(i2, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex3_sampled, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    // --- Pass 3 (tex3) ---
+    // FIXED: Changed 'var a1' to 'var a3'
+    var a3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e3: MF4 = textureSampleLevel(tex3_sampled, sam, pos, 0.0);
+    var f3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na3: MF4 = max(-a3, MF4(0.0));
     let nb3: MF4 = max(-b3, MF4(0.0));
@@ -869,15 +879,16 @@ fn Pass4(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh3: MF4 = max(-h3, MF4(0.0));
     let ni3: MF4 = max(-i3, MF4(0.0));
 
-    var a3 =  max(a3, MF4(0.0));
-    var b3 =  max(b3, MF4(0.0));
-    var c3 =  max(c3, MF4(0.0));
-    var d3 =  max(d3, MF4(0.0));
-    var e3 =  max(e3, MF4(0.0));
-    var f3 =  max(f3, MF4(0.0));
-    var g3 =  max(g3, MF4(0.0));
-    var h3 =  max(h3, MF4(0.0));
-    var i3 =  max(i3, MF4(0.0));
+    // Update existing variables
+    a3 = max(a3, MF4(0.0));
+    b3 = max(b3, MF4(0.0));
+    c3 = max(c3, MF4(0.0));
+    d3 = max(d3, MF4(0.0));
+    e3 = max(e3, MF4(0.0));
+    f3 = max(f3, MF4(0.0));
+    g3 = max(g3, MF4(0.0));
+    h3 = max(h3, MF4(0.0));
+    i3 = max(i3, MF4(0.0));
 
     var target1: MF4 = MF4(-0.034046266, 0.030718531, 0.029500093, -0.007484251); // 佔位符
 	target1 = (a1 * MF4x4(-0.19656715, 0.073294915, -0.019779518, 0.021025823, 0.15261759, 0.04309221, -0.1493544, 0.049283743, -0.0905334, 0.1813188, -0.0016973419, 0.15697837, 0.13670535, -0.11242918, -0.013915669, -0.13730156) + target1);
@@ -1070,6 +1081,9 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	let inputPt: MF2= GetInputPt();
 	let pos = (gxy + 0.5f) * inputPt;
 
+    // ---------------------------------------------------------
+    // GROUP 1: Texture 4 (處理 tex4 -> a1, b1... -> na1)
+    // ---------------------------------------------------------
     var a1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
     var b1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
     var c1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
@@ -1080,6 +1094,7 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
     var i1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
+    // 計算負值部分 (Negative Rectification)
     let na1: MF4 = max(-a1, MF4(0.0));
     let nb1: MF4 = max(-b1, MF4(0.0));
     let nc1: MF4 = max(-c1, MF4(0.0));
@@ -1090,25 +1105,31 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh1: MF4 = max(-h1, MF4(0.0));
     let ni1: MF4 = max(-i1, MF4(0.0));
 
-    var a1 =  max(a1, MF4(0.0));
-    var b1 =  max(b1, MF4(0.0));
-    var c1 =  max(c1, MF4(0.0));
-    var d1 =  max(d1, MF4(0.0));
-    var e1 =  max(e1, MF4(0.0));
-    var f1 =  max(f1, MF4(0.0));
-    var g1 =  max(g1, MF4(0.0));
-    var h1 =  max(h1, MF4(0.0));
-    var i1 =  max(i1, MF4(0.0));
+    // 更新原始變數為正值部分 (Positive Rectification)
+    // [修正] 移除 'var'，直接賦值
+    a1 = max(a1, MF4(0.0));
+    b1 = max(b1, MF4(0.0));
+    c1 = max(c1, MF4(0.0));
+    d1 = max(d1, MF4(0.0));
+    e1 = max(e1, MF4(0.0));
+    f1 = max(f1, MF4(0.0));
+    g1 = max(g1, MF4(0.0));
+    h1 = max(h1, MF4(0.0));
+    i1 = max(i1, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex5_sampled, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    // ---------------------------------------------------------
+    // GROUP 2: Texture 5 (處理 tex5 -> a2, b2... -> na2)
+    // ---------------------------------------------------------
+    // [修正] 變數名稱改為 a2, b2... (原本寫成 a1)
+    var a2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e2: MF4 = textureSampleLevel(tex5_sampled, sam, pos, 0.0);
+    var f2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na2: MF4 = max(-a2, MF4(0.0));
     let nb2: MF4 = max(-b2, MF4(0.0));
@@ -1120,25 +1141,30 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh2: MF4 = max(-h2, MF4(0.0));
     let ni2: MF4 = max(-i2, MF4(0.0));
 
-    var a2 =  max(a2, MF4(0.0));
-    var b2 =  max(b2, MF4(0.0));
-    var c2 =  max(c2, MF4(0.0));
-    var d2 =  max(d2, MF4(0.0));
-    var e2 =  max(e2, MF4(0.0));
-    var f2 =  max(f2, MF4(0.0));
-    var g2 =  max(g2, MF4(0.0));
-    var h2 =  max(h2, MF4(0.0));
-    var i2 =  max(i2, MF4(0.0));
+    // [修正] 移除 'var'，直接賦值
+    a2 = max(a2, MF4(0.0));
+    b2 = max(b2, MF4(0.0));
+    c2 = max(c2, MF4(0.0));
+    d2 = max(d2, MF4(0.0));
+    e2 = max(e2, MF4(0.0));
+    f2 = max(f2, MF4(0.0));
+    g2 = max(g2, MF4(0.0));
+    h2 = max(h2, MF4(0.0));
+    i2 = max(i2, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex6_sampled, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    // ---------------------------------------------------------
+    // GROUP 3: Texture 6 (處理 tex6 -> a3, b3... -> na3)
+    // ---------------------------------------------------------
+    // [修正] 變數名稱改為 a3, b3... (原本寫成 a1)
+    var a3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e3: MF4 = textureSampleLevel(tex6_sampled, sam, pos, 0.0);
+    var f3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na3: MF4 = max(-a3, MF4(0.0));
     let nb3: MF4 = max(-b3, MF4(0.0));
@@ -1150,15 +1176,16 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh3: MF4 = max(-h3, MF4(0.0));
     let ni3: MF4 = max(-i3, MF4(0.0));
 
-    var a3 =  max(a3, MF4(0.0));
-    var b3 =  max(b3, MF4(0.0));
-    var c3 =  max(c3, MF4(0.0));
-    var d3 =  max(d3, MF4(0.0));
-    var e3 =  max(e3, MF4(0.0));
-    var f3 =  max(f3, MF4(0.0));
-    var g3 =  max(g3, MF4(0.0));
-    var h3 =  max(h3, MF4(0.0));
-    var i3 =  max(i3, MF4(0.0));
+    // [修正] 移除 'var'，直接賦值
+    a3 = max(a3, MF4(0.0));
+    b3 = max(b3, MF4(0.0));
+    c3 = max(c3, MF4(0.0));
+    d3 = max(d3, MF4(0.0));
+    e3 = max(e3, MF4(0.0));
+    f3 = max(f3, MF4(0.0));
+    g3 = max(g3, MF4(0.0));
+    h3 = max(h3, MF4(0.0));
+    i3 = max(i3, MF4(0.0));
 
 	var target1: MF4 =MF4(-0.112874866, 0.058437236, -0.011864247, -0.050339766 );
 	target1 = (a1 * MF4x4(0.0858087, -0.091669075, -0.029618878, -0.006829049, 0.05929614, -0.10007056, -0.07165286, -0.044839766, 0.16440393, -0.013165904, 0.16345644, -0.040166497, -0.08533438, 0.033274904, 0.023744298, 0.00462745) + target1);
@@ -1338,7 +1365,7 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     textureStore(tex1_storaged, gxy, target1);
     textureStore(tex2_storaged, gxy, target2);
     textureStore(tex3_storaged, gxy, target3);
-    textureStore(tex7_storaged, gxy, target, MF4(target4, 1.0));
+    textureStore(tex7_storaged, gxy, MF4(target4, 1.0));
 }
 //!END PASS 5
 
@@ -1363,6 +1390,9 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	// [ a, d, g ]
 	// [ b, e, h ]
 	// [ c, f, i ]
+    // ---------------------------------------------------------
+    // GROUP 1: Texture 1 (處理 tex1 -> a1... -> na1)
+    // ---------------------------------------------------------
     var a1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
     var b1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
     var c1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
@@ -1373,6 +1403,8 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     var h1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
     var i1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
+    // 計算負值部分
+    let na1: MF4 = max(-a1, MF4(0.0));
     let nb1: MF4 = max(-b1, MF4(0.0));
     let nc1: MF4 = max(-c1, MF4(0.0));
     let nd1: MF4 = max(-d1, MF4(0.0));
@@ -1381,27 +1413,31 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let ng1: MF4 = max(-g1, MF4(0.0));
     let nh1: MF4 = max(-h1, MF4(0.0));
     let ni1: MF4 = max(-i1, MF4(0.0));
-    let na1: MF4 = max(-a1, MF4(0.0));
 
-    var a1 =  max(a1, MF4(0.0));
-    var b1 =  max(b1, MF4(0.0));
-    var c1 =  max(c1, MF4(0.0));
-    var d1 =  max(d1, MF4(0.0));
-    var e1 =  max(e1, MF4(0.0));
-    var f1 =  max(f1, MF4(0.0));
-    var g1 =  max(g1, MF4(0.0));
-    var h1 =  max(h1, MF4(0.0));
-    var i1 =  max(i1, MF4(0.0));
+    // 更新正值部分 [修正：移除 var]
+    a1 = max(a1, MF4(0.0));
+    b1 = max(b1, MF4(0.0));
+    c1 = max(c1, MF4(0.0));
+    d1 = max(d1, MF4(0.0));
+    e1 = max(e1, MF4(0.0));
+    f1 = max(f1, MF4(0.0));
+    g1 = max(g1, MF4(0.0));
+    h1 = max(h1, MF4(0.0));
+    i1 = max(i1, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex2_sampled, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    // ---------------------------------------------------------
+    // GROUP 2: Texture 2 (處理 tex2 -> a2... -> na2)
+    // ---------------------------------------------------------
+    // [修正：變數名稱改為 a2, b2...]
+    var a2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e2: MF4 = textureSampleLevel(tex2_sampled, sam, pos, 0.0);
+    var f2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na2: MF4 = max(-a2, MF4(0.0));
     let nb2: MF4 = max(-b2, MF4(0.0));
@@ -1413,25 +1449,30 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh2: MF4 = max(-h2, MF4(0.0));
     let ni2: MF4 = max(-i2, MF4(0.0));
 
-    var a2 =  max(a2, MF4(0.0));
-    var b2 =  max(b2, MF4(0.0));
-    var c2 =  max(c2, MF4(0.0));
-    var d2 =  max(d2, MF4(0.0));
-    var e2 =  max(e2, MF4(0.0));
-    var f2 =  max(f2, MF4(0.0));
-    var g2 =  max(g2, MF4(0.0));
-    var h2 =  max(h2, MF4(0.0));
-    var i2 =  max(i2, MF4(0.0));
+    // [修正：移除 var]
+    a2 = max(a2, MF4(0.0));
+    b2 = max(b2, MF4(0.0));
+    c2 = max(c2, MF4(0.0));
+    d2 = max(d2, MF4(0.0));
+    e2 = max(e2, MF4(0.0));
+    f2 = max(f2, MF4(0.0));
+    g2 = max(g2, MF4(0.0));
+    h2 = max(h2, MF4(0.0));
+    i2 = max(i2, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex3_sampled, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    // ---------------------------------------------------------
+    // GROUP 3: Texture 3 (處理 tex3 -> a3... -> na3)
+    // ---------------------------------------------------------
+    // [修正：變數名稱改為 a3, b3...]
+    var a3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e3: MF4 = textureSampleLevel(tex3_sampled, sam, pos, 0.0);
+    var f3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na3: MF4 = max(-a3, MF4(0.0));
     let nb3: MF4 = max(-b3, MF4(0.0));
@@ -1443,15 +1484,16 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh3: MF4 = max(-h3, MF4(0.0));
     let ni3: MF4 = max(-i3, MF4(0.0));
 
-    var a3 =  max(a3, MF4(0.0));
-    var b3 =  max(b3, MF4(0.0));
-    var c3 =  max(c3, MF4(0.0));
-    var d3 =  max(d3, MF4(0.0));
-    var e3 =  max(e3, MF4(0.0));
-    var f3 =  max(f3, MF4(0.0));
-    var g3 =  max(g3, MF4(0.0));
-    var h3 =  max(h3, MF4(0.0));
-    var i3 =  max(i3, MF4(0.0));
+    // [修正：移除 var]
+    a3 = max(a3, MF4(0.0));
+    b3 = max(b3, MF4(0.0));
+    c3 = max(c3, MF4(0.0));
+    d3 = max(d3, MF4(0.0));
+    e3 = max(e3, MF4(0.0));
+    f3 = max(f3, MF4(0.0));
+    g3 = max(g3, MF4(0.0));
+    h3 = max(h3, MF4(0.0));
+    i3 = max(i3, MF4(0.0));
 
     var target1: MF4 =MF4(0.04207974, -0.22892998, 0.061954536, 0.076551735);
 	target1 = (a1 * MF4x4(0.09584929, -0.095243275, 0.08022671, 0.075294726, 0.18445255, -0.082423694, -0.097833045, -0.021506732, -0.21379599, -0.023127496, -0.18897046, 0.023956126, -0.060177475, 0.027762169, 0.19984011, -0.20838684) + target1);
@@ -1509,7 +1551,7 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target1 = (nh3 * MF4x4(-0.0932687, 0.092196085, -0.31407887, 0.1343263, -0.27295715, 0.14278416, 0.08114481, -0.12019184, 0.11957917, -0.113183275, 0.039373737, 0.46590427, 0.13638581, -0.043146584, 0.072187565, 0.25355667) + target1);
 	target1 = (ni3 * MF4x4(0.123297654, 0.13584657, 0.07648451, -0.13606457, -0.16890481, 0.01590599, -0.21695235, -0.0694265, -0.2649162, 0.02908455, 0.21927917, 0.010575717, 0.0485126, 0.039509103, 0.28077808, 0.081715904) + target1);
 
-    var target2: MF4 =MF4(0.0076388572, -0.16117841, -0.21034169, -0.019341651);
+    var target2 = MF4(0.0076388572, -0.16117841, -0.21034169, -0.019341651);
 	target2 = (a1 * MF4x4(-0.017371856, 0.031500984, -0.07871794, 0.07516421, -0.047120046, -0.1499491, 0.03412159, -0.11797919, 0.24790019, -0.19525756, -0.05562878, 0.0328997, 0.21224782, -0.15311961, -0.18679233, -0.021687083) + target2);
 	target2 = (b1 * MF4x4(-0.025990961, 0.12443172, 0.0647746, -0.05208365, 0.05024424, -0.15237884, -0.12913004, -0.03974524, 0.1453159, 0.105298564, -0.17882426, 0.15200019, -0.024576407, 0.024749285, -0.114573665, 0.12468399) + target2);
 	target2 = (c1 * MF4x4(0.07534002, -0.018443566, -0.07744656, -0.049855288, 0.030816372, -0.011974315, 0.05701086, 0.083947234, -0.16585147, -0.09379088, -0.090112925, -0.110042654, -0.105956376, 0.014653304, 0.041867986, 0.24255139) + target2);
@@ -1565,7 +1607,7 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target2 = (nh3 * MF4x4(0.035608087, -0.17302564, 0.07696709, -0.18077038, -0.02534479, 0.035865046, 0.15503906, -0.07042084, 0.37430316, 0.2688597, 0.23763078, 0.26458314, 0.22778325, 0.13661247, 0.032626268, 0.10627844) + target2);
 	target2 = (ni3 * MF4x4(-0.14816584, 0.08924656, -0.02333901, 0.0735485, -0.17011848, -0.059921533, 0.045324218, 0.026974149, 0.15702479, 0.0067652813, 0.08584165, 0.09428486, 0.035495974, -0.07220769, -0.0524813, -0.008241412) + target2);
 
-	var target2: MF4 =MF4(0.11033049, -0.073737, -0.013228117, 0.01553484);
+	var target3 =MF4(0.11033049, -0.073737, -0.013228117, 0.01553484);
 	target3 = (a1 * MF4x4(0.051828694, -0.14444938, -0.06172656, -0.092529796, 0.0032331774, 0.0505327, -0.092972204, 0.054304235, 0.04113735, 0.05488947, 0.27173808, 0.008734756, -0.037090253, 0.11106639, 0.1864697, -0.1308939) + target3);
 	target3 = (b1 * MF4x4(-0.0292121, 0.09739149, -0.057740077, -0.043211482, 0.00057832256, 0.122456014, 0.14004166, -0.22281875, -0.00958859, 0.012818551, 0.21724443, 0.038053658, 0.11917748, -0.0147661995, 0.15326285, -0.007842389) + target3);
 	target3 = (c1 * MF4x4(0.028475946, -0.044710767, 0.120977476, 0.024894554, 0.034071486, 0.002889187, 0.0886379, -0.13210039, 0.0254021, -0.10800576, -0.0154256895, 0.07889771, -0.026208088, -0.1735971, 0.12414827, 0.06541947) + target3);
@@ -1621,7 +1663,7 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target3 = (nh3 * MF4x4(-0.07171402, 0.053826947, 0.1817855, 0.15776771, 0.020122573, 0.014001945, 0.107657574, 0.06755519, -0.16229364, 0.025698826, 0.19443901, -0.18386869, -0.112747826, 0.19832937, 0.032073986, 0.07755969) + target3);
 	target3 = (ni3 * MF4x4(-0.0017903978, 0.017006857, -0.154056, -0.12544118, -0.17143774, 0.11694203, 0.046639796, -0.13699242, 0.1032892, -0.16337542, 0.20032221, 0.30423567, -0.09217524, 0.03736137, 0.06391171, 0.18111771) + target3);
 
-	var target4: MF3 = textureSampleLevel(tex7, sam, pos, 0.0).rgb;
+	var target4: MF3 = textureSampleLevel(tex7_sampled, sam, pos, 0.0).rgb;
 	target4 = (e1 * MF4x3(0.060458526, -0.0033674864, -0.006985535, -0.013925546, 0.051077038, 0.053856038, -0.033647064, 0.043235198, 0.05311577, 0.0391791, -0.044376004, -0.054064214) + target4);
 	target4 = (e2 * MF4x3(0.0069859014, -0.0050665336, -0.010343517, -0.027551029, 0.049856182, 0.058316905, 0.0121670095, -0.013107907, -0.0151846, 0.007648614, -0.0051277154, -0.0053846613) + target4);
 	target4 = (e3 * MF4x3(0.06848036, 0.026777437, 0.024801696, -0.08711668, 0.049429595, 0.067019165, -0.09006778, -0.042166695, -0.02230536, -0.048024856, -0.020088708, -0.009932858) + target4);
@@ -1630,9 +1672,9 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target4 = (ne3 * MF4x3(-0.04058634, -0.01822148, -0.014306331, 0.107378654, -0.04138371, -0.058573496, 0.03701269, -0.009420217, -0.02310707, 0.039931968, 0.001769326, -0.007929419) + target4);
 
     textureStore(tex4_storaged, gxy, target1);
-    textureStore(tex5_sampled.storaged, gxy, target2);
-    textureStore(tex6_sampled.storaged, gxy, target3);
-    textureStore(tex8_storaged, gxy, target, MF4(target4, 1.0));
+    textureStore(tex5_storaged, gxy, target2);
+    textureStore(tex6_storaged, gxy, target3);
+    textureStore(tex8_storaged, gxy, MF4(target4, 1.0));
 }
 //!END PASS 6
 
@@ -1656,6 +1698,9 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	// [ a, d, g ]
 	// [ b, e, h ]
 	// [ c, f, i ]
+// =========================================================
+    // GROUP 1: Texture 4 (處理 tex4 -> a1, b1...)
+    // =========================================================
     var a1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
     var b1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
     var c1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
@@ -1676,25 +1721,30 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh1: MF4 = max(-h1, MF4(0.0));
     let ni1: MF4 = max(-i1, MF4(0.0));
 
-    var a1 =  max(a1, MF4(0.0));
-    var b1 =  max(b1, MF4(0.0));
-    var c1 =  max(c1, MF4(0.0));
-    var d1 =  max(d1, MF4(0.0));
-    var e1 =  max(e1, MF4(0.0));
-    var f1 =  max(f1, MF4(0.0));
-    var g1 =  max(g1, MF4(0.0));
-    var h1 =  max(h1, MF4(0.0));
-    var i1 =  max(i1, MF4(0.0));
+    // [修正] 更新值不需要 'var'
+    a1 = max(a1, MF4(0.0));
+    b1 = max(b1, MF4(0.0));
+    c1 = max(c1, MF4(0.0));
+    d1 = max(d1, MF4(0.0));
+    e1 = max(e1, MF4(0.0));
+    f1 = max(f1, MF4(0.0));
+    g1 = max(g1, MF4(0.0));
+    h1 = max(h1, MF4(0.0));
+    i1 = max(i1, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex5_sampled, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    // =========================================================
+    // GROUP 2: Texture 5 (處理 tex5 -> a2, b2...)
+    // =========================================================
+    // [修正] 變數名稱改為 a2, b2... (原本誤寫為 a1)
+    var a2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e2: MF4 = textureSampleLevel(tex5_sampled, sam, pos, 0.0);
+    var f2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i2: MF4 = textureSampleLevel(tex5_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na2: MF4 = max(-a2, MF4(0.0));
     let nb2: MF4 = max(-b2, MF4(0.0));
@@ -1706,25 +1756,30 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh2: MF4 = max(-h2, MF4(0.0));
     let ni2: MF4 = max(-i2, MF4(0.0));
 
-    var a2 =  max(a2, MF4(0.0));
-    var b2 =  max(b2, MF4(0.0));
-    var c2 =  max(c2, MF4(0.0));
-    var d2 =  max(d2, MF4(0.0));
-    var e2 =  max(e2, MF4(0.0));
-    var f2 =  max(f2, MF4(0.0));
-    var g2 =  max(g2, MF4(0.0));
-    var h2 =  max(h2, MF4(0.0));
-    var i2 =  max(i2, MF4(0.0));
+    // [修正] 更新值不需要 'var'
+    a2 = max(a2, MF4(0.0));
+    b2 = max(b2, MF4(0.0));
+    c2 = max(c2, MF4(0.0));
+    d2 = max(d2, MF4(0.0));
+    e2 = max(e2, MF4(0.0));
+    f2 = max(f2, MF4(0.0));
+    g2 = max(g2, MF4(0.0));
+    h2 = max(h2, MF4(0.0));
+    i2 = max(i2, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex6_sampled, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    // =========================================================
+    // GROUP 3: Texture 6 (處理 tex6 -> a3, b3...)
+    // =========================================================
+    // [修正] 變數名稱改為 a3, b3... (原本誤寫為 a1)
+    var a3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e3: MF4 = textureSampleLevel(tex6_sampled, sam, pos, 0.0);
+    var f3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i3: MF4 = textureSampleLevel(tex6_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na3: MF4 = max(-a3, MF4(0.0));
     let nb3: MF4 = max(-b3, MF4(0.0));
@@ -1736,15 +1791,16 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh3: MF4 = max(-h3, MF4(0.0));
     let ni3: MF4 = max(-i3, MF4(0.0));
 
-    var a3 =  max(a3, MF4(0.0));
-    var b3 =  max(b3, MF4(0.0));
-    var c3 =  max(c3, MF4(0.0));
-    var d3 =  max(d3, MF4(0.0));
-    var e3 =  max(e3, MF4(0.0));
-    var f3 =  max(f3, MF4(0.0));
-    var g3 =  max(g3, MF4(0.0));
-    var h3 =  max(h3, MF4(0.0));
-    var i3 =  max(i3, MF4(0.0));
+    // [修正] 更新值不需要 'var'
+    a3 = max(a3, MF4(0.0));
+    b3 = max(b3, MF4(0.0));
+    c3 = max(c3, MF4(0.0));
+    d3 = max(d3, MF4(0.0));
+    e3 = max(e3, MF4(0.0));
+    f3 = max(f3, MF4(0.0));
+    g3 = max(g3, MF4(0.0));
+    h3 = max(h3, MF4(0.0));
+    i3 = max(i3, MF4(0.0));
 
     var target1: MF4 = MF4(-0.12162919, -0.00032382424, 0.025486631, -0.09447538);
 	target1 = (a1 * MF4x4(-0.0041438183, 0.087629646, 0.02373779, -0.008705929, -0.06460613, -0.079614826, 0.20589171, -0.21300887, 0.06673036, -0.14301205, 0.0005478004, 0.10480311, 0.16944528, -0.023095177, -0.04593122, 0.031710908) + target1);
@@ -1802,7 +1858,7 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target1 = (nh3 * MF4x4(-0.066518046, -0.011708588, -0.007350381, -0.16976248, 0.09265956, 0.08236158, 0.12594578, 0.021188073, -0.2299054, -0.12767331, -0.098674, 0.035027504, -0.1722649, -0.15037538, 0.037455063, -0.027518287) + target1);
 	target1 = (ni3 * MF4x4(-0.040520877, -0.17789118, 0.0535865, -0.15534161, 0.09352957, 0.11459578, -0.15315403, 0.04562035, -0.0015360791, 0.047871828, -0.021276174, 0.35346803, -0.10936083, 0.057735037, -0.089098595, 0.0057320776) + target1);
 
-	var target1: MF4 = MF4(0.091157734, 0.06337161, 0.09025765, 0.07787731);
+	var target2: MF4 = MF4(0.091157734, 0.06337161, 0.09025765, 0.07787731);
 	target2 = (a1 * MF4x4(-0.024318032, 0.062261496, 0.028226431, 0.063416876, -0.122350864, -0.0113668, 0.061698295, -0.22892742, -0.21282825, -0.30799037, -0.020646222, -0.21302511, 0.050188534, -0.03943688, -0.078553416, 0.010918215) + target2);
 	target2 = (b1 * MF4x4(-0.0064165345, 0.082449056, -0.03667216, 0.026472934, -0.021514278, 0.17880541, 0.39611253, -0.17107382, 0.06770686, -0.053641487, 0.002025645, 0.09812659, -0.07990987, -0.08550891, 0.00025631645, -0.10817648) + target2);
 	target2 = (c1 * MF4x4(-0.11507329, -0.06074527, 0.007052484, 0.015466066, 0.0675046, 0.28604895, -0.020563968, 0.04284168, -0.10729741, -0.103069924, 0.028218608, 0.2833194, 0.11628834, -0.06599205, -0.10394839, 0.13991328) + target2);
@@ -1858,7 +1914,7 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target2 = (nh3 * MF4x4(0.07837116, -0.22945437, -0.05715237, 0.062118188, -0.07539828, 0.22634326, -0.19471732, 0.31986186, 0.15694539, 0.1633341, -0.03029404, 0.056681212, -0.029835409, -0.13129339, 0.19710875, 0.13151285) + target2);
 	target2 = (ni3 * MF4x4(0.017191496, 0.33163047, -0.026875576, 0.19212759, 0.27074674, 0.17707312, -0.13339694, 0.10855495, -0.18034323, 0.43113244, -0.33985507, 0.316351, 0.0358167, 0.023788683, 0.13152061, -0.019543748) + target2);
 
-	var target1: MF4 = MF4(0.013481283, -0.0006846239, 0.017479934, 0.13998064);
+	var target3: MF4 = MF4(0.013481283, -0.0006846239, 0.017479934, 0.13998064);
 	target3 = (a1 * MF4x4(-0.10152706, 0.13643685, 0.050397865, 0.10665431, 0.026328163, 0.1460299, 0.2569912, -0.19533697, 0.03801618, 0.0003496284, 0.18598852, -0.22565664, 0.05281963, -0.034972392, -0.14308542, 0.030370854) + target3);
 	target3 = (b1 * MF4x4(-0.004119863, 0.057859607, -0.2119656, 0.14261195, -0.16826284, -0.25717396, -0.041528255, -0.119776234, -0.1013885, 0.16835499, 0.27712375, 0.11540263, 0.13435264, -0.15992326, -0.011525119, -0.052719552) + target3);
 	target3 = (c1 * MF4x4(0.015662286, 0.039283197, 0.1298957, 0.14770529, 0.16800109, -0.26307538, -0.043486428, -0.088268735, -0.091123246, -0.02737689, 0.1340816, 0.20996217, 0.108091205, 0.030314112, 0.054512065, 0.012642684) + target3);
@@ -1925,7 +1981,7 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     textureStore(tex1_storaged, gxy, target1);
     textureStore(tex2_storaged, gxy, target2);
     textureStore(tex3_storaged, gxy, target3);
-    textureStore(tex7_storaged, gxy, target, MF4(target4, 1.0));
+    textureStore(tex7_storaged, gxy, MF4(target4, 1.0));
 }
 //!END PASS 7
 
@@ -1946,6 +2002,9 @@ fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let inputPt: MF2 = GetInputPt();
     let pos: MF2 = (MF2(gxy) + 0.5) * inputPt;
 
+// =========================================================
+    // GROUP 1: Texture 1 (處理 tex1 -> a1, b1... -> na1)
+    // =========================================================
     var a1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
     var b1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
     var c1: MF4 = textureSampleLevel(tex1_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
@@ -1966,25 +2025,30 @@ fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh1: MF4 = max(-h1, MF4(0.0));
     let ni1: MF4 = max(-i1, MF4(0.0));
 
-    var a1 =  max(a1, MF4(0.0));
-    var b1 =  max(b1, MF4(0.0));
-    var c1 =  max(c1, MF4(0.0));
-    var d1 =  max(d1, MF4(0.0));
-    var e1 =  max(e1, MF4(0.0));
-    var f1 =  max(f1, MF4(0.0));
-    var g1 =  max(g1, MF4(0.0));
-    var h1 =  max(h1, MF4(0.0));
-    var i1 =  max(i1, MF4(0.0));
+    // [修正] 更新變數不需要 'var'
+    a1 = max(a1, MF4(0.0));
+    b1 = max(b1, MF4(0.0));
+    c1 = max(c1, MF4(0.0));
+    d1 = max(d1, MF4(0.0));
+    e1 = max(e1, MF4(0.0));
+    f1 = max(f1, MF4(0.0));
+    g1 = max(g1, MF4(0.0));
+    h1 = max(h1, MF4(0.0));
+    i1 = max(i1, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex2_sampled, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    // =========================================================
+    // GROUP 2: Texture 2 (處理 tex2 -> a2, b2... -> na2)
+    // =========================================================
+    // [修正] 變數名稱改為 a2, b2... (原本誤寫為 a1)
+    var a2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e2: MF4 = textureSampleLevel(tex2_sampled, sam, pos, 0.0);
+    var f2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i2: MF4 = textureSampleLevel(tex2_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na2: MF4 = max(-a2, MF4(0.0));
     let nb2: MF4 = max(-b2, MF4(0.0));
@@ -1996,25 +2060,30 @@ fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh2: MF4 = max(-h2, MF4(0.0));
     let ni2: MF4 = max(-i2, MF4(0.0));
 
-    var a2 =  max(a2, MF4(0.0));
-    var b2 =  max(b2, MF4(0.0));
-    var c2 =  max(c2, MF4(0.0));
-    var d2 =  max(d2, MF4(0.0));
-    var e2 =  max(e2, MF4(0.0));
-    var f2 =  max(f2, MF4(0.0));
-    var g2 =  max(g2, MF4(0.0));
-    var h2 =  max(h2, MF4(0.0));
-    var i2 =  max(i2, MF4(0.0));
+    // [修正] 變數名稱改為 a2 且移除 'var'
+    a2 = max(a2, MF4(0.0));
+    b2 = max(b2, MF4(0.0));
+    c2 = max(c2, MF4(0.0));
+    d2 = max(d2, MF4(0.0));
+    e2 = max(e2, MF4(0.0));
+    f2 = max(f2, MF4(0.0));
+    g2 = max(g2, MF4(0.0));
+    h2 = max(h2, MF4(0.0));
+    i2 = max(i2, MF4(0.0));
 
-    var a1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
-    var b1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
-    var c1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
-    var d1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
-    var e1: MF4 = textureSampleLevel(tex3_sampled, sam, pos, 0.0);
-    var f1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
-    var g1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
-    var h1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
-    var i1: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
+    // =========================================================
+    // GROUP 3: Texture 3 (處理 tex3 -> a3, b3... -> na3)
+    // =========================================================
+    // [修正] 變數名稱改為 a3, b3... (原本誤寫為 a1)
+    var a3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
+    var b3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, 0.0), 0.0);
+    var c3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(-inputPt.x, inputPt.y), 0.0);
+    var d3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, -inputPt.y), 0.0);
+    var e3: MF4 = textureSampleLevel(tex3_sampled, sam, pos, 0.0);
+    var f3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(0.0, inputPt.y), 0.0);
+    var g3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, -inputPt.y), 0.0);
+    var h3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, 0.0), 0.0);
+    var i3: MF4 = textureSampleLevel(tex3_sampled, sam, pos + MF2(inputPt.x, inputPt.y), 0.0);
 
     let na3: MF4 = max(-a3, MF4(0.0));
     let nb3: MF4 = max(-b3, MF4(0.0));
@@ -2026,15 +2095,16 @@ fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     let nh3: MF4 = max(-h3, MF4(0.0));
     let ni3: MF4 = max(-i3, MF4(0.0));
 
-    var a3 =  max(a3, MF4(0.0));
-    var b3 =  max(b3, MF4(0.0));
-    var c3 =  max(c3, MF4(0.0));
-    var d3 =  max(d3, MF4(0.0));
-    var e3 =  max(e3, MF4(0.0));
-    var f3 =  max(f3, MF4(0.0));
-    var g3 =  max(g3, MF4(0.0));
-    var h3 =  max(h3, MF4(0.0));
-    var i3 =  max(i3, MF4(0.0));
+    // [修正] 變數名稱改為 a3 且移除 'var'
+    a3 = max(a3, MF4(0.0));
+    b3 = max(b3, MF4(0.0));
+    c3 = max(c3, MF4(0.0));
+    d3 = max(d3, MF4(0.0));
+    e3 = max(e3, MF4(0.0));
+    f3 = max(f3, MF4(0.0));
+    g3 = max(g3, MF4(0.0));
+    h3 = max(h3, MF4(0.0));
+    i3 = max(i3, MF4(0.0));
 
     var target1: MF4 = MF4(0.20634188, -0.10455712, -0.031700566, -0.13400781);
 	target1 = (a1 * MF4x4(-0.013182829, 0.053091962, 0.06549412, 0.09314398, 0.12759157, 0.19831958, -0.0066986284, 0.008724786, -0.008788724, -0.18448268, -0.08061004, -0.122672, 0.039246775, 0.114899494, 0.0053096768, -0.45705518) + target1);
@@ -2092,7 +2162,7 @@ fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target1 = (nh3 * MF4x4(0.056506306, 0.15181234, -0.1497428, 0.01186181, 0.02351036, 0.01086669, -0.031891935, 0.01414558, 0.27038968, -0.2806401, -0.14722337, 0.080689445, 0.07039954, -0.054969363, -0.016640754, 0.020795437) + target1);
 	target1 = (ni3 * MF4x4(-0.237999, 0.13528651, 0.005025065, -0.01291728, -0.22655746, 0.022678101, 0.07165532, 0.0073296893, 0.084639646, -0.06724732, -0.13105223, 0.10164715, -0.15071161, 0.08882156, -0.016988168, -0.013606533) + target1);
 
-	var target1: MF4 = MF4(0.15939143, -0.031111173, 0.011407361, 0.04436536);
+	var target2: MF4 = MF4(0.15939143, -0.031111173, 0.011407361, 0.04436536);
 	target2 = (a1 * MF4x4(0.1606533, 0.1120602, 0.427334, -0.056228757, -0.026887462, 0.0858575, 0.0052684247, 0.1645524, 0.021588106, -0.08577256, -0.03301297, -0.087385215, 0.17341405, 0.26737398, 0.04566977, 0.047820427) + target2);
 	target2 = (b1 * MF4x4(0.21000437, 0.05300574, 0.060565695, -0.086724475, 0.09684198, 0.12685667, -0.10724282, -0.11021523, 0.048485592, -0.0054517, 0.081800036, -0.099787444, -0.12168391, 0.07623567, 0.09177046, 0.15815327) + target2);
 	target2 = (c1 * MF4x4(0.14400747, 0.13797458, 0.11044521, 0.077145234, 0.14364728, 0.10041894, 0.0948857, 0.08613703, 0.030833652, 0.102926254, 0.029892365, -0.09385337, 0.07609406, -0.038274735, 0.22529188, -0.0905732) + target2);
@@ -2148,7 +2218,7 @@ fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target2 = (nh3 * MF4x4(0.31691772, 0.03877285, -0.31999993, 0.15607259, -0.014967208, 0.17467377, -0.021213053, 0.05274054, 0.09042282, 0.3026185, -0.19465268, -0.15643322, -0.28652924, -0.12624627, -0.123150274, -0.06579748) + target2);
 	target2 = (ni3 * MF4x4(-0.12737115, 0.21119869, 0.021830728, 0.25310937, 0.056086678, -0.10591854, -0.09623413, 0.09552772, 0.0077543957, -0.38552082, 0.105930105, 0.21966095, 0.03846968, -0.18900576, 0.13454477, 0.01323755) + target2);
 
-	var target1: MF4 = MF4(-0.09157235, -0.025660357, 0.076311104, -0.13737188);
+	var target3: MF4 = MF4(-0.09157235, -0.025660357, 0.076311104, -0.13737188);
 	target3 = (a1 * MF4x4(0.009852172, 0.067582026, -0.004946671, 0.10223505, -0.10428496, -0.025925757, -0.1812229, -0.086897664, -0.007505929, 0.11395492, -0.046959464, -0.040778246, -0.05989385, 0.2917696, 0.21723987, 0.104860075) + target3);
 	target3 = (b1 * MF4x4(0.014223285, 0.23677638, 0.18793987, 0.1604355, -0.13773453, -0.035079855, 0.1325962, -0.01843488, 0.013658427, -0.039640892, -0.049931083, -0.17938142, -0.20694439, 0.13461684, 0.15713528, 0.061465815) + target3);
 	target3 = (c1 * MF4x4(-0.045403525, 0.24799547, 0.073604435, 0.21103963, 0.18720928, -0.06703258, -0.20043622, -0.067137614, -0.19021615, -0.020830747, -0.120527774, 0.20456503, 0.07813807, -0.03798654, 0.04036844, -0.0033802337) + target3);
@@ -2205,19 +2275,19 @@ fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	target3 = (ni3 * MF4x4(0.009482551, 0.12501961, 0.38921976, -0.1280031, -0.103060484, -0.027821409, 0.0720024, -0.027280543, 0.056729473, 0.048927493, -0.035154913, -0.08341783, 0.23103711, 0.046025522, 0.17039533, -0.014161812) + target3);
 
     // 最後的組合步驟
-    var result: MF3 = textureSampleLevel(tex7_sampled, pos, MF4(0.0)).rgb;
+    var result: MF3 = textureSampleLevel(tex7_sampled, sam, pos, 0.0).rgb;
 	result = (e1 * MF4x3(0.012708346, 0.014336439, 0.012533707, -0.0019346073, -0.0070978077, -0.009478742, -0.011659758, -0.009855903, -0.008657096, 0.0098037105, 0.010785594, 0.008409619) + result);
 	result = (e2 * MF4x3(0.0056228717, 0.013483413, 0.008108323, -0.0013697809, 0.0026797573, 0.0037666177, 0.0130932415, 0.019868238, 0.01968549, 0.011160769, 0.012374028, 0.012855804) + result);
 	result = (e3 * MF4x3(0.0011662204, 0.00025071716, 0.0022244148, -0.017808594, -0.013589306, -0.01396329, -0.008117086, -0.0068251803, -0.004963602, -0.0069141523, -0.009125296, -0.008327947) + result);
 	result = (ne1 * MF4x3(-0.027597412, -0.02631107, -0.022816146, 0.009350171, 0.013661565, 0.015324706, 0.032538984, 0.02918167, 0.026186563, 0.018760988, 0.024502547, 0.023201061) + result);
 	result = (ne2 * MF4x3(0.013216693, 0.00991115, 0.01178417, 0.0076343333, 0.004714098, 0.0074490295, -0.0064893183, -0.014818341, -0.01199717, -0.008334491, -0.009955103, -0.011240684) + result);
 	result = (ne3 * MF4x3(-0.013846397, -0.012687341, -0.015767701, -0.0019117722, -0.0072347773, -0.0074835457, 0.013531867, 0.014263165, 0.012797156, 0.008260445, 0.0070536416, 0.0065693366) + result);
-	result = (max(target1, 0) * MF4x3(0.0017003485, 0.0021871394, 0.0003407296, 0.0054420815, 0.00801073, 0.008788295, -0.012685104, -0.0150940735, -0.017530257, -0.030698642, -0.030817484, -0.028548386) + result);
-	result = (max(target2, 0) * MF4x3(-0.008882145, -0.008943836, -0.007986094, -0.010494911, -0.011511255, -0.00892924, 0.014072905, 0.014985031, 0.011853883, -0.015823284, -0.017817877, -0.01684662) + result);
-	result = (max(target3, 0) * MF4x3(0.012270136, 0.011127063, 0.010729208, 0.00027298275, 0.001011805, 0.001318525, 0.0029811305, 0.0029161042, 0.0060088155, 0.00021241597, -0.0013439909, 0.0013205905) + result);
-	result = (max(-target1, 0) * MF4x3(-0.03467924, -0.035764243, -0.03348244, 0.023858175, 0.02580526, 0.026217844, -0.016814101, -0.016412167, -0.012021982, -0.0007905926, -0.0019904284, -0.0015143935) + result);
-	result = (max(-target2, 0) * MF4x3(0.046779703, 0.04961137, 0.046104047, -0.023665644, -0.022809561, -0.02236428, -0.054706786, -0.056090504, -0.052543454, -0.015520943, -0.01587306, -0.0142722875) + result);
-	result = (max(-target3, 0) * MF4x3(0.020273875, 0.020399818, 0.021745082, 0.037485637, 0.039574977, 0.03556703, 0.036673885, 0.04102765, 0.033708427, 0.024422405, 0.027724478, 0.0252598) + result);
+	result = (max(target1, MF4(0.0)) * MF4x3(0.0017003485, 0.0021871394, 0.0003407296, 0.0054420815, 0.00801073, 0.008788295, -0.012685104, -0.0150940735, -0.017530257, -0.030698642, -0.030817484, -0.028548386) + result);
+	result = (max(target2, MF4(0.0)) * MF4x3(-0.008882145, -0.008943836, -0.007986094, -0.010494911, -0.011511255, -0.00892924, 0.014072905, 0.014985031, 0.011853883, -0.015823284, -0.017817877, -0.01684662) + result);
+	result = (max(target3, MF4(0.0)) * MF4x3(0.012270136, 0.011127063, 0.010729208, 0.00027298275, 0.001011805, 0.001318525, 0.0029811305, 0.0029161042, 0.0060088155, 0.00021241597, -0.0013439909, 0.0013205905) + result);
+	result = (max(-target1, MF4(0.0)) * MF4x3(-0.03467924, -0.035764243, -0.03348244, 0.023858175, 0.02580526, 0.026217844, -0.016814101, -0.016412167, -0.012021982, -0.0007905926, -0.0019904284, -0.0015143935) + result);
+	result = (max(-target2, MF4(0.0)) * MF4x3(0.046779703, 0.04961137, 0.046104047, -0.023665644, -0.022809561, -0.02236428, -0.054706786, -0.056090504, -0.052543454, -0.015520943, -0.01587306, -0.0142722875) + result);
+	result = (max(-target3, MF4(0.0)) * MF4x3(0.020273875, 0.020399818, 0.021745082, 0.037485637, 0.039574977, 0.03556703, 0.036673885, 0.04102765, 0.033708427, 0.024422405, 0.027724478, 0.0252598) + result);
 	result += MF3(-0.0036656514, 0.006677459, 0.007698717);
 
 	result += textureSampleLevel(INPUT, sam, pos, 0.0).rgb;
