@@ -10,10 +10,7 @@
  *   提供用於編譯和運行 WGFX 效果的高級 API。
  */
 
-import {createRequire} from 'module';
-
-const require = createRequire(import.meta.url);
-const shaderParser = require('./ShaderParser.cjs');
+import {parse} from './ShaderParser.js';
 import {ResourceManager} from './ResourceManager.js';
 import {PipelineManager} from './PipelineManager.js';
 import {WGSLCodeGenerator} from './WGSLCodeGenerator.js';
@@ -75,7 +72,7 @@ export class WGFXRuntime {
          * - EN: 1. Parse the FX file to get the Intermediate Representation (IR).
          * - TW: 1. 解析 FX 檔案以獲取中介表示 (IR)。
          */
-        this.shaderInfo = shaderParser.parse(effectCode);
+        this.shaderInfo = parse(effectCode);
         /**
          * - EN: ShaderInfo (IR) parsed.
          * - TW: 已解析 ShaderInfo (IR)。

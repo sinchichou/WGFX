@@ -27,7 +27,7 @@ import {FileUtils} from '../utils/FileUtils.js';
  * - EN: Directly use the runtime parser.
  * - TW: 直接使用運行時解析器。
  */
-const shaderParser = require('../runtime/ShaderParser.cjs');
+import {parse} from '../runtime/ShaderParser.js';
 
 /**
  * - EN: A simple command-line argument parser.
@@ -103,7 +103,7 @@ async function main() {
          * - TW: 2. 使用運行時解析器直接將檔案解析為中介表示 (IR)。
          */
         console.log("Parsing WGSL file...");
-        const shaderInfo = shaderParser.parse(fxCode);
+        const shaderInfo = parse(fxCode);
 
         /**
          * - EN: 3. Generate WGSL code from the IR using the runtime generator directly.

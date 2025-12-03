@@ -1,0 +1,1302 @@
+{
+  "passes": [
+    {
+      "index": 1,
+      "in": [
+        "INPUT"
+      ],
+      "out": [
+        "tex1_sampled",
+        "tex2_sampled",
+        "tex3_sampled",
+        "tex1_storaged",
+        "tex2_storaged",
+        "tex3_storaged"
+      ],
+      "workgroup_size": [
+        64,
+        1,
+        1
+      ],
+      "style": "CS",
+      "description": "Conv-4x3x3x3",
+      "resources": {
+        "textures": [
+          {
+            "id": "INPUT",
+            "name": "INPUT",
+            "binding": 1,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex1_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_sampled",
+            "binding": 2,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex1_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_storaged",
+            "binding": 3,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex2_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_sampled",
+            "binding": 4,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex2_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_storaged",
+            "binding": 5,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex3_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_sampled",
+            "binding": 6,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex3_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_storaged",
+            "binding": 7,
+            "group": 0,
+            "isStorage": true
+          }
+        ],
+        "samplers": [
+          {
+            "name": "sam",
+            "binding": 0,
+            "group": 0,
+            "filter": "LINEAR"
+          }
+        ],
+        "parameters": []
+      }
+    },
+    {
+      "index": 2,
+      "in": [
+        "tex1_sampled",
+        "tex2_sampled",
+        "tex3_sampled",
+        "tex1_storaged",
+        "tex2_storaged",
+        "tex3_storaged"
+      ],
+      "out": [
+        "tex4_sampled",
+        "tex5_sampled",
+        "tex6_sampled",
+        "tex4_storaged",
+        "tex5_storaged",
+        "tex6_storaged"
+      ],
+      "workgroup_size": [
+        64,
+        1,
+        1
+      ],
+      "style": "CS",
+      "description": "Conv-4x3x3x24",
+      "resources": {
+        "textures": [
+          {
+            "id": "tex1_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_sampled",
+            "binding": 1,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex1_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_storaged",
+            "binding": 2,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex2_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_sampled",
+            "binding": 3,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex2_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_storaged",
+            "binding": 4,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex3_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_sampled",
+            "binding": 5,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex3_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_storaged",
+            "binding": 6,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex4_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex4_sampled",
+            "binding": 7,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex4_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex4_storaged",
+            "binding": 8,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex5_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex5_sampled",
+            "binding": 9,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex5_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex5_storaged",
+            "binding": 10,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex6_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex6_sampled",
+            "binding": 11,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex6_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex6_storaged",
+            "binding": 12,
+            "group": 0,
+            "isStorage": true
+          }
+        ],
+        "samplers": [
+          {
+            "name": "sam",
+            "binding": 0,
+            "group": 0,
+            "filter": "LINEAR"
+          }
+        ],
+        "parameters": []
+      }
+    },
+    {
+      "index": 3,
+      "in": [
+        "tex4_sampled",
+        "tex5_sampled",
+        "tex6_sampled",
+        "tex4_storaged",
+        "tex5_storaged",
+        "tex6_storaged"
+      ],
+      "out": [
+        "tex1_sampled",
+        "tex2_sampled",
+        "tex3_sampled",
+        "tex1_storaged",
+        "tex2_storaged",
+        "tex3_storaged"
+      ],
+      "workgroup_size": [
+        64,
+        1,
+        1
+      ],
+      "style": "CS",
+      "description": "Conv-4x3x3x24",
+      "resources": {
+        "textures": [
+          {
+            "id": "tex1_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_sampled",
+            "binding": 1,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex1_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_storaged",
+            "binding": 2,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex2_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_sampled",
+            "binding": 3,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex2_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_storaged",
+            "binding": 4,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex3_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_sampled",
+            "binding": 5,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex3_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_storaged",
+            "binding": 6,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex4_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex4_sampled",
+            "binding": 7,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex4_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex4_storaged",
+            "binding": 8,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex5_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex5_sampled",
+            "binding": 9,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex5_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex5_storaged",
+            "binding": 10,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex6_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex6_sampled",
+            "binding": 11,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex6_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex6_storaged",
+            "binding": 12,
+            "group": 0,
+            "isStorage": true
+          }
+        ],
+        "samplers": [
+          {
+            "name": "sam",
+            "binding": 0,
+            "group": 0,
+            "filter": "LINEAR"
+          }
+        ],
+        "parameters": []
+      }
+    },
+    {
+      "index": 4,
+      "in": [
+        "tex1_sampled",
+        "tex2_sampled",
+        "tex3_sampled",
+        "tex1_storaged",
+        "tex2_storaged",
+        "tex3_storaged"
+      ],
+      "out": [
+        "tex4_sampled",
+        "tex5_sampled",
+        "tex6_sampled",
+        "tex4_storaged",
+        "tex5_storaged",
+        "tex6_storaged"
+      ],
+      "workgroup_size": [
+        64,
+        1,
+        1
+      ],
+      "style": "CS",
+      "description": "Conv-4x3x3x24",
+      "resources": {
+        "textures": [
+          {
+            "id": "tex1_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_sampled",
+            "binding": 1,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex1_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_storaged",
+            "binding": 2,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex2_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_sampled",
+            "binding": 3,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex2_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_storaged",
+            "binding": 4,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex3_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_sampled",
+            "binding": 5,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex3_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_storaged",
+            "binding": 6,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex4_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex4_sampled",
+            "binding": 7,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex4_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex4_storaged",
+            "binding": 8,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex5_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex5_sampled",
+            "binding": 9,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex5_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex5_storaged",
+            "binding": 10,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex6_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex6_sampled",
+            "binding": 11,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex6_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex6_storaged",
+            "binding": 12,
+            "group": 0,
+            "isStorage": true
+          }
+        ],
+        "samplers": [
+          {
+            "name": "sam",
+            "binding": 0,
+            "group": 0,
+            "filter": "LINEAR"
+          }
+        ],
+        "parameters": []
+      }
+    },
+    {
+      "index": 5,
+      "in": [
+        "tex4_sampled",
+        "tex5_sampled",
+        "tex6_sampled",
+        "tex4_storaged",
+        "tex5_storaged",
+        "tex6_storaged"
+      ],
+      "out": [
+        "tex1_sampled",
+        "tex2_sampled",
+        "tex3_sampled",
+        "tex1_storaged",
+        "tex2_storaged",
+        "tex3_storaged",
+        "tex7_sampled",
+        "tex7_storaged"
+      ],
+      "workgroup_size": [
+        64,
+        1,
+        1
+      ],
+      "style": "CS",
+      "description": "Conv-4x3x3x24",
+      "resources": {
+        "textures": [
+          {
+            "id": "tex1_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_sampled",
+            "binding": 1,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex1_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_storaged",
+            "binding": 2,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex2_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_sampled",
+            "binding": 3,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex2_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_storaged",
+            "binding": 4,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex3_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_sampled",
+            "binding": 5,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex3_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_storaged",
+            "binding": 6,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex4_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex4_sampled",
+            "binding": 7,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex4_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex4_storaged",
+            "binding": 8,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex5_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex5_sampled",
+            "binding": 9,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex5_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex5_storaged",
+            "binding": 10,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex6_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex6_sampled",
+            "binding": 11,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex6_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex6_storaged",
+            "binding": 12,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex7_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex7_sampled",
+            "binding": 13,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex7_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex7_storaged",
+            "binding": 14,
+            "group": 0,
+            "isStorage": true
+          }
+        ],
+        "samplers": [
+          {
+            "name": "sam",
+            "binding": 0,
+            "group": 0,
+            "filter": "LINEAR"
+          }
+        ],
+        "parameters": []
+      }
+    },
+    {
+      "index": 6,
+      "in": [
+        "tex1_sampled",
+        "tex2_sampled",
+        "tex3_sampled",
+        "tex1_storaged",
+        "tex2_storaged",
+        "tex3_storaged",
+        "tex7_sampled",
+        "tex7_storaged"
+      ],
+      "out": [
+        "tex4_sampled",
+        "tex5_sampled",
+        "tex6_sampled",
+        "tex4_storaged",
+        "tex5_storaged",
+        "tex6_storaged",
+        "tex8_sampled",
+        "tex8_storaged"
+      ],
+      "workgroup_size": [
+        64,
+        1,
+        1
+      ],
+      "style": "CS",
+      "description": "Conv-4x3x3x24",
+      "resources": {
+        "textures": [
+          {
+            "id": "tex1_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_sampled",
+            "binding": 1,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex1_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_storaged",
+            "binding": 2,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex2_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_sampled",
+            "binding": 3,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex2_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_storaged",
+            "binding": 4,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex3_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_sampled",
+            "binding": 5,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex3_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_storaged",
+            "binding": 6,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex4_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex4_sampled",
+            "binding": 7,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex4_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex4_storaged",
+            "binding": 8,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex5_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex5_sampled",
+            "binding": 9,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex5_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex5_storaged",
+            "binding": 10,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex6_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex6_sampled",
+            "binding": 11,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex6_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex6_storaged",
+            "binding": 12,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex7_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex7_sampled",
+            "binding": 13,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex7_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex7_storaged",
+            "binding": 14,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex8_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex8_sampled",
+            "binding": 15,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex8_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex8_storaged",
+            "binding": 16,
+            "group": 0,
+            "isStorage": true
+          }
+        ],
+        "samplers": [
+          {
+            "name": "sam",
+            "binding": 0,
+            "group": 0,
+            "filter": "LINEAR"
+          }
+        ],
+        "parameters": []
+      }
+    },
+    {
+      "index": 7,
+      "in": [
+        "tex4_sampled",
+        "tex5_sampled",
+        "tex6_sampled",
+        "tex4_storaged",
+        "tex5_storaged",
+        "tex6_storaged",
+        "tex8_sampled",
+        "tex8_storaged"
+      ],
+      "out": [
+        "tex1_sampled",
+        "tex2_sampled",
+        "tex3_sampled",
+        "tex1_storaged",
+        "tex2_storaged",
+        "tex3_storaged",
+        "tex7_sampled",
+        "tex7_storaged"
+      ],
+      "workgroup_size": [
+        64,
+        1,
+        1
+      ],
+      "style": "CS",
+      "description": "Conv-4x3x3x24",
+      "resources": {
+        "textures": [
+          {
+            "id": "tex1_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_sampled",
+            "binding": 1,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex1_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_storaged",
+            "binding": 2,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex2_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_sampled",
+            "binding": 3,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex2_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_storaged",
+            "binding": 4,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex3_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_sampled",
+            "binding": 5,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex3_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_storaged",
+            "binding": 6,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex4_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex4_sampled",
+            "binding": 7,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex4_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex4_storaged",
+            "binding": 8,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex5_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex5_sampled",
+            "binding": 9,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex5_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex5_storaged",
+            "binding": 10,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex6_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex6_sampled",
+            "binding": 11,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex6_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex6_storaged",
+            "binding": 12,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex7_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex7_sampled",
+            "binding": 13,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex7_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex7_storaged",
+            "binding": 14,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex8_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex8_sampled",
+            "binding": 15,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex8_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex8_storaged",
+            "binding": 16,
+            "group": 0,
+            "isStorage": true
+          }
+        ],
+        "samplers": [
+          {
+            "name": "sam",
+            "binding": 0,
+            "group": 0,
+            "filter": "LINEAR"
+          }
+        ],
+        "parameters": []
+      }
+    },
+    {
+      "index": 8,
+      "in": [
+        "INPUT",
+        "tex1_sampled",
+        "tex2_sampled",
+        "tex3_sampled",
+        "tex1_storaged",
+        "tex2_storaged",
+        "tex3_storaged",
+        "tex7_sampled",
+        "tex7_storaged"
+      ],
+      "out": [
+        "OUTPUT"
+      ],
+      "workgroup_size": [
+        64,
+        1,
+        1
+      ],
+      "style": "CS",
+      "description": "Conv-4x3x3x24, Conv-3x1x1x120",
+      "resources": {
+        "textures": [
+          {
+            "id": "INPUT",
+            "name": "INPUT",
+            "binding": 1,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "OUTPUT",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "name": "OUTPUT",
+            "binding": 2,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex1_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_sampled",
+            "binding": 3,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex1_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex1_storaged",
+            "binding": 4,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex2_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_sampled",
+            "binding": 5,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex2_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex2_storaged",
+            "binding": 6,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex3_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_sampled",
+            "binding": 7,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex3_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex3_storaged",
+            "binding": 8,
+            "group": 0,
+            "isStorage": true
+          },
+          {
+            "id": "tex7_sampled",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex7_sampled",
+            "binding": 9,
+            "group": 0,
+            "isStorage": false
+          },
+          {
+            "id": "tex7_storaged",
+            "width": "INPUT_WIDTH",
+            "height": "INPUT_HEIGHT",
+            "format": "rgba16float",
+            "name": "tex7_storaged",
+            "binding": 10,
+            "group": 0,
+            "isStorage": true
+          }
+        ],
+        "samplers": [
+          {
+            "name": "sam",
+            "binding": 0,
+            "group": 0,
+            "filter": "LINEAR"
+          }
+        ],
+        "parameters": []
+      }
+    }
+  ]
+}
