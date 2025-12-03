@@ -9,9 +9,15 @@
 /**
  * - EN: Finds a resource by name in the shader info.
  * - TW: 在著色器資訊中按名稱尋找資源。
- * @param {import('../cli/StaticParser.js').WGFXShaderInfo} shaderInfo - EN: The shader information object. - TW: 著色器資訊物件。
- * @param {string} name - EN: The name of the resource to find. - TW: 要尋找的資源名稱。
- * @returns {{type: string, [key: string]: any} | null} - EN: The found resource with its type, or null if not found. - TW: 找到的資源及其類型，如果找不到則為 null。
+ * @param {import('../cli/StaticParser.js').WGFXShaderInfo} shaderInfo
+ * - EN: The shader information object.
+ * - TW: 著色器資訊物件。
+ * @param {string} name
+ * - EN: The name of the resource to find.
+ * - TW: 要尋找的資源名稱。
+ * @returns {{type: string, [key: string]: any} | null}
+ * - EN: The found resource with its type, or null if not found.
+ * - TW: 找到的資源及其類型，如果找不到則為 null。
  */
 export function findResource(shaderInfo, name) {
     /**

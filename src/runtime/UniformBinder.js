@@ -62,8 +62,8 @@ export class UniformBinder {
      * - EN: Dynamically updates the value of a single uniform in the shared uniform buffer.
      * - TW: 在共享統一緩衝區中動態更新單個統一的值。
      * @param {string} name
-     * - EN: The name of the uniform to update (e.g., "Strength").
-     * - TW: 要更新的統一名稱 (例如："Strength")。
+     * - EN: The name of the uniform to update (e.g., `Strength`).
+     * - TW: 要更新的統一名稱 (例如：`Strength`)。
      * @param {number} value
      * - EN: The new numeric value for the uniform.
      * - TW: 統一的新數值。
@@ -101,23 +101,28 @@ export class UniformBinder {
          * - TW: 將資料寫入 GPU 緩衝區中的正確位置。
          */
         this.device.queue.writeBuffer(
-            buffer,   /**
+            buffer,
+            /**
              * - EN: Destination buffer.
              * - TW: 目標緩衝區。
              */
-            offset,   /**
+            offset,
+            /**
              * - EN: Byte offset to start writing from.
              * - TW: 開始寫入的位元組偏移量。
              */
-            data,     /**
+            data,
+            /**
              * - EN: Source data.
              * - TW: 來源資料。
              */
-            0,        /**
+            0,
+            /**
              * - EN: Offset within the source data.
              * - TW: 來源資料中的偏移量。
              */
-            size      /**
+            size
+            /**
              * - EN: Number of bytes to write.
              * - TW: 要寫入的位元組數。
              */

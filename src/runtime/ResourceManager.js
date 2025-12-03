@@ -55,7 +55,9 @@ try {
 
 export class ResourceManager {
     /**
-     * @param {GPUDevice} [device] - EN: The active WebGPU device. If not provided, a mock device will be used. - TW: 作用中的 WebGPU 裝置。如果未提供，將使用模擬裝置。
+     * @param {GPUDevice} [device]
+     * - EN: The active WebGPU device. If not provided, a mock device will be used.
+     * - TW: 作用中的 WebGPU 裝置。如果未提供，將使用模擬裝置。
      */
     constructor(device) {
         /** @type {GPUDevice} */
@@ -118,7 +120,9 @@ export class ResourceManager {
     /**
      * - EN: Initializes all GPU resources based on the parsed shader IR.
      * - TW: 根據解析後的著色器 IR 初始化所有 GPU 資源。
-     * @param {import('./ShaderParser.js').WGFXShaderInfo} shaderInfo - EN: Parsed shader information from Parser.js. - TW: 來自 Parser.js 的解析後著色器資訊。
+     * @param {import('./ShaderParser.js').WGFXShaderInfo} shaderInfo
+     * - EN: Parsed shader information from Parser.js.
+     * - TW: 來自 Parser.js 的解析後著色器資訊。
      */
     initialize(shaderInfo) {
         /**
@@ -216,9 +220,15 @@ export class ResourceManager {
     /**
      * - EN: Creates or replaces a GPUTexture in the manager.
      * - TW: 在管理器中建立或替換 GPUTexture。
-     * @param {string} name - EN: The unique name of the texture. - TW: 紋理的唯一名稱。
-     * @param {GPUTextureDescriptor} descriptor - EN: The descriptor for the texture. - TW: 紋理描述符。
-     * @returns {GPUTexture} - EN: The created GPUTexture. - TW: 建立的 GPUTexture。
+     * @param {string} name
+     * - EN: The unique name of the texture.
+     * - TW: 紋理的唯一名稱。
+     * @param {GPUTextureDescriptor} descriptor
+     * - EN: The descriptor for the texture.
+     * - TW: 紋理描述符。
+     * @returns {GPUTexture}
+     * - EN: The created GPUTexture.
+     * - TW: 建立的 GPUTexture。
      */
     createTexture(name, descriptor) {
         /**
@@ -241,8 +251,12 @@ export class ResourceManager {
     /**
      * - EN: Retrieves a texture by its name.
      * - TW: 按名稱檢索紋理。
-     * @param {string} name - EN: The name of the texture. - TW: 紋理的名稱。
-     * @returns {GPUTexture | undefined} - EN: The texture object or undefined if not found. - TW: 紋理物件，如果找不到則為 undefined。
+     * @param {string} name
+     * - EN: The name of the texture.
+     * - TW: 紋理的名稱。
+     * @returns {GPUTexture | undefined}
+     * - EN: The texture object or undefined if not found.
+     * - TW: 紋理物件，如果找不到則為 undefined。
      */
     getTexture(name) {
         return this.textures.get(name);
@@ -251,9 +265,15 @@ export class ResourceManager {
     /**
      * - EN: Creates a new GPUSampler.
      * - TW: 建立新的 GPUSampler。
-     * @param {string} name - EN: The unique name of the sampler. - TW: 取樣器的唯一名稱。
-     * @param {GPUSamplerDescriptor} descriptor - EN: The descriptor for the sampler. - TW: 取樣器描述符。
-     * @returns {GPUSampler} - EN: The created GPUSampler. - TW: 建立的 GPUSampler。
+     * @param {string} name
+     * - EN: The unique name of the sampler.
+     * - TW: 取樣器的唯一名稱。
+     * @param {GPUSamplerDescriptor} descriptor
+     * - EN: The descriptor for the sampler.
+     * - TW: 取樣器描述符。
+     * @returns {GPUSampler}
+     * - EN: The created GPUSampler.
+     * - TW: 建立的 GPUSampler。
      */
     createSampler(name, descriptor) {
         const sampler = this.device.createSampler(descriptor);
@@ -264,8 +284,12 @@ export class ResourceManager {
     /**
      * - EN: Retrieves a sampler by its name.
      * - TW: 按名稱檢索取樣器。
-     * @param {string} name - EN: The name of the sampler. - TW: 取樣器的名稱。
-     * @returns {GPUSampler | undefined} - EN: The sampler object or undefined if not found. - TW: 取樣器物件，如果找不到則為 undefined。
+     * @param {string} name
+     * - EN: The name of the sampler.
+     * - TW: 取樣器的名稱。
+     * @returns {GPUSampler | undefined}
+     * - EN: The sampler object or undefined if not found.
+     * - TW: 取樣器物件，如果找不到則為 undefined。
      */
     getSampler(name) {
         return this.samplers.get(name);
@@ -283,8 +307,12 @@ export class ResourceManager {
     /**
      * - EN: Retrieves metadata for a specific uniform.
      * - TW: 檢索特定 uniform 的元資料。
-     * @param {string} name - EN: The name of the uniform parameter. - TW: uniform 參數的名稱。
-     * @returns {{buffer: GPUBuffer, offset: number, size: number} | undefined} - EN: Metadata for the uniform, or undefined if not found. - TW: uniform 的元資料，如果找不到則為 undefined。
+     * @param {string} name
+     * - EN: The name of the uniform parameter.
+     * - TW: uniform 參數的名稱。
+     * @returns {{buffer: GPUBuffer, offset: number, size: number} | undefined}
+     * - EN: Metadata for the uniform, or undefined if not found.
+     * - TW: uniform 的元資料，如果找不到則為 undefined。
      */
     getUniform(name) {
         return this.uniforms.get(name);

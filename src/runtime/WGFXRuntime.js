@@ -21,7 +21,9 @@ import {UniformBinder} from './UniformBinder.js';
 
 export class WGFXRuntime {
     /**
-     * @param {GPUDevice} device - EN: The active WebGPU device. - TW: 作用中的 WebGPU 裝置。
+     * @param {GPUDevice} device
+     * - EN: The active WebGPU device.
+     * - TW: 作用中的 WebGPU 裝置。
      */
     constructor(device) {
         if (!device) {
@@ -56,8 +58,12 @@ export class WGFXRuntime {
      *   The process involves parsing, code generation, resource allocation, and pipeline creation.
      * - TW: 從程式碼字串編譯 WGFX 效果。這是設定新效果的主要入口點。
      *   該過程涉及解析、程式碼生成、資源分配和管線建立。
-     * @param {string} effectCode - EN: The string containing the entire WGFX effect code. - TW: 包含整個 WGFX 效果程式碼的字串。
-     * @returns {Promise<void>} - EN: A Promise that resolves when compilation is complete. - TW: 編譯完成時解析的 Promise。
+     * @param {string} effectCode
+     * - EN: The string containing the entire WGFX effect code.
+     * - TW: 包含整個 WGFX 效果程式碼的字串。
+     * @returns {Promise<void>}
+     * - EN: A Promise that resolves when compilation is complete.
+     * - TW: 編譯完成時解析的 Promise。
      */
     async compile(effectCode) {
         /**
@@ -118,8 +124,12 @@ export class WGFXRuntime {
     /**
      * - EN: Encodes commands to dispatch a specific compute pass.
      * - TW: 編碼調度特定計算通道的命令。
-     * @param {string} passName - EN: The name of the pass to dispatch (e.g., 'PASS_1'). - TW: 要調度的通道名稱 (例如：'PASS_1')。
-     * @param {GPUCommandEncoder} commandEncoder - EN: The command encoder for the current frame. - TW: 當前幀的命令編碼器。
+     * @param {string} passName
+     * - EN: The name of the pass to dispatch (e.g., `PASS_1`).
+     * - TW: 要調度的通道名稱 (例如：`PASS_1`)。
+     * @param {GPUCommandEncoder} commandEncoder
+     * - EN: The command encoder for the current frame.
+     * - TW: 當前幀的命令編碼器。
      */
     dispatchPass(passName, commandEncoder) {
         if (!this.shaderInfo) {
@@ -138,8 +148,8 @@ export class WGFXRuntime {
         const passInfo = this.shaderInfo.passes.find(p => p.index === passIndex);
         if (!passInfo) {
             /**
-             * - EN: Pass "${passName}" not found in shader information.
-             * - TW: 在著色器資訊中找不到通道 "${passName}"。
+             * - EN: Pass `passName` not found in shader information.
+             * - TW: 在著色器資訊中找不到通道 `passName`。
              */
             throw new Error(`Pass "${passName}" not found in shader information.`);
         }
@@ -154,8 +164,12 @@ export class WGFXRuntime {
     /**
      * - EN: Updates the value of a uniform parameter in the GPU buffer.
      * - TW: 更新 GPU 緩衝區中 uniform 參數的值。
-     * @param {string} name - EN: The name of the uniform to update. - TW: 要更新的 uniform 名稱。
-     * @param {number} value - EN: The new value for the uniform. - TW: uniform 的新值。
+     * @param {string} name
+     * - EN: The name of the uniform to update.
+     * - TW: 要更新的 uniform 名稱。
+     * @param {number} value
+     * - EN: The new value for the uniform.
+     * - TW: uniform 的新值。
      */
     updateUniform(name, value) {
         if (!this.shaderInfo) {
@@ -171,14 +185,16 @@ export class WGFXRuntime {
     /**
      * - EN: Gets the GPUTextureView of the final output texture, usually named 'OUTPUT'.
      * - TW: 獲取最終輸出紋理的 GPUTextureView，通常命名為 'OUTPUT'。
-     * @returns {GPUTextureView} - EN: The texture view of the final output. - TW: 最終輸出的紋理視圖。
+     * @returns {GPUTextureView}
+     * - EN: The texture view of the final output.
+     * - TW: 最終輸出的紋理視圖。
      */
     getOutput() {
         const outputTexture = this.resourceManager.getTexture('OUTPUT');
         if (!outputTexture) {
             /**
-             * - EN: Output texture 'OUTPUT' not found in ResourceManager. Ensure it is correctly defined or managed.
-             * - TW: 在 ResourceManager 中找不到輸出紋理 'OUTPUT'。請確保已正確定義或管理。
+             * - EN: Output texture `OUTPUT` not found in ResourceManager. Ensure it is correctly defined or managed.
+             * - TW: 在 ResourceManager 中找不到輸出紋理 `OUTPUT`。請確保已正確定義或管理。
              */
             throw new Error("Output texture 'OUTPUT' not found in ResourceManager. Ensure it is correctly defined or managed.");
         }
@@ -188,8 +204,12 @@ export class WGFXRuntime {
     /**
      * - EN: Utility function to get raw GPU resources.
      * - TW: 獲取原始 GPU 資源的實用函數。
-     * @param {string} name - EN: The name of the resource. - TW: 資源的名稱。
-     * @returns {GPUTexture | GPUSampler | GPUBuffer | undefined} - EN: The underlying GPU resource. - TW: 底層 GPU 資源。
+     * @param {string} name
+     * - EN: The name of the resource.
+     * - TW: 資源的名稱。
+     * @returns {GPUTexture | GPUSampler | GPUBuffer | undefined}
+     * - EN: The underlying GPU resource.
+     * - TW: 底層 GPU 資源。
      */
     getResource(name) {
         return this.resourceManager.getTexture(name)

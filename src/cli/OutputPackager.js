@@ -34,10 +34,18 @@ export class OutputPackager {
      *   因此它使用佔位符 `FileUtils.zipFiles`，該函數將內容寫入
      *   目錄而不是壓縮檔。
      *
-     * @param {Array<{ wgslCode: string, passIndex: number }>} generatedModules - EN: An array of generated WGSL modules for each pass. - TW: 每個通道生成的 WGSL 模組陣列。
-     * @param {object} pipelineMetadata - EN: Pipeline metadata JSON object. - TW: 管線元資料 JSON 物件。
-     * @param {object} generalMetadata - EN: General effect metadata JSON object. - TW: 一般效果元資料 JSON 物件。
-     * @param {string} outputPath - EN: The path to the output ".zip" file (will be created as a directory). - TW: 輸出 ".zip" 檔案的路徑 (將建立為目錄)。
+     * @param {Array<{ wgslCode: string, passIndex: number }>} generatedModules
+     * - EN: An array of generated WGSL modules for each pass.
+     * - TW: 每個通道生成的 WGSL 模組陣列。
+     * @param {object} pipelineMetadata
+     * - EN: Pipeline metadata JSON object.
+     * - TW: 管線元資料 JSON 物件。
+     * @param {object} generalMetadata
+     * - EN: General effect metadata JSON object.
+     * - TW: 一般效果元資料 JSON 物件。
+     * @param {string} outputPath
+     * - EN: The path to the output ".zip" file (will be created as a directory).
+     * - TW: 輸出 ".zip" 檔案的路徑 (將建立為目錄)。
      * @returns {Promise<void>}
      */
     async package(generatedModules, pipelineMetadata, generalMetadata, outputPath) {

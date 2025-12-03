@@ -13,8 +13,12 @@ export class PipelineClassGenerator {
     /**
      * - EN: Generates a JavaScript class for the pipeline.
      * - TW: 為管線生成一個 JavaScript 類別。
-     * @param {import('./StaticParser.js').WGFXShaderInfo} shaderInfo - EN: The parsed shader information. - TW: 解析後的著色器資訊。
-     * @returns {string} - EN: The generated JavaScript class as a string. - TW: 生成的 JavaScript 類別字串。
+     * @param {import('./StaticParser.js').WGFXShaderInfo} shaderInfo
+     * - EN: The parsed shader information.
+     * - TW: 解析後的著色器資訊。
+     * @returns {string}
+     * - EN: The generated JavaScript class as a string.
+     * - TW: 生成的 JavaScript 類別字串。
      */
     generate(shaderInfo) {
         const className = this.toCamelCase(shaderInfo.metadata.sortName || 'WGFXPipeline');
@@ -51,8 +55,12 @@ class ${className} {
     /**
      * - EN: Generates the pipeline layouts for all bind groups based on the shader information.
      * - TW: 根據著色器資訊生成所有綁定組的管線佈局。
-     * @param {import('./StaticParser.js').WGFXShaderInfo} shaderInfo - EN: The parsed shader information. - TW: 解析後的著色器資訊。
-     * @returns {string} - EN: The generated JavaScript code for pipeline layouts. - TW: 生成的管線佈局 JavaScript 程式碼。
+     * @param {import('./StaticParser.js').WGFXShaderInfo} shaderInfo
+     * - EN: The parsed shader information.
+     * - TW: 解析後的著色器資訊。
+     * @returns {string}
+     * - EN: The generated JavaScript code for pipeline layouts.
+     * - TW: 生成的管線佈局 JavaScript 程式碼。
      */
     generatePipelineLayouts(shaderInfo) {
         let code = '';
@@ -126,8 +134,12 @@ class ${className} {
     /**
      * - EN: Generates the compute pipelines for each pass based on the shader information.
      * - TW: 根據著色器資訊為每個通道生成計算管線。
-     * @param {import('./StaticParser.js').WGFXShaderInfo} shaderInfo - EN: The parsed shader information. - TW: 解析後的著色器資訊。
-     * @returns {string} - EN: The generated JavaScript code for compute pipelines. - TW: 生成的計算管線 JavaScript 程式碼。
+     * @param {import('./StaticParser.js').WGFXShaderInfo} shaderInfo
+     * - EN: The parsed shader information.
+     * - TW: 解析後的著色器資訊。
+     * @returns {string}
+     * - EN: The generated JavaScript code for compute pipelines.
+     * - TW: 生成的計算管線 JavaScript 程式碼。
      */
     generateComputePipelines(shaderInfo) {
         let code = '';
@@ -156,8 +168,12 @@ class ${className} {
     /**
      * - EN: Generates the methods for creating resources (textures, samplers, buffers) for the pipeline.
      * - TW: 生成為管線創建資源（紋理、取樣器、緩衝區）的方法。
-     * @param {import('./StaticParser.js').WGFXShaderInfo} shaderInfo - EN: The parsed shader information. - TW: 解析後的著色器資訊。
-     * @returns {string} - EN: The generated JavaScript code for resource creation methods. - TW: 生成的資源創建方法 JavaScript 程式碼。
+     * @param {import('./StaticParser.js').WGFXShaderInfo} shaderInfo
+     * - EN: The parsed shader information.
+     * - TW: 解析後的著色器資訊。
+     * @returns {string}
+     * - EN: The generated JavaScript code for resource creation methods.
+     * - TW: 生成的資源創建方法 JavaScript 程式碼。
      */
     generateResourceCreationMethods(shaderInfo) {
         let code = `
@@ -213,8 +229,12 @@ class ${className} {
     /**
      * - EN: Generates the dispatch method for the pipeline, including setting bind groups and dispatching workgroups.
      * - TW: 生成管線的調度方法，包括設置綁定組和調度工作組。
-     * @param {import('./StaticParser.js').WGFXShaderInfo} shaderInfo - EN: The parsed shader information. - TW: 解析後的著色器資訊。
-     * @returns {string} - EN: The generated JavaScript code for the dispatch method. - TW: 生成的調度方法 JavaScript 程式碼。
+     * @param {import('./StaticParser.js').WGFXShaderInfo} shaderInfo
+     * - EN: The parsed shader information.
+     * - TW: 解析後的著色器資訊。
+     * @returns {string}
+     * - EN: The generated JavaScript code for the dispatch method.
+     * - TW: 生成的調度方法 JavaScript 程式碼。
      */
     generateDispatchMethods(shaderInfo) {
         let code = `
@@ -274,8 +294,12 @@ class ${className} {
     /**
      * - EN: Converts a string to camel case, removing non-alphanumeric characters and capitalizing the first letter of each word.
      * - TW: 將字串轉換為駝峰命名法，移除非字母數字字符並將每個單詞的首字母大寫。
-     * @param {string} str - EN: The input string. - TW: 輸入字串。
-     * @returns {string} - EN: The camel-cased string. - TW: 駝峰命名法的字串。
+     * @param {string} str
+     * - EN: The input string.
+     * - TW: 輸入字串。
+     * @returns {string}
+     * - EN: The camel-cased string.
+     * - TW: 駝峰命名法的字串。
      */
     toCamelCase(str) {
         return str.replace(/[^a-zA-Z0-9]+(.)?/g, (m, chr) => chr ? chr.toUpperCase() : '').replace(/^./, (m) => m.toUpperCase());

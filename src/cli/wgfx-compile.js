@@ -81,7 +81,7 @@ async function main() {
      * - TW: 驗證所需參數。
      */
     if (!inputFxFile || !outputZipFile) {
-        console.error("Error: Missing required arguments. / 錯誤：缺少必要參數。");
+        console.error("Error: Missing required arguments.");
         console.error("Usage: node wgfx-compile.js --input <path/to/effect.fx> --output <path/to/output.zip>");
         /**
          * - EN: Exit with an error code.
@@ -92,24 +92,24 @@ async function main() {
 
     try {
         /**
-         * - EN: 1. Read the source .fx file.
-         * - TW: 1. 讀取源 .fx 檔案。
+         * - EN: 1. Read the source .wgsl file.
+         * - TW: 1. 讀取源 .wgsl 檔案。
          */
-        console.log(`Reading FX file: ${inputFxFile}`);
+        console.log(`Reading WGSL file: ${inputFxFile}`);
         const fxCode = await FileUtils.readFile(inputFxFile);
 
         /**
          * - EN: 2. Parse the file into an Intermediate Representation (IR) using the runtime parser directly.
          * - TW: 2. 使用運行時解析器直接將檔案解析為中介表示 (IR)。
          */
-        console.log("Parsing FX file... / 解析 FX 檔案...");
+        console.log("Parsing WGSL file...");
         const shaderInfo = shaderParser.parse(fxCode);
 
         /**
          * - EN: 3. Generate WGSL code from the IR using the runtime generator directly.
          * - TW: 3. 使用運行時生成器直接從 IR 生成 WGSL 程式碼。
          */
-        console.log("Generating WGSL code and pass-specific resource bindings... / 生成 WGSL 程式碼和通道特定的資源綁定...");
+        console.log("Generating WGSL code and pass-specific resource bindings...");
         const codeGenerator = new WGSLCodeGenerator();
         /**
          * - EN: The runtime generator produces an array of modules, each containing WGSL code and its bound resources.
@@ -121,7 +121,7 @@ async function main() {
          * - EN: 4. Generate metadata JSON from the IR.
          * - TW: 4. 從 IR 生成元資料 JSON。
          */
-        console.log("Generating pipeline metadata... / 生成管線元資料...");
+        console.log("Generating pipeline metadata...");
         const metadataGenerator = new PipelineMetadataGenerator();
         const {pipeline, metadata} = metadataGenerator.generate(shaderInfo);
 
@@ -140,12 +140,12 @@ async function main() {
          * - EN: 5. Package all artifacts for distribution.
          * - TW: 5. 將所有構件打包以便分發。
          */
-        console.log(`Packaging output to ${outputZipFile}... / 將輸出打包到 ${outputZipFile}...`);
+        console.log(`Packaging output to ${outputZipFile}...`);
         const packager = new OutputPackager();
         await packager.package(generatedModules, pipeline, metadata, outputZipFile);
 
         console.log(`
-Successfully compiled ${inputFxFile}. / 成功編譯 ${inputFxFile}。`);
+Successfully compiled ${inputFxFile}.`);
 
     } catch (error) {
         /**

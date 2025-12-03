@@ -26,9 +26,15 @@ export class FunctionOverloadResolver {
      *   For example, `resolve('doSomething', ['float', 'vec2'])` might return 'doSomething_float_vec2'.
      * - TW: 根據函數簽名生成一個唯一的、經過混淆的函數名稱。
      *   例如，`resolve('doSomething', ['float', 'vec2'])` 可能會返回 'doSomething_float_vec2'。
-     * @param {string} functionName - EN: The original name of the function (e.g., "doSomething"). - TW: 函數的原始名稱 (例如："doSomething")。
-     * @param {string[]} paramTypes - EN: An array of parameter type names (e.g., ['float', 'vec2']). - TW: 參數類型名稱的陣列 (例如：['float', 'vec2'])。
-     * @returns {string} - EN: A unique name for the function signature. - TW: 函數簽名的唯一名稱。
+     * @param {string} functionName
+     * - EN: The original name of the function (e.g., "doSomething").
+     * - TW: 函數的原始名稱 (例如："doSomething")。
+     * @param {string[]} paramTypes
+     * - EN: An array of parameter type names (e.g., ['float', 'vec2']).
+     * - TW: 參數類型名稱的陣列 (例如：['float', 'vec2'])。
+     * @returns {string}
+     * - EN: A unique name for the function signature.
+     * - TW: 函數簽名的唯一名稱。
      */
     resolve(functionName, paramTypes) {
         const signature = paramTypes.join('_');
