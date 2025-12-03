@@ -66,7 +66,7 @@ async function main() {
      * - EN: Console output for CLI start.
      * - TW: CLI 啟動的控制台輸出。
      */
-    console.log("--- WGFX CLI Compiler ---");
+    console.log("--- WGFX CLI Compiler --- \n");
     /**
      * - EN: Parse command-line arguments.
      * - TW: 解析命令列參數。

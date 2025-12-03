@@ -91,7 +91,7 @@ export class FileUtils {
      */
     static async zipFiles(files, outputPath) {
         console.warn(
-            "FileUtils.zipFiles is a placeholder. Compression requires external libraries like 'archiver'."
+            "FileUtils.zipFiles is a placeholder. \nCompression requires external libraries like 'archiver'."
         );
 
         const dir = path.dirname(outputPath);
