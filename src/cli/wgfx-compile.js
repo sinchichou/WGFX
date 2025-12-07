@@ -10,9 +10,9 @@
  *
  * @example
  * - EN: To run from the project root:
- *   node src/cli/wgfx-compile.js --input examples/demo.fx --output build/demo.zip
+ *   node index.js  --input examples/examples.wgsl --output build/examples.zip
  * - TW: 從專案根目錄運行：
- *   node src/cli/wgfx-compile.js --input examples/demo.fx --output build/demo.zip
+ *   node index.js  --input examples/examples.wgsl --output build/examples.zip
  */
 import {createRequire} from 'module';
 

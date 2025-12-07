@@ -131,7 +131,7 @@ export class WGSLCodeGenerator {
          * - TW: 注入通用程式碼區塊。如果存在,將 'type' 替換為 'alias' 才能符合 WGSL 相容性。
          */
         const commonCode = shaderInfo.commonCode
-            ? `// --- 通用程式碼 ---\n${shaderInfo.commonCode.replace(/type\s+/g, 'alias ')}\n\n`
+            ? `// --- 通用程式碼 ---\n${shaderInfo.commonCode}\n\n`
             : '';
 
         /**
