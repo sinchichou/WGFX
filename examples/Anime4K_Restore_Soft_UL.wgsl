@@ -7,22 +7,22 @@
 //!CAPABILITY FP16
 
 //! COMMON
-type uint2 = vec2<u32>;
-type uint3 = vec3<u32>;
-type int2 = vec2<i32>;
-type MF = f32;
-type MF2 = vec2<f32>;
-type MF3 = vec3<f32>;
-type MF4 = vec4<f32>;
-type MF2x2 = mat2x2<f32>;
-type MF3x3 = mat3x3<f32>;
-type MF4x4 = mat4x4<f32>;
-type MF2x3 = mat3x2<f32>;
-type MF2x4 = mat4x2<f32>;
-type MF3x2 = mat2x3<f32>;
-type MF3x4 = mat4x3<f32>;
-type MF4x2 = mat2x4<f32>;
-type MF4x3 = mat3x4<f32>;
+alias uint2 = vec2<u32>;
+alias uint3 = vec3<u32>;
+alias int2 = vec2<i32>;
+alias MF = f32;
+alias MF2 = vec2<f32>;
+alias MF3 = vec3<f32>;
+alias MF4 = vec4<f32>;
+alias MF2x2 = mat2x2<f32>;
+alias MF3x3 = mat3x3<f32>;
+alias MF4x4 = mat4x4<f32>;
+alias MF2x3 = mat3x2<f32>;
+alias MF2x4 = mat4x2<f32>;
+alias MF3x2 = mat2x3<f32>;
+alias MF3x4 = mat4x3<f32>;
+alias MF4x2 = mat2x4<f32>;
+alias MF4x3 = mat3x4<f32>;
 
 fn GetInputSize() -> uint2 {
     return uint2(0, 0);
