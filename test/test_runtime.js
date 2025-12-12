@@ -57,14 +57,9 @@ async function main() {
         const externalResources = {
             textures: {
                 'INPUT': {
-                    size: [1920, 1080],
+                    size: [1280, 720],
                     format: 'rgba8unorm',
                     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_DST
-                },
-                'OUTPUT': {
-                    size: [1920, 1080],
-                    format: 'rgba8unorm',
-                    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC
                 }
             }
         };

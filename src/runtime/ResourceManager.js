@@ -100,32 +100,57 @@ export class ResourceManager {
      * - TW: 來自 Parser.js 的解析後著色器資訊。
      */
     initialize(shaderInfo, externalResources = {}) {
+        // Create external textures first, especially INPUT and OUTPUT
         if (externalResources.textures) {
             for (const [name, descriptor] of Object.entries(externalResources.textures)) {
                 this.createTexture(name, descriptor);
             }
         }
+
+        const inputTexture = this.getTexture('INPUT');
+        const context = {};
+        if (inputTexture) {
+            context['INPUT_WIDTH'] = inputTexture.width;
+            context['INPUT_HEIGHT'] = inputTexture.height;
+        }
+
+        // A simple expression evaluator
+        const evaluate = (expr, ctx) => {
+            if (typeof expr !== 'string') return expr; // It's already a number
+
+            // Replace variables with their values
+            let evaluatedExpr = expr;
+            for (const key in ctx) {
+                // Use a regex to replace whole words only to avoid replacing parts of other words
+                const regex = new RegExp('\\b' + key + '\\b', 'g');
+                evaluatedExpr = evaluatedExpr.replace(regex, ctx[key]);
+            }
+
+            try {
+                // Use Function constructor for safe evaluation
+                return Math.ceil(new Function('return ' + evaluatedExpr)());
+            } catch (e) {
+                throw new Error(`Cannot evaluate expression: "${expr}"`);
+            }
+        };
+
+
         /**
          * - EN: Create textures defined in the shader.
          * - TW: 建立著色器中定義的紋理。
          */
         shaderInfo.textures.forEach(tex => {
-            /**
-             * - EN: INPUT and OUTPUT are special cases, assumed to be managed externally or already created.
-             * - TW: INPUT 和 OUTPUT 是特殊情況，假定由外部管理或已建立。
-             */
-            if (this.textures.has(tex.name)) return;
+            if (this.textures.has(tex.name)) return; // Already created externally
 
-            /**
-             * - EN: TODO: A more robust implementation would parse width/height expressions (e.g., "INPUT_WIDTH * 0.5").
-             * - TW: TODO: 更穩健的實作將解析寬度/高度表達式 (例如："INPUT_WIDTH * 0.5")。
-             */
+            const width = evaluate(tex.width, context);
+            const height = evaluate(tex.height, context);
+
+            if (!width || !height) {
+                throw new Error(`Could not determine size for texture ${tex.name}. Width or height expression is invalid.`);
+            }
+
             const descriptor = {
-                size: [1920, 1080],
-                /**
-                 * - EN: Current placeholder size.
-                 * - TW: 目前的佔位符大小。
-                 */
+                size: [width, height],
                 format: tex.format?.toLowerCase() || 'rgba8unorm',
                 usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC,
             };

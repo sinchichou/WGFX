@@ -63,6 +63,8 @@ export class WGFXRuntime {
      * - TW: 編譯完成時解析的 Promise。
      */
     async compile(effectCode, externalResources = {}) {
+        // FIXME: This is a temporary solution to pass external resources.
+        // A more robust solution would be to have a dedicated method to set resources.
         /**
          * - EN: Starting effect compilation.
          * - TW: 開始效果編譯。
