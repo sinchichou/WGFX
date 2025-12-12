@@ -90,31 +90,6 @@ export class ResourceManager {
          * @type {import('./WebGPU-mock.js').GPUBuffer}
          */
         this.uniformBuffer = null;
-
-        /**
-         * - EN: Pre-create INPUT and OUTPUT textures with default descriptors.
-         *   These textures can be replaced by external textures later.
-         * - TW: 使用預設描述符預先建立 INPUT 和 OUTPUT 紋理。
-         *   這些紋理稍後可以被外部紋理替換。
-         */
-        this.createTexture('INPUT', {
-            size: [1, 1],
-            /**
-             * - EN: Default size, should be overridden by actual input.
-             * - TW: 預設大小，應由實際輸入覆蓋。
-             */
-            format: 'rgba8unorm',
-            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-        });
-        this.createTexture('OUTPUT', {
-            size: [1, 1],
-            /**
-             * - EN: Default size, should be overridden by actual input.
-             * - TW: 預設大小，應由實際輸入覆蓋。
-             */
-            format: 'rgba8unorm',
-            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING,
-        });
     }
 
     /**
@@ -124,7 +99,12 @@ export class ResourceManager {
      * - EN: Parsed shader information from Parser.js.
      * - TW: 來自 Parser.js 的解析後著色器資訊。
      */
-    initialize(shaderInfo) {
+    initialize(shaderInfo, externalResources = {}) {
+        if (externalResources.textures) {
+            for (const [name, descriptor] of Object.entries(externalResources.textures)) {
+                this.createTexture(name, descriptor);
+            }
+        }
         /**
          * - EN: Create textures defined in the shader.
          * - TW: 建立著色器中定義的紋理。
@@ -134,7 +114,7 @@ export class ResourceManager {
              * - EN: INPUT and OUTPUT are special cases, assumed to be managed externally or already created.
              * - TW: INPUT 和 OUTPUT 是特殊情況，假定由外部管理或已建立。
              */
-            if (tex.name === 'INPUT' || tex.name === 'OUTPUT') return;
+            if (this.textures.has(tex.name)) return;
 
             /**
              * - EN: TODO: A more robust implementation would parse width/height expressions (e.g., "INPUT_WIDTH * 0.5").

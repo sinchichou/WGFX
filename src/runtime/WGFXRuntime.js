@@ -62,7 +62,7 @@ export class WGFXRuntime {
      * - EN: A Promise that resolves when compilation is complete.
      * - TW: 編譯完成時解析的 Promise。
      */
-    async compile(effectCode) {
+    async compile(effectCode, externalResources = {}) {
         /**
          * - EN: Starting effect compilation.
          * - TW: 開始效果編譯。
@@ -95,7 +95,7 @@ export class WGFXRuntime {
          * - EN: 3. Initialize all GPU resources (textures, samplers, buffers) based on the IR.
          * - TW: 3. 根據 IR 初始化所有 GPU 資源 (紋理、取樣器、緩衝區)。
          */
-        this.resourceManager.initialize(this.shaderInfo);
+        this.resourceManager.initialize(this.shaderInfo, externalResources);
         /**
          * - EN: Resources initialized.
          * - TW: 資源已初始化。

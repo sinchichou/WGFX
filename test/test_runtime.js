@@ -52,13 +52,27 @@ async function main() {
         console.log(`Loading effect file: ${effectPath}`);
         const effectCode = await fs.readFile(effectPath, 'utf-8');
 
-        // 3. Compile the effect and get shader info.
+        // 3. Define external resources and compile the effect.
         console.log("Compiling effect...");
-        const shaderInfo = await compile(effectCode, device);
+        const externalResources = {
+            textures: {
+                'INPUT': {
+                    size: [1920, 1080],
+                    format: 'rgba8unorm',
+                    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_DST
+                },
+                'OUTPUT': {
+                    size: [1920, 1080],
+                    format: 'rgba8unorm',
+                    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC
+                }
+            }
+        };
+        const shaderInfo = await compile(effectCode, device, externalResources);
         console.log("Effect compiled successfully.");
         console.log(`Found ${shaderInfo.passes.length} passes.`);
 
-        // 4. Create a mock command encoder to dispatch the passes.
+        // 4. Create a command encoder to dispatch the passes.
         const commandEncoder = device.createCommandEncoder();
         console.log("Mock GPUCommandEncoder created.");
 

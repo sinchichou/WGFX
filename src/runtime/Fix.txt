@@ -1,4 +1,3 @@
-ResourcesManager 90行
-生成器邏輯
-Texture 
-WGSL 變數別名需要用 alias宣告
+TODO: ResourcesManager 90行
+TODO: 生成器邏輯
+TODO: Texture

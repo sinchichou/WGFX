@@ -34,9 +34,9 @@ let runtimeInstance = null;
  * - EN: A Promise that resolves when compilation is complete.
  * - TW: 編譯完成時解析的 Promise。
  */
-export async function compile(effectCode, device) {
+export async function compile(effectCode, device, externalResources = {}) {
     runtimeInstance = new WGFXRuntime(device);
-    await runtimeInstance.compile(effectCode);
+    await runtimeInstance.compile(effectCode, externalResources);
     return runtimeInstance.shaderInfo;
 }
 
