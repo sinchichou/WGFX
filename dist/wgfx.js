@@ -1137,28 +1137,63 @@ class ResourceManager {
      * @param {string} name - The name of the texture (e.g., 'INPUT').
      * @param {ImageBitmap | VideoFrame | HTMLCanvasElement} image - The source image data.
      */
-    updateTextureFromImage(name, image) {
-        const texture = this.getTexture(name);
-
+    /**
+     * - EN: Updates a texture's content from an ImageBitmap, HTMLVideoElement, HTMLCanvasElement, or OffscreenCanvas
+     * - TW: 從 ImageBitmap、HTMLVideoElement、HTMLCanvasElement 或 OffscreenCanvas 更新紋理內容
+     *
+     * @param {string} textureName - The name of the texture to update
+     * @param {ImageBitmap | HTMLVideoElement | HTMLCanvasElement | OffscreenCanvas} imageSource - The image source
+     */
+    updateTextureFromImage(textureName, imageSource) {
+        const texture = this.textures.get(textureName);
         if (!texture) {
-            throw new Error(`Texture '${name}' not found for update.`);
+            throw new Error(`Texture "${textureName}" not found in ResourceManager.`);
         }
 
-        // Ensure the texture has COPY_DST usage, which is usually included for dynamic textures.
-        // We assume 'INPUT' is correctly set up with the right dimensions/format during compile/external setup.
-
-        if (texture.width !== image.width || texture.height !== image.height) {
-            // In a real implementation, you might resize the texture or throw an error.
-            // For simplicity, we assume the input size matches the texture size (e.g., INPUT is pre-sized).
-            console.warn(`Input image size (${image.width}x${image.height}) does not match texture size (${texture.width}x${texture.height}).`);
+        // Get the size of the image source
+        let width, height;
+        if (imageSource instanceof HTMLVideoElement) {
+            width = imageSource.videoWidth;
+            height = imageSource.videoHeight;
+        } else {
+            width = imageSource.width;
+            height = imageSource.height;
         }
 
-        this.device.queue.copyExternalImageToBufferOrTexture(
-            {source: image},
-            {texture: texture},
-            [image.width, image.height]
+        // Validate dimensions
+        if (width === 0 || height === 0) {
+            throw new Error(`Image source has invalid dimensions: ${width}x${height}`);
+        }
+
+        // Validate texture size matches
+        if (texture.width !== width || texture.height !== height) {
+            console.warn(
+                `Texture "${textureName}" size (${texture.width}x${texture.height}) ` +
+                `does not match image size (${width}x${height}). Texture will be recreated.`
+            );
+            // In production, you might want to recreate the texture here
+            // For now, we'll throw an error
+            throw new Error(`Texture size mismatch for "${textureName}"`);
+        }
+
+        // CRITICAL FIX: Use the correct WebGPU API method
+        // The correct method name is copyExternalImageToTexture, not copyExternalImageToBufferOrTexture
+        this.device.queue.copyExternalImageToTexture(
+            {
+                source: imageSource,
+                flipY: false  // Set to true if you need to flip the image vertically
+            },
+            {
+                texture: texture,
+                mipLevel: 0,
+                origin: { x: 0, y: 0, z: 0 }
+            },
+            {
+                width: width,
+                height: height,
+                depthOrArrayLayers: 1
+            }
         );
-        console.log(`Texture '${name}' updated from image source.`);
     }
 
     /**
@@ -1252,7 +1287,7 @@ class PipelineManager {
 
         // Setup uncaptured error handler for debugging
         this.device.addEventListener('uncapturederror', event => {
-            console.error('❌ WebGPU Uncaptured Error:', event.error.message);
+            console.error('WebGPU Uncaptured Error:', event.error.message);
         });
     }
 
@@ -1270,8 +1305,8 @@ class PipelineManager {
                 continue;
             }
 
-            console.log(`🔧 建立 Pass ${module.passIndex} 的管線...`);
-            console.log(`📄 WGSL 程式碼長度: ${module.wgslCode.length} 字元`);
+            console.log(`建立 Pass ${module.passIndex} 的管線...`);
+            console.log(`WGSL 程式碼長度: ${module.wgslCode.length} 字元`);
 
             try {
                 // 1. Create GPUShaderModule with error scope
@@ -1284,16 +1319,16 @@ class PipelineManager {
 
                 const shaderError = await this.device.popErrorScope();
                 if (shaderError) {
-                    console.error(`❌ Shader Module 建立錯誤:`, shaderError.message);
+                    console.error('Shader Module 建立錯誤:', shaderError.message);
                     throw shaderError;
                 }
 
                 // Check compilation info
                 const compilationInfo = await shaderModule.getCompilationInfo();
                 if (compilationInfo.messages.length > 0) {
-                    console.group(`⚠️ Shader 編譯訊息 (Pass ${module.passIndex}):`);
+                    console.group(`Shader 編譯訊息 (Pass ${module.passIndex}):`);
                     for (const msg of compilationInfo.messages) {
-                        const level = msg.type === 'error' ? '❌' : msg.type === 'warning' ? '⚠️' : 'ℹ️';
+                        const level = msg.type === 'error' ? 'ERROR' : msg.type === 'warning' ? 'WARN' : 'INFO';
                         console.log(`${level} Line ${msg.lineNum}:${msg.linePos} - ${msg.message}`);
 
                         // Show context
@@ -1317,28 +1352,28 @@ class PipelineManager {
                     }
                 }
 
-                console.log(`  ✅ Shader Module 建立成功`);
+                console.log('Shader Module 建立成功');
 
                 // 2. Create GPUBindGroupLayout
                 const bindingMap = new Map();
 
                 // Add Samplers
                 module.resources.samplers.forEach(samp => {
-                    console.log(`  ✓ Sampler "${samp.name}" -> @binding(${samp.binding})`);
+                    console.log(`Sampler "${samp.name}" -> @binding(${samp.binding})`);
                     bindingMap.set(samp.binding, {
                         binding: samp.binding,
                         visibility: GPUShaderStage.COMPUTE,
-                        sampler: { type: 'filtering' }
+                        sampler: {type: 'filtering'}
                     });
                 });
 
                 // Add Uniforms (binding 1 if present)
                 if (module.resources.parameters.length > 0) {
-                    console.log(`  ✓ Uniforms -> @binding(1)`);
+                    console.log('Uniforms -> @binding(1)');
                     bindingMap.set(1, {
                         binding: 1,
                         visibility: GPUShaderStage.COMPUTE,
-                        buffer: { type: 'uniform' }
+                        buffer: {type: 'uniform'}
                     });
                 }
 
@@ -1346,19 +1381,9 @@ class PipelineManager {
                 module.resources.textures.forEach(tex => {
                     const texType = tex.isStorage ? 'storage' : 'sampled';
                     const normalizedFormat = (tex.format || 'rgba8unorm').toLowerCase().replace(/_/g, '');
-                    console.log(`  ✓ Texture "${tex.name}" (${texType}, ${normalizedFormat}) -> @binding(${tex.binding})`);
+                    console.log(`Texture "${tex.name}" (${texType}, ${normalizedFormat}) -> @binding(${tex.binding})`);
 
                     if (tex.isStorage) {
-                        // Validate storage format
-                        const validStorageFormats = [
-                            'r32float', 'r32sint', 'r32uint',
-                            'rgba16float', 'rgba16sint', 'rgba16uint',
-                            'rgba32float', 'rgba32sint', 'rgba32uint',
-                            'rg32float', 'rg32sint', 'rg32uint',
-                            'rgba8unorm', 'rgba8snorm', 'rgba8uint', 'rgba8sint' // These are for read-only
-                        ];
-
-                        // For write-only storage, only certain formats are valid
                         const validWriteStorageFormats = [
                             'r32float', 'r32sint', 'r32uint',
                             'rgba16float', 'rgba16sint', 'rgba16uint',
@@ -1367,8 +1392,7 @@ class PipelineManager {
                         ];
 
                         if (!validWriteStorageFormats.includes(normalizedFormat)) {
-                            console.error(`❌ Invalid write storage texture format: ${normalizedFormat}`);
-                            console.error(`   Valid formats for write-only storage: ${validWriteStorageFormats.join(', ')}`);
+                            console.error(`Invalid write storage texture format: ${normalizedFormat}`);
                             throw new Error(
                                 `Texture "${tex.name}" has invalid storage format "${normalizedFormat}". ` +
                                 `Valid formats for write access: ${validWriteStorageFormats.join(', ')}`
@@ -1387,24 +1411,15 @@ class PipelineManager {
                         bindingMap.set(tex.binding, {
                             binding: tex.binding,
                             visibility: GPUShaderStage.COMPUTE,
-                            texture: { sampleType: 'float' }
+                            texture: {sampleType: 'float'}
                         });
                     }
                 });
 
-                // CRITICAL: Sort entries by binding number
                 const bindGroupLayoutEntries = Array.from(bindingMap.values())
                     .sort((a, b) => a.binding - b.binding);
 
-                console.log(`  📋 BindGroupLayout entries (${bindGroupLayoutEntries.length} total):`,
-                    bindGroupLayoutEntries.map(e => {
-                        let desc = `binding ${e.binding}`;
-                        if (e.sampler) desc += ' (sampler)';
-                        if (e.buffer) desc += ' (uniform buffer)';
-                        if (e.texture) desc += ' (sampled texture)';
-                        if (e.storageTexture) desc += ` (storage texture: ${e.storageTexture.format})`;
-                        return desc;
-                    }).join(', '));
+                console.log(`BindGroupLayout entries (${bindGroupLayoutEntries.length} total)`);
 
                 this.device.pushErrorScope('validation');
 
@@ -1415,11 +1430,11 @@ class PipelineManager {
 
                 const layoutError = await this.device.popErrorScope();
                 if (layoutError) {
-                    console.error(`❌ BindGroupLayout 建立錯誤:`, layoutError.message);
+                    console.error('BindGroupLayout 建立錯誤:', layoutError.message);
                     throw layoutError;
                 }
 
-                console.log(`  ✅ BindGroupLayout 建立成功`);
+                console.log('BindGroupLayout 建立成功');
 
                 // 3. Create GPUPipelineLayout
                 this.device.pushErrorScope('validation');
@@ -1431,11 +1446,11 @@ class PipelineManager {
 
                 const pipelineLayoutError = await this.device.popErrorScope();
                 if (pipelineLayoutError) {
-                    console.error(`❌ PipelineLayout 建立錯誤:`, pipelineLayoutError.message);
+                    console.error('PipelineLayout 建立錯誤:', pipelineLayoutError.message);
                     throw pipelineLayoutError;
                 }
 
-                console.log(`  ✅ PipelineLayout 建立成功`);
+                console.log('PipelineLayout 建立成功');
 
                 // 4. Create GPUComputePipeline
                 this.device.pushErrorScope('validation');
@@ -1451,16 +1466,14 @@ class PipelineManager {
 
                 const pipelineError = await this.device.popErrorScope();
                 if (pipelineError) {
-                    console.error(`❌ ComputePipeline 建立錯誤:`, pipelineError.message);
+                    console.error('ComputePipeline 建立錯誤:', pipelineError.message);
                     throw pipelineError;
                 }
 
-                // Force error processing
                 await this.device.queue.submit([]);
 
-                console.log(`  ✅ Pass ${module.passIndex} 管線建立完全成功`);
+                console.log(`Pass ${module.passIndex} 管線建立成功`);
 
-                // Store pipeline components
                 this.pipelines.set(module.passIndex, {
                     shaderModule,
                     bindGroupLayout,
@@ -1471,10 +1484,9 @@ class PipelineManager {
                 });
 
             } catch (error) {
-                console.error(`❌ Pass ${module.passIndex} 管線建立失敗:`, error);
+                console.error(`Pass ${module.passIndex} 管線建立失敗:`, error);
 
-                // Output full WGSL code for debugging
-                console.group(`🔍 Pass ${module.passIndex} 完整 WGSL 程式碼:`);
+                console.group(`Pass ${module.passIndex} 完整 WGSL 程式碼:`);
                 const lines = module.wgslCode.split('\n');
                 lines.forEach((line, idx) => {
                     console.log(`${(idx + 1).toString().padStart(4)}: ${line}`);
@@ -1485,7 +1497,7 @@ class PipelineManager {
             }
         }
 
-        console.log(`✅ 共成功建立 ${this.pipelines.size} 個管線`);
+        console.log(`成功建立 ${this.pipelines.size} 個管線`);
     }
 
     /**
@@ -1500,10 +1512,8 @@ class PipelineManager {
 
         const {computePipeline, bindGroupLayout, resources, passInfo: originalPassInfo} = storedPipeline;
 
-        // Build bind group entries
         const bindingMap = new Map();
 
-        // Samplers
         resources.samplers.forEach(samp => {
             const sampler = this.resourceManager.getSampler(samp.name);
             if (!sampler) {
@@ -1527,19 +1537,17 @@ class PipelineManager {
             }
         });
 
-        // Uniforms
         if (resources.parameters.length > 0) {
             const uniformBuffer = this.resourceManager.getUniformBuffer();
             if (!uniformBuffer) {
-                throw new Error("Uniform buffer not found in ResourceManager.");
+                throw new Error('Uniform buffer not found in ResourceManager.');
             }
             bindingMap.set(1, {
                 binding: 1,
-                resource: { buffer: uniformBuffer }
+                resource: {buffer: uniformBuffer}
             });
         }
 
-        // Textures
         resources.textures.forEach(tex => {
             const texture = this.resourceManager.getTexture(tex.name);
             if (!texture) {
@@ -1551,7 +1559,6 @@ class PipelineManager {
             });
         });
 
-        // Sort entries by binding number
         const bindGroupEntries = Array.from(bindingMap.values())
             .sort((a, b) => a.binding - b.binding);
 
@@ -1561,12 +1568,10 @@ class PipelineManager {
             label: `Pass ${passInfo.index} Bind Group`
         });
 
-        // Encode compute pass
         const passEncoder = commandEncoder.beginComputePass();
         passEncoder.setPipeline(computePipeline);
         passEncoder.setBindGroup(0, bindGroup);
 
-        // Calculate workgroup dispatch
         const outputTextureName = originalPassInfo.out[0];
         const outputTexture = this.resourceManager.getTexture(outputTextureName);
         const workgroupSize = originalPassInfo.numThreads;
@@ -1580,7 +1585,7 @@ class PipelineManager {
 
     dispose() {
         this.pipelines.clear();
-        console.log("PipelineManager: All pipeline states cleared.");
+        console.log('PipelineManager: All pipeline states cleared.');
     }
 }
 
@@ -1591,7 +1596,8 @@ class PipelineManager {
  */
 
 class WGSLCodeGenerator {
-    constructor() {}
+    constructor() {
+    }
 
     /**
      * - EN: Determines if a texture format is valid for Storage Texture write access

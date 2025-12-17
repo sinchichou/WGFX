@@ -364,28 +364,63 @@ export class ResourceManager {
      * @param {string} name - The name of the texture (e.g., 'INPUT').
      * @param {ImageBitmap | VideoFrame | HTMLCanvasElement} image - The source image data.
      */
-    updateTextureFromImage(name, image) {
-        const texture = this.getTexture(name);
-
+    /**
+     * - EN: Updates a texture's content from an ImageBitmap, HTMLVideoElement, HTMLCanvasElement, or OffscreenCanvas
+     * - TW: 從 ImageBitmap、HTMLVideoElement、HTMLCanvasElement 或 OffscreenCanvas 更新紋理內容
+     *
+     * @param {string} textureName - The name of the texture to update
+     * @param {ImageBitmap | HTMLVideoElement | HTMLCanvasElement | OffscreenCanvas} imageSource - The image source
+     */
+    updateTextureFromImage(textureName, imageSource) {
+        const texture = this.textures.get(textureName);
         if (!texture) {
-            throw new Error(`Texture '${name}' not found for update.`);
+            throw new Error(`Texture "${textureName}" not found in ResourceManager.`);
         }
 
-        // Ensure the texture has COPY_DST usage, which is usually included for dynamic textures.
-        // We assume 'INPUT' is correctly set up with the right dimensions/format during compile/external setup.
-
-        if (texture.width !== image.width || texture.height !== image.height) {
-            // In a real implementation, you might resize the texture or throw an error.
-            // For simplicity, we assume the input size matches the texture size (e.g., INPUT is pre-sized).
-            console.warn(`Input image size (${image.width}x${image.height}) does not match texture size (${texture.width}x${texture.height}).`);
+        // Get the size of the image source
+        let width, height;
+        if (imageSource instanceof HTMLVideoElement) {
+            width = imageSource.videoWidth;
+            height = imageSource.videoHeight;
+        } else {
+            width = imageSource.width;
+            height = imageSource.height;
         }
 
-        this.device.queue.copyExternalImageToBufferOrTexture(
-            {source: image},
-            {texture: texture},
-            [image.width, image.height]
+        // Validate dimensions
+        if (width === 0 || height === 0) {
+            throw new Error(`Image source has invalid dimensions: ${width}x${height}`);
+        }
+
+        // Validate texture size matches
+        if (texture.width !== width || texture.height !== height) {
+            console.warn(
+                `Texture "${textureName}" size (${texture.width}x${texture.height}) ` +
+                `does not match image size (${width}x${height}). Texture will be recreated.`
+            );
+            // In production, you might want to recreate the texture here
+            // For now, we'll throw an error
+            throw new Error(`Texture size mismatch for "${textureName}"`);
+        }
+
+        // CRITICAL FIX: Use the correct WebGPU API method
+        // The correct method name is copyExternalImageToTexture, not copyExternalImageToBufferOrTexture
+        this.device.queue.copyExternalImageToTexture(
+            {
+                source: imageSource,
+                flipY: false  // Set to true if you need to flip the image vertically
+            },
+            {
+                texture: texture,
+                mipLevel: 0,
+                origin: {x: 0, y: 0, z: 0}
+            },
+            {
+                width: width,
+                height: height,
+                depthOrArrayLayers: 1
+            }
         );
-        console.log(`Texture '${name}' updated from image source.`);
     }
 
     /**
