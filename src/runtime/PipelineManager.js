@@ -2,176 +2,232 @@
 
 /**
  * - EN: Manages the creation and scheduling of WebGPU compute pipelines.
- *   This class receives shader IR and WGSL code to build the required GPU state,
- *   including pipeline layouts, pipelines, and bind groups.
  * - TW: 管理 WebGPU 計算管線的建立和調度。
- *   此類別接收著色器 IR 和 WGSL 程式碼,以建立執行所需的 GPU 狀態,
- *   包括管線佈局、管線和綁定組。
  */
 export class PipelineManager {
-    /**
-     * - EN: Constructs a new PipelineManager instance.
-     * - TW: 建構一個新的 PipelineManager 實例。
-     *
-     * @param {GPUDevice} device
-     * - EN: The active WebGPU device.
-     * - TW: 作用中的 WebGPU 裝置。
-     *
-     * @param {import('./ResourceManager.js').ResourceManager} resourceManager
-     * - EN: An instance of the resource manager.
-     * - TW: 資源管理器的實例。
-     */
     constructor(device, resourceManager) {
         this.device = device;
         this.resourceManager = resourceManager;
-
-        /**
-         * - EN: A map storing pipeline components and metadata for each pass, indexed by pass index.
-         * - TW: 儲存每個通道的管線組件和中繼資料的映射表,以通道索引為鍵。
-         *
-         * @type {Map<number, {
-         *   shaderModule: GPUShaderModule,
-         *   bindGroupLayout: GPUBindGroupLayout,
-         *   pipelineLayout: GPUPipelineLayout,
-         *   computePipeline: GPUComputePipeline,
-         *   resources: {
-         *     textures: import('./Parser.js').WGFXTexture[],
-         *     samplers: import('./Parser.js').WGFXSampler[],
-         *     parameters: import('./Parser.js').WGFXParameter[]
-         *   },
-         *   passInfo: import('./Parser.js').WGFXPass
-         * }>}
-         */
         this.pipelines = new Map();
+
+        // Setup uncaptured error handler for debugging
+        this.device.addEventListener('uncapturederror', event => {
+            console.error('WebGPU Uncaptured Error:', event.error.message);
+        });
     }
 
     /**
-     * - EN: Asynchronously creates compute pipelines for all passes defined in the shader IR.
-     * - TW: 非同步建立著色器 IR 中定義的所有通道的計算管線。
-     *
-     * @param {import('./Parser.js').WGFXShaderInfo} shaderInfo
-     * - EN: The parsed shader information (IR).
-     * - TW: 解析後的著色器資訊 (IR)。
-     *
-     * @param {string} generatedModules
-     * - EN: The complete, generated WGSL shader code.
-     * - TW: 完整、生成的 WGSL 著色器程式碼。
-     *
-     * @returns {Promise<void>}
-     * - EN: A promise that resolves when all pipelines are created.
-     * - TW: 當所有管線建立完成時解析的 Promise。
+     * - EN: Asynchronously creates compute pipelines for all passes.
+     * - TW: 非同步建立所有通道的計算管線。
      */
     async createPipelines(shaderInfo, generatedModules) {
-        // EN: Clear any existing pipelines
-        // TW: 清除任何現有的管線
         this.pipelines.clear();
 
         for (const module of generatedModules) {
             const pass = shaderInfo.passes.find(p => p.index === module.passIndex);
             if (!pass) {
-                console.warn(`WGFXRuntime: Pass with index ${module.passIndex} not found in shaderInfo.`);
+                console.warn(`PipelineManager: Pass ${module.passIndex} not found in shaderInfo.`);
                 continue;
             }
 
-            // EN: 1. Create GPUShaderModule
-            // TW: 1. 建立 GPUShaderModule
-            const shaderModule = this.device.createShaderModule({
-                code: module.wgslCode,
-                label: `Pass ${module.passIndex} Shader Module`
-            });
+            console.log(`建立 Pass ${module.passIndex} 的管線...`);
+            console.log(`WGSL 程式碼長度: ${module.wgslCode.length} 字元`);
 
-            // EN: 2. Create GPUBindGroupLayout
-            // TW: 2. 建立 GPUBindGroupLayout
-            const bindGroupLayoutEntries = [];
+            try {
+                // 1. Create GPUShaderModule with error scope
+                this.device.pushErrorScope('validation');
 
-            // EN: Samplers
-            // TW: 取樣器
-            module.resources.samplers.forEach(samp => {
-                bindGroupLayoutEntries.push({
-                    binding: samp.binding,
-                    visibility: GPUShaderStage.COMPUTE,
-                    sampler: {type: 'filtering'}
+                const shaderModule = this.device.createShaderModule({
+                    code: module.wgslCode,
+                    label: `Pass ${module.passIndex} Shader Module`
                 });
-            });
 
-            // EN: Uniforms (binding 1 if present)
-            // TW: 統一變數 (如存在則使用綁定點 1)
-            if (module.resources.parameters.length > 0) {
-                bindGroupLayoutEntries.push({
-                    binding: 1, // EN: Fixed binding for uniforms / TW: 統一變數的固定綁定點
-                    visibility: GPUShaderStage.COMPUTE,
-                    buffer: {type: 'uniform'}
-                });
-            }
+                const shaderError = await this.device.popErrorScope();
+                if (shaderError) {
+                    console.error('Shader Module 建立錯誤:', shaderError.message);
+                    throw shaderError;
+                }
 
-            // EN: Textures
-            // TW: 紋理
-            module.resources.textures.forEach(tex => {
-                bindGroupLayoutEntries.push({
-                    binding: tex.binding,
-                    visibility: GPUShaderStage.COMPUTE,
-                    ...(tex.isStorage ? {
-                        storageTexture: {
-                            format: tex.format || 'rgba8unorm',
-                            access: 'write-only'
+                // Check compilation info
+                const compilationInfo = await shaderModule.getCompilationInfo();
+                if (compilationInfo.messages.length > 0) {
+                    console.group(`Shader 編譯訊息 (Pass ${module.passIndex}):`);
+                    for (const msg of compilationInfo.messages) {
+                        const level = msg.type === 'error' ? 'ERROR' : msg.type === 'warning' ? 'WARN' : 'INFO';
+                        console.log(`${level} Line ${msg.lineNum}:${msg.linePos} - ${msg.message}`);
+
+                        // Show context
+                        if (msg.lineNum) {
+                            const lines = module.wgslCode.split('\n');
+                            const contextStart = Math.max(0, msg.lineNum - 2);
+                            const contextEnd = Math.min(lines.length, msg.lineNum + 2);
+                            console.log('Context:');
+                            for (let i = contextStart; i < contextEnd; i++) {
+                                const prefix = (i + 1) === msg.lineNum ? '>>> ' : '    ';
+                                console.log(`${prefix}${i + 1}: ${lines[i]}`);
+                            }
                         }
-                    } : {texture: {sampleType: 'float'}})
+                    }
+                    console.groupEnd();
+
+                    // If there are errors, stop
+                    const hasErrors = compilationInfo.messages.some(m => m.type === 'error');
+                    if (hasErrors) {
+                        throw new Error(`Shader compilation failed with ${compilationInfo.messages.filter(m => m.type === 'error').length} error(s)`);
+                    }
+                }
+
+                console.log('Shader Module 建立成功');
+
+                // 2. Create GPUBindGroupLayout
+                const bindingMap = new Map();
+
+                // Add Samplers
+                module.resources.samplers.forEach(samp => {
+                    console.log(`Sampler "${samp.name}" -> @binding(${samp.binding})`);
+                    bindingMap.set(samp.binding, {
+                        binding: samp.binding,
+                        visibility: GPUShaderStage.COMPUTE,
+                        sampler: {type: 'filtering'}
+                    });
                 });
-            });
 
-            const bindGroupLayout = this.device.createBindGroupLayout({
-                entries: bindGroupLayoutEntries,
-                label: `Pass ${module.passIndex} Bind Group Layout`
-            });
+                // Add Uniforms (binding 1 if present)
+                if (module.resources.parameters.length > 0) {
+                    console.log('Uniforms -> @binding(1)');
+                    bindingMap.set(1, {
+                        binding: 1,
+                        visibility: GPUShaderStage.COMPUTE,
+                        buffer: {type: 'uniform'}
+                    });
+                }
 
-            // EN: 3. Create GPUPipelineLayout
-            // TW: 3. 建立 GPUPipelineLayout
-            const pipelineLayout = this.device.createPipelineLayout({
-                bindGroupLayouts: [bindGroupLayout],
-                label: `Pass ${module.passIndex} Pipeline Layout`
-            });
+                // Add Textures
+                module.resources.textures.forEach(tex => {
+                    const texType = tex.isStorage ? 'storage' : 'sampled';
+                    const normalizedFormat = (tex.format || 'rgba8unorm').toLowerCase().replace(/_/g, '');
+                    console.log(`Texture "${tex.name}" (${texType}, ${normalizedFormat}) -> @binding(${tex.binding})`);
 
-            // EN: 4. Create GPUComputePipeline
-            // TW: 4. 建立 GPUComputePipeline
-            const computePipeline = await this.device.createComputePipelineAsync({
-                layout: pipelineLayout,
-                compute: {
-                    module: shaderModule,
-                    // EN: Assuming 'main_cs' is the entry point for all compute shaders
-                    // TW: 假定 'main_cs' 是所有計算著色器的進入點
-                    entryPoint: 'main_cs',
-                },
-                label: `Pass ${module.passIndex} Compute Pipeline`
-            });
+                    if (tex.isStorage) {
+                        const validWriteStorageFormats = [
+                            'r32float', 'r32sint', 'r32uint',
+                            'rgba16float', 'rgba16sint', 'rgba16uint',
+                            'rgba32float', 'rgba32sint', 'rgba32uint',
+                            'rg32float', 'rg32sint', 'rg32uint'
+                        ];
 
-            // EN: Store the pipeline components
-            // TW: 儲存管線組件
-            this.pipelines.set(module.passIndex, {
-                shaderModule,
-                bindGroupLayout,
-                pipelineLayout,
-                computePipeline,
-                resources: module.resources, // EN: Store resources for bind group creation later / TW: 儲存資源供後續建立綁定組使用
-                passInfo: pass // EN: Store original pass info for dispatching / TW: 儲存原始通道資訊供調度使用
-            });
+                        if (!validWriteStorageFormats.includes(normalizedFormat)) {
+                            console.error(`Invalid write storage texture format: ${normalizedFormat}`);
+                            throw new Error(
+                                `Texture "${tex.name}" has invalid storage format "${normalizedFormat}". ` +
+                                `Valid formats for write access: ${validWriteStorageFormats.join(', ')}`
+                            );
+                        }
+
+                        bindingMap.set(tex.binding, {
+                            binding: tex.binding,
+                            visibility: GPUShaderStage.COMPUTE,
+                            storageTexture: {
+                                format: normalizedFormat,
+                                access: 'write-only'
+                            }
+                        });
+                    } else {
+                        bindingMap.set(tex.binding, {
+                            binding: tex.binding,
+                            visibility: GPUShaderStage.COMPUTE,
+                            texture: {sampleType: 'float'}
+                        });
+                    }
+                });
+
+                const bindGroupLayoutEntries = Array.from(bindingMap.values())
+                    .sort((a, b) => a.binding - b.binding);
+
+                console.log(`BindGroupLayout entries (${bindGroupLayoutEntries.length} total)`);
+
+                this.device.pushErrorScope('validation');
+
+                const bindGroupLayout = this.device.createBindGroupLayout({
+                    entries: bindGroupLayoutEntries,
+                    label: `Pass ${module.passIndex} Bind Group Layout`
+                });
+
+                const layoutError = await this.device.popErrorScope();
+                if (layoutError) {
+                    console.error('BindGroupLayout 建立錯誤:', layoutError.message);
+                    throw layoutError;
+                }
+
+                console.log('BindGroupLayout 建立成功');
+
+                // 3. Create GPUPipelineLayout
+                this.device.pushErrorScope('validation');
+
+                const pipelineLayout = this.device.createPipelineLayout({
+                    bindGroupLayouts: [bindGroupLayout],
+                    label: `Pass ${module.passIndex} Pipeline Layout`
+                });
+
+                const pipelineLayoutError = await this.device.popErrorScope();
+                if (pipelineLayoutError) {
+                    console.error('PipelineLayout 建立錯誤:', pipelineLayoutError.message);
+                    throw pipelineLayoutError;
+                }
+
+                console.log('PipelineLayout 建立成功');
+
+                // 4. Create GPUComputePipeline
+                this.device.pushErrorScope('validation');
+
+                const computePipeline = await this.device.createComputePipelineAsync({
+                    layout: pipelineLayout,
+                    compute: {
+                        module: shaderModule,
+                        entryPoint: 'main_cs',
+                    },
+                    label: `Pass ${module.passIndex} Compute Pipeline`
+                });
+
+                const pipelineError = await this.device.popErrorScope();
+                if (pipelineError) {
+                    console.error('ComputePipeline 建立錯誤:', pipelineError.message);
+                    throw pipelineError;
+                }
+
+                await this.device.queue.submit([]);
+
+                console.log(`Pass ${module.passIndex} 管線建立成功`);
+
+                this.pipelines.set(module.passIndex, {
+                    shaderModule,
+                    bindGroupLayout,
+                    pipelineLayout,
+                    computePipeline,
+                    resources: module.resources,
+                    passInfo: pass
+                });
+
+            } catch (error) {
+                console.error(`Pass ${module.passIndex} 管線建立失敗:`, error);
+
+                console.group(`Pass ${module.passIndex} 完整 WGSL 程式碼:`);
+                const lines = module.wgslCode.split('\n');
+                lines.forEach((line, idx) => {
+                    console.log(`${(idx + 1).toString().padStart(4)}: ${line}`);
+                });
+                console.groupEnd();
+
+                throw error;
+            }
         }
+
+        console.log(`成功建立 ${this.pipelines.size} 個管線`);
     }
 
     /**
      * - EN: Encodes commands to dispatch a specific compute pass.
      * - TW: 編碼調度特定計算通道的命令。
-     *
-     * @param {import('./Parser.js').WGFXPass} passInfo
-     * - EN: The IR object of the pass to be dispatched.
-     * - TW: 要調度的通道的 IR 物件。
-     *
-     * @param {GPUCommandEncoder} commandEncoder
-     * - EN: The command encoder for the current frame.
-     * - TW: 當前幀的命令編碼器。
-     *
-     * @throws {Error}
-     * - EN: If the pipeline for the given pass is not found or if required resources are missing.
-     * - TW: 如果找不到給定通道的管線或缺少必要資源時拋出錯誤。
      */
     dispatchPass(passInfo, commandEncoder) {
         const storedPipeline = this.pipelines.get(passInfo.index);
@@ -181,52 +237,55 @@ export class PipelineManager {
 
         const {computePipeline, bindGroupLayout, resources, passInfo: originalPassInfo} = storedPipeline;
 
-        const bindGroupEntries = [];
+        const bindingMap = new Map();
 
-        // EN: Samplers
-        // TW: 取樣器
         resources.samplers.forEach(samp => {
             const sampler = this.resourceManager.getSampler(samp.name);
             if (!sampler) {
-                // EN: If 'sam' is a default sampler, it might not be in resourceManager if not explicitly defined in the shader.
-                // For now, assume it's always available or created by resourceManager.
-                // TW: 如果 'sam' 是預設取樣器,若未在著色器中明確定義,可能不在 resourceManager 中。
-                // 目前假定它總是可用或由 resourceManager 建立。
                 if (samp.name === 'sam') {
-                    // EN: Create a default linear sampler if 'sam' is not found
-                    // TW: 如果找不到 'sam',建立預設的線性取樣器
                     const defaultSampler = this.device.createSampler({
                         magFilter: 'linear',
                         minFilter: 'linear',
                     });
-                    bindGroupEntries.push({binding: samp.binding, resource: defaultSampler});
+                    bindingMap.set(samp.binding, {
+                        binding: samp.binding,
+                        resource: defaultSampler
+                    });
                 } else {
                     throw new Error(`Sampler ${samp.name} not found in ResourceManager.`);
                 }
             } else {
-                bindGroupEntries.push({binding: samp.binding, resource: sampler});
+                bindingMap.set(samp.binding, {
+                    binding: samp.binding,
+                    resource: sampler
+                });
             }
         });
 
-        // EN: Uniforms (binding 1 if present)
-        // TW: 統一變數 (如存在則使用綁定點 1)
         if (resources.parameters.length > 0) {
             const uniformBuffer = this.resourceManager.getUniformBuffer();
             if (!uniformBuffer) {
-                throw new Error("Uniform buffer not found in ResourceManager.");
+                throw new Error('Uniform buffer not found in ResourceManager.');
             }
-            bindGroupEntries.push({binding: 1, resource: {buffer: uniformBuffer}}); // EN: Fixed binding for uniforms / TW: 統一變數的固定綁定點
+            bindingMap.set(1, {
+                binding: 1,
+                resource: {buffer: uniformBuffer}
+            });
         }
 
-        // EN: Textures
-        // TW: 紋理
         resources.textures.forEach(tex => {
             const texture = this.resourceManager.getTexture(tex.name);
             if (!texture) {
                 throw new Error(`Texture ${tex.name} not found in ResourceManager.`);
             }
-            bindGroupEntries.push({binding: tex.binding, resource: texture.createView()});
+            bindingMap.set(tex.binding, {
+                binding: tex.binding,
+                resource: texture.createView()
+            });
         });
+
+        const bindGroupEntries = Array.from(bindingMap.values())
+            .sort((a, b) => a.binding - b.binding);
 
         const bindGroup = this.device.createBindGroup({
             layout: bindGroupLayout,
@@ -234,19 +293,13 @@ export class PipelineManager {
             label: `Pass ${passInfo.index} Bind Group`
         });
 
-        // EN: Encode compute pass commands
-        // TW: 編碼計算通道命令
         const passEncoder = commandEncoder.beginComputePass();
         passEncoder.setPipeline(computePipeline);
         passEncoder.setBindGroup(0, bindGroup);
 
-        // EN: Calculate the number of workgroups to dispatch.
-        // This is based on the size of the primary output texture and the workgroup size.
-        // TW: 計算要調度的工作組數量。
-        // 這基於主要輸出紋理的大小和工作組大小。
-        const outputTextureName = originalPassInfo.out[0]; // EN: Assume the first output is the primary output for sizing / TW: 假定第一個輸出是主要輸出,用於確定大小
+        const outputTextureName = originalPassInfo.out[0];
         const outputTexture = this.resourceManager.getTexture(outputTextureName);
-        const workgroupSize = originalPassInfo.numThreads; // EN: e.g., [8, 8, 1] / TW: 例如,[8, 8, 1]
+        const workgroupSize = originalPassInfo.numThreads;
 
         const dispatchX = Math.ceil(outputTexture.width / workgroupSize[0]);
         const dispatchY = Math.ceil(outputTexture.height / workgroupSize[1]);
@@ -255,14 +308,8 @@ export class PipelineManager {
         passEncoder.end();
     }
 
-    /**
-     * - EN: Clears all stored GPU objects. Does not destroy them as they are managed by the device.
-     * - TW: 清除所有儲存的 GPU 物件。不銷毀它們,因為它們由裝置管理。
-     *
-     * @returns {void}
-     */
     dispose() {
         this.pipelines.clear();
-        console.log("PipelineManager: All stored pipeline states have been cleared.");
+        console.log('PipelineManager: All pipeline states cleared.');
     }
 }
