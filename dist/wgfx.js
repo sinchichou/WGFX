@@ -6,715 +6,769 @@
 
 
 class peg$SyntaxError extends SyntaxError {
-  constructor(message, expected, found, location) {
-    super(message);
-    this.expected = expected;
-    this.found = found;
-    this.location = location;
-    this.name = "SyntaxError";
-  }
-
-  format(sources) {
-    let str = "Error: " + this.message;
-    if (this.location) {
-      let src = null;
-      const st = sources.find(s => s.source === this.location.source);
-      if (st) {
-        src = st.text.split(/\r\n|\n|\r/g);
-      }
-      const s = this.location.start;
-      const offset_s = (this.location.source && (typeof this.location.source.offset === "function"))
-        ? this.location.source.offset(s)
-        : s;
-      const loc = this.location.source + ":" + offset_s.line + ":" + offset_s.column;
-      if (src) {
-        const e = this.location.end;
-        const filler = "".padEnd(offset_s.line.toString().length, " ");
-        const line = src[s.line - 1];
-        const last = s.line === e.line ? e.column : line.length + 1;
-        const hatLen = (last - s.column) || 1;
-        str += "\n --> " + loc + "\n"
-            + filler + " |\n"
-            + offset_s.line + " | " + line + "\n"
-            + filler + " | " + "".padEnd(s.column - 1, " ")
-            + "".padEnd(hatLen, "^");
-      } else {
-        str += "\n at " + loc;
-      }
-    }
-    return str;
-  }
-
-  static buildMessage(expected, found) {
-    function hex(ch) {
-      return ch.codePointAt(0).toString(16).toUpperCase();
+    constructor(message, expected, found, location) {
+        super(message);
+        this.expected = expected;
+        this.found = found;
+        this.location = location;
+        this.name = "SyntaxError";
     }
 
-    const nonPrintable = Object.prototype.hasOwnProperty.call(RegExp.prototype, "unicode")
-      ? new RegExp("[\\p{C}\\p{Mn}\\p{Mc}]", "gu")
-      : null;
-    function unicodeEscape(s) {
-      if (nonPrintable) {
-        return s.replace(nonPrintable,  ch => "\\u{" + hex(ch) + "}");
-      }
-      return s;
-    }
-
-    function literalEscape(s) {
-      return unicodeEscape(s
-        .replace(/\\/g, "\\\\")
-        .replace(/"/g,  "\\\"")
-        .replace(/\0/g, "\\0")
-        .replace(/\t/g, "\\t")
-        .replace(/\n/g, "\\n")
-        .replace(/\r/g, "\\r")
-        .replace(/[\x00-\x0F]/g,          ch => "\\x0" + hex(ch))
-        .replace(/[\x10-\x1F\x7F-\x9F]/g, ch => "\\x"  + hex(ch)));
-    }
-
-    function classEscape(s) {
-      return unicodeEscape(s
-        .replace(/\\/g, "\\\\")
-        .replace(/\]/g, "\\]")
-        .replace(/\^/g, "\\^")
-        .replace(/-/g,  "\\-")
-        .replace(/\0/g, "\\0")
-        .replace(/\t/g, "\\t")
-        .replace(/\n/g, "\\n")
-        .replace(/\r/g, "\\r")
-        .replace(/[\x00-\x0F]/g,          ch => "\\x0" + hex(ch))
-        .replace(/[\x10-\x1F\x7F-\x9F]/g, ch => "\\x"  + hex(ch)));
-    }
-
-    const DESCRIBE_EXPECTATION_FNS = {
-      literal(expectation) {
-        return "\"" + literalEscape(expectation.text) + "\"";
-      },
-
-      class(expectation) {
-        const escapedParts = expectation.parts.map(
-          part => (Array.isArray(part)
-            ? classEscape(part[0]) + "-" + classEscape(part[1])
-            : classEscape(part))
-        );
-
-        return "[" + (expectation.inverted ? "^" : "") + escapedParts.join("") + "]" + (expectation.unicode ? "u" : "");
-      },
-
-      any() {
-        return "any character";
-      },
-
-      end() {
-        return "end of input";
-      },
-
-      other(expectation) {
-        return expectation.description;
-      },
-    };
-
-    function describeExpectation(expectation) {
-      return DESCRIBE_EXPECTATION_FNS[expectation.type](expectation);
-    }
-
-    function describeExpected(expected) {
-      const descriptions = expected.map(describeExpectation);
-      descriptions.sort();
-
-      if (descriptions.length > 0) {
-        let j = 1;
-        for (let i = 1; i < descriptions.length; i++) {
-          if (descriptions[i - 1] !== descriptions[i]) {
-            descriptions[j] = descriptions[i];
-            j++;
-          }
+    static buildMessage(expected, found) {
+        function hex(ch) {
+            return ch.codePointAt(0).toString(16).toUpperCase();
         }
-        descriptions.length = j;
-      }
 
-      switch (descriptions.length) {
-        case 1:
-          return descriptions[0];
+        const nonPrintable = Object.prototype.hasOwnProperty.call(RegExp.prototype, "unicode")
+            ? new RegExp("[\\p{C}\\p{Mn}\\p{Mc}]", "gu")
+            : null;
 
-        case 2:
-          return descriptions[0] + " or " + descriptions[1];
+        function unicodeEscape(s) {
+            if (nonPrintable) {
+                return s.replace(nonPrintable, ch => "\\u{" + hex(ch) + "}");
+            }
+            return s;
+        }
 
-        default:
-          return descriptions.slice(0, -1).join(", ")
-            + ", or "
-            + descriptions[descriptions.length - 1];
-      }
+        function literalEscape(s) {
+            return unicodeEscape(s
+                .replace(/\\/g, "\\\\")
+                .replace(/"/g, "\\\"")
+                .replace(/\0/g, "\\0")
+                .replace(/\t/g, "\\t")
+                .replace(/\n/g, "\\n")
+                .replace(/\r/g, "\\r")
+                .replace(/[\x00-\x0F]/g, ch => "\\x0" + hex(ch))
+                .replace(/[\x10-\x1F\x7F-\x9F]/g, ch => "\\x" + hex(ch)));
+        }
+
+        function classEscape(s) {
+            return unicodeEscape(s
+                .replace(/\\/g, "\\\\")
+                .replace(/\]/g, "\\]")
+                .replace(/\^/g, "\\^")
+                .replace(/-/g, "\\-")
+                .replace(/\0/g, "\\0")
+                .replace(/\t/g, "\\t")
+                .replace(/\n/g, "\\n")
+                .replace(/\r/g, "\\r")
+                .replace(/[\x00-\x0F]/g, ch => "\\x0" + hex(ch))
+                .replace(/[\x10-\x1F\x7F-\x9F]/g, ch => "\\x" + hex(ch)));
+        }
+
+        const DESCRIBE_EXPECTATION_FNS = {
+            literal(expectation) {
+                return "\"" + literalEscape(expectation.text) + "\"";
+            },
+
+            class(expectation) {
+                const escapedParts = expectation.parts.map(
+                    part => (Array.isArray(part)
+                        ? classEscape(part[0]) + "-" + classEscape(part[1])
+                        : classEscape(part))
+                );
+
+                return "[" + (expectation.inverted ? "^" : "") + escapedParts.join("") + "]" + (expectation.unicode ? "u" : "");
+            },
+
+            any() {
+                return "any character";
+            },
+
+            end() {
+                return "end of input";
+            },
+
+            other(expectation) {
+                return expectation.description;
+            },
+        };
+
+        function describeExpectation(expectation) {
+            return DESCRIBE_EXPECTATION_FNS[expectation.type](expectation);
+        }
+
+        function describeExpected(expected) {
+            const descriptions = expected.map(describeExpectation);
+            descriptions.sort();
+
+            if (descriptions.length > 0) {
+                let j = 1;
+                for (let i = 1; i < descriptions.length; i++) {
+                    if (descriptions[i - 1] !== descriptions[i]) {
+                        descriptions[j] = descriptions[i];
+                        j++;
+                    }
+                }
+                descriptions.length = j;
+            }
+
+            switch (descriptions.length) {
+                case 1:
+                    return descriptions[0];
+
+                case 2:
+                    return descriptions[0] + " or " + descriptions[1];
+
+                default:
+                    return descriptions.slice(0, -1).join(", ")
+                        + ", or "
+                        + descriptions[descriptions.length - 1];
+            }
+        }
+
+        function describeFound(found) {
+            return found ? "\"" + literalEscape(found) + "\"" : "end of input";
+        }
+
+        return "Expected " + describeExpected(expected) + " but " + describeFound(found) + " found.";
     }
 
-    function describeFound(found) {
-      return found ? "\"" + literalEscape(found) + "\"" : "end of input";
+    format(sources) {
+        let str = "Error: " + this.message;
+        if (this.location) {
+            let src = null;
+            const st = sources.find(s => s.source === this.location.source);
+            if (st) {
+                src = st.text.split(/\r\n|\n|\r/g);
+            }
+            const s = this.location.start;
+            const offset_s = (this.location.source && (typeof this.location.source.offset === "function"))
+                ? this.location.source.offset(s)
+                : s;
+            const loc = this.location.source + ":" + offset_s.line + ":" + offset_s.column;
+            if (src) {
+                const e = this.location.end;
+                const filler = "".padEnd(offset_s.line.toString().length, " ");
+                const line = src[s.line - 1];
+                const last = s.line === e.line ? e.column : line.length + 1;
+                const hatLen = (last - s.column) || 1;
+                str += "\n --> " + loc + "\n"
+                    + filler + " |\n"
+                    + offset_s.line + " | " + line + "\n"
+                    + filler + " | " + "".padEnd(s.column - 1, " ")
+                    + "".padEnd(hatLen, "^");
+            } else {
+                str += "\n at " + loc;
+            }
+        }
+        return str;
     }
-
-    return "Expected " + describeExpected(expected) + " but " + describeFound(found) + " found.";
-  }
 }
 
 function peg$parse(input, options) {
-  options = options !== undefined ? options : {};
+    options = options !== undefined ? options : {};
 
-  const peg$FAILED = {};
-  const peg$source = options.grammarSource;
+    const peg$FAILED = {};
+    const peg$source = options.grammarSource;
 
-  const peg$startRuleFunctions = {
-    start: peg$parsestart,
-  };
-  let peg$startRuleFunction = peg$parsestart;
+    const peg$startRuleFunctions = {
+        start: peg$parsestart,
+    };
+    let peg$startRuleFunction = peg$parsestart;
 
-  const peg$c0 = "\n";
-  const peg$c1 = "//!";
+    const peg$c0 = "\n";
+    const peg$c1 = "//!";
 
-  const peg$r0 = /^[^\n]/;
-  const peg$r1 = /^[a-zA-Z0-9_]/;
-  const peg$r2 = /^[ \t]/;
+    const peg$r0 = /^[^\n]/;
+    const peg$r1 = /^[a-zA-Z0-9_]/;
+    const peg$r2 = /^[ \t]/;
 
-  const peg$e0 = peg$literalExpectation("\n", false);
-  const peg$e1 = peg$literalExpectation("//!", false);
-  const peg$e2 = peg$classExpectation(["\n"], true, false, false);
-  const peg$e3 = peg$classExpectation([["a", "z"], ["A", "Z"], ["0", "9"], "_"], false, false, false);
-  const peg$e4 = peg$classExpectation([" ", "\t"], false, false, false);
+    const peg$e0 = peg$literalExpectation("\n", false);
+    const peg$e1 = peg$literalExpectation("//!", false);
+    const peg$e2 = peg$classExpectation(["\n"], true, false, false);
+    const peg$e3 = peg$classExpectation([["a", "z"], ["A", "Z"], ["0", "9"], "_"], false, false, false);
+    const peg$e4 = peg$classExpectation([" ", "\t"], false, false, false);
 
-  function peg$f0() {
-    // Commit the last block if it was a PASS and had accumulated code.
-    // 如果最後一個區塊是 PASS 並且有累積的程式碼，則提交它。
-    if (currentBlock === 'PASS' && passCodeBuffer.length > 0) {
-      currentData.code = passCodeBuffer.join('\n');
-    }
-    // Commit any remaining current block data.
-    // 提交任何剩餘的當前區塊資料。
-    if (currentData) commitBlock(currentBlock, currentData);
-    return shaderInfo;
-  }
-  function peg$f1() {    return { type: "empty" };  }
-  function peg$f2(name, value) {
-    const directive = name.toUpperCase();
-    const val = value.trim();
-
-    // Handle the 'END' directive, which explicitly closes the current block.
-    // 處理 'END' 指令，它會明確關閉當前區塊。
-    if (directive === 'END') {
-        // If a PASS block was active, commit its accumulated code.
-        // 如果 PASS 區塊處於活動狀態，則提交其累積的程式碼。
+    function peg$f0() {
+        // Commit the last block if it was a PASS and had accumulated code.
+        // 如果最後一個區塊是 PASS 並且有累積的程式碼，則提交它。
         if (currentBlock === 'PASS' && passCodeBuffer.length > 0) {
             currentData.code = passCodeBuffer.join('\n');
-            passCodeBuffer = [];
         }
-        // Commit any remaining current block data before ending.
-        // 在結束前提交任何剩餘的當前區塊資料。
-        if (currentData) {
-            commitBlock(currentBlock, currentData);
+        // Commit any remaining current block data.
+        // 提交任何剩餘的當前區塊資料。
+        if (currentData) commitBlock(currentBlock, currentData);
+        return shaderInfo;
+    }
+
+    function peg$f1() {
+        return {type: "empty"};
+    }
+
+    function peg$f2(name, value) {
+        const directive = name.toUpperCase();
+        const val = value.trim();
+
+        // Handle the 'END' directive, which explicitly closes the current block.
+        // 處理 'END' 指令，它會明確關閉當前區塊。
+        if (directive === 'END') {
+            // If a PASS block was active, commit its accumulated code.
+            // 如果 PASS 區塊處於活動狀態，則提交其累積的程式碼。
+            if (currentBlock === 'PASS' && passCodeBuffer.length > 0) {
+                currentData.code = passCodeBuffer.join('\n');
+                passCodeBuffer = [];
+            }
+            // Commit any remaining current block data before ending.
+            // 在結束前提交任何剩餘的當前區塊資料。
+            if (currentData) {
+                commitBlock(currentBlock, currentData);
+            }
+            currentBlock = null;
+            currentData = null;
+            return {type: "directive", directive: "END"};
         }
-        currentBlock = null;
-        currentData = null;
-        return { type: "directive", directive: "END" };
-    }
 
-    // Check for block-starting directives.
-    // 檢查區塊起始指令。
-    if (["PARAMETER","TEXTURE","SAMPLER","COMMON","PASS", "VERSION","SORT_NAME","USE","CAPABILITY"].includes(directive)) {
-        // If we were in a PASS block, commit its code first before starting a new block.
-        // 如果我們在 PASS 區塊中，則在開始新區塊之前先提交其程式碼。
-        if (currentBlock === 'PASS' && passCodeBuffer.length > 0) {
-          currentData.code = passCodeBuffer.join('\n');
-          passCodeBuffer = [];
+        // Check for block-starting directives.
+        // 檢查區塊起始指令。
+        if (["PARAMETER", "TEXTURE", "SAMPLER", "COMMON", "PASS", "VERSION", "SORT_NAME", "USE", "CAPABILITY"].includes(directive)) {
+            // If we were in a PASS block, commit its code first before starting a new block.
+            // 如果我們在 PASS 區塊中，則在開始新區塊之前先提交其程式碼。
+            if (currentBlock === 'PASS' && passCodeBuffer.length > 0) {
+                currentData.code = passCodeBuffer.join('\n');
+                passCodeBuffer = [];
+            }
+            // Commit the data of the previous block.
+            // 提交前一個區塊的資料。
+            if (currentData) {
+                commitBlock(currentBlock, currentData);
+            }
+
+            // Start a new block based on the directive.
+            // 根據指令開始一個新區塊。
+            if (["PARAMETER", "TEXTURE", "SAMPLER", "COMMON", "PASS"].includes(directive)) {
+                currentBlock = directive;
+                currentData = {id: val, lines: []}; // Initialize currentData for the new block.
+                if (directive === 'PASS') currentData.index = parseInt(val, 10); // Special handling for PASS index.
+            } else { // Global directives (VERSION, SORT_NAME, USE, CAPABILITY) are self-contained and don't start a multi-line block.
+                currentBlock = null;
+                currentData = null;
+                commitBlock(directive, {id: val}); // Commit immediately as they are single-line directives.
+            }
+        } else { // This is a sub-directive within an active block.
+            // If there's no active block, this sub-directive is out of place.
+            // 如果沒有活動區塊，則此子指令放置不當。
+            if (!currentData) throw new Error(`Directive //! ${directive} cannot be used here / 指令 //! ${directive} 不能在此處使用`);
+            parseSubDirective(currentData, directive, val); // Parse the sub-directive.
         }
-        // Commit the data of the previous block.
-        // 提交前一個區塊的資料。
-        if (currentData) {
-          commitBlock(currentBlock, currentData);
+        return {type: "directive", directive: directive, value: val};
+    }
+
+    function peg$f3(text) {
+        const lineStr = text.join("");
+        const trimmedLine = lineStr.trim();
+
+        // Special handling for resource declarations in TEXTURE, SAMPLER, PARAMETER blocks.
+        // 對於 TEXTURE, SAMPLER, PARAMETER 區塊中的資源宣告進行特殊處理。
+        if (currentBlock === 'TEXTURE' || currentBlock === 'SAMPLER' || currentBlock === 'PARAMETER') {
+            const match = trimmedLine.match(/var\s+([a-zA-Z0-9_]+)\s*:/); // Regex to find variable declaration.
+            if (match) {
+                currentData.isTemplate = true; // Mark as a template for resource creation.
+                const name = match[1]; // Extract the resource name.
+                const newResource = {...currentData, name: name, id: name}; // Create a new resource object.
+                delete newResource.lines; // These are specific to COMMON blocks.
+                delete newResource.isTemplate;
+
+                // Push the new resource to the appropriate shaderInfo array.
+                // 將新資源推送到相應的 shaderInfo 陣列中。
+                if (currentBlock === 'TEXTURE') {
+                    shaderInfo.textures.push(newResource);
+                } else if (currentBlock === 'SAMPLER') {
+                    shaderInfo.samplers.push(newResource);
+                } else if (currentBlock === 'PARAMETER') {
+                    shaderInfo.parameters.push(newResource);
+                }
+                return {type: "code", text: lineStr};
+            }
         }
 
-        // Start a new block based on the directive.
-        // 根據指令開始一個新區塊。
-        if (["PARAMETER","TEXTURE","SAMPLER","COMMON","PASS"].includes(directive)) {
-          currentBlock = directive;
-          currentData = { id: val, lines: [] }; // Initialize currentData for the new block.
-          if (directive === 'PASS') currentData.index = parseInt(val,10); // Special handling for PASS index.
-        } else { // Global directives (VERSION, SORT_NAME, USE, CAPABILITY) are self-contained and don't start a multi-line block.
-          currentBlock = null;
-          currentData = null;
-          commitBlock(directive, { id: val }); // Commit immediately as they are single-line directives.
+        // Accumulate code lines for COMMON and PASS blocks.
+        // 累積 COMMON 和 PASS 區塊的程式碼行。
+        if (currentBlock === 'COMMON') {
+            currentData.lines.push(lineStr);
+        } else if (currentBlock === 'PASS') {
+            passCodeBuffer.push(lineStr);
         }
-    } else { // This is a sub-directive within an active block.
-      // If there's no active block, this sub-directive is out of place.
-      // 如果沒有活動區塊，則此子指令放置不當。
-      if (!currentData) throw new Error(`Directive //! ${directive} cannot be used here / 指令 //! ${directive} 不能在此處使用`);
-      parseSubDirective(currentData, directive, val); // Parse the sub-directive.
-    }
-    return { type: "directive", directive: directive, value: val };
-  }
-  function peg$f3(text) {
-    const lineStr = text.join("");
-    const trimmedLine = lineStr.trim();
-
-    // Special handling for resource declarations in TEXTURE, SAMPLER, PARAMETER blocks.
-    // 對於 TEXTURE, SAMPLER, PARAMETER 區塊中的資源宣告進行特殊處理。
-    if (currentBlock === 'TEXTURE' || currentBlock === 'SAMPLER' || currentBlock === 'PARAMETER') {
-      const match = trimmedLine.match(/var\s+([a-zA-Z0-9_]+)\s*:/); // Regex to find variable declaration.
-      if (match) {
-          currentData.isTemplate = true; // Mark as a template for resource creation.
-          const name = match[1]; // Extract the resource name.
-          const newResource = { ...currentData, name: name, id: name }; // Create a new resource object.
-          delete newResource.lines; // These are specific to COMMON blocks.
-          delete newResource.isTemplate;
-
-          // Push the new resource to the appropriate shaderInfo array.
-          // 將新資源推送到相應的 shaderInfo 陣列中。
-          if (currentBlock === 'TEXTURE') {
-              shaderInfo.textures.push(newResource);
-          } else if (currentBlock === 'SAMPLER') {
-              shaderInfo.samplers.push(newResource);
-          } else if (currentBlock === 'PARAMETER') {
-              shaderInfo.parameters.push(newResource);
-          }
-          return { type: "code", text: lineStr };
-      }
+        return {type: "code", text: lineStr};
     }
 
-    // Accumulate code lines for COMMON and PASS blocks.
-    // 累積 COMMON 和 PASS 區塊的程式碼行。
-    if (currentBlock === 'COMMON') {
-      currentData.lines.push(lineStr);
-    } else if (currentBlock === 'PASS') {
-      passCodeBuffer.push(lineStr);
-    }
-    return { type: "code", text: lineStr };
-  }
-  let peg$currPos = options.peg$currPos | 0;
-  const peg$posDetailsCache = [{ line: 1, column: 1 }];
-  let peg$maxFailPos = peg$currPos;
-  let peg$maxFailExpected = options.peg$maxFailExpected || [];
-  let peg$silentFails = options.peg$silentFails | 0;
+    let peg$currPos = options.peg$currPos | 0;
+    const peg$posDetailsCache = [{line: 1, column: 1}];
+    let peg$maxFailPos = peg$currPos;
+    let peg$maxFailExpected = options.peg$maxFailExpected || [];
+    let peg$silentFails = options.peg$silentFails | 0;
 
-  let peg$result;
+    let peg$result;
 
-  if (options.startRule) {
-    if (!(options.startRule in peg$startRuleFunctions)) {
-      throw new Error("Can't start parsing from rule \"" + options.startRule + "\".");
+    if (options.startRule) {
+        if (!(options.startRule in peg$startRuleFunctions)) {
+            throw new Error("Can't start parsing from rule \"" + options.startRule + "\".");
+        }
+
+        peg$startRuleFunction = peg$startRuleFunctions[options.startRule];
     }
 
-    peg$startRuleFunction = peg$startRuleFunctions[options.startRule];
-  }
-
-  function peg$getUnicode(pos = peg$currPos) {
-    const cp = input.codePointAt(pos);
-    if (cp === undefined) {
-      return "";
+    function peg$getUnicode(pos = peg$currPos) {
+        const cp = input.codePointAt(pos);
+        if (cp === undefined) {
+            return "";
+        }
+        return String.fromCodePoint(cp);
     }
-    return String.fromCodePoint(cp);
-  }
 
-  function peg$literalExpectation(text, ignoreCase) {
-    return { type: "literal", text, ignoreCase };
-  }
+    function peg$literalExpectation(text, ignoreCase) {
+        return {type: "literal", text, ignoreCase};
+    }
 
-  function peg$classExpectation(parts, inverted, ignoreCase, unicode) {
-    return { type: "class", parts, inverted, ignoreCase, unicode };
-  }
+    function peg$classExpectation(parts, inverted, ignoreCase, unicode) {
+        return {type: "class", parts, inverted, ignoreCase, unicode};
+    }
 
-  function peg$endExpectation() {
-    return { type: "end" };
-  }
+    function peg$endExpectation() {
+        return {type: "end"};
+    }
 
-  function peg$computePosDetails(pos) {
-    let details = peg$posDetailsCache[pos];
-    let p;
+    function peg$computePosDetails(pos) {
+        let details = peg$posDetailsCache[pos];
+        let p;
 
-    if (details) {
-      return details;
-    } else {
-      if (pos >= peg$posDetailsCache.length) {
-        p = peg$posDetailsCache.length - 1;
-      } else {
-        p = pos;
-        while (!peg$posDetailsCache[--p]) {}
-      }
-
-      details = peg$posDetailsCache[p];
-      details = {
-        line: details.line,
-        column: details.column,
-      };
-
-      while (p < pos) {
-        if (input.charCodeAt(p) === 10) {
-          details.line++;
-          details.column = 1;
+        if (details) {
+            return details;
         } else {
-          details.column++;
+            if (pos >= peg$posDetailsCache.length) {
+                p = peg$posDetailsCache.length - 1;
+            } else {
+                p = pos;
+                while (!peg$posDetailsCache[--p]) {
+                }
+            }
+
+            details = peg$posDetailsCache[p];
+            details = {
+                line: details.line,
+                column: details.column,
+            };
+
+            while (p < pos) {
+                if (input.charCodeAt(p) === 10) {
+                    details.line++;
+                    details.column = 1;
+                } else {
+                    details.column++;
+                }
+
+                p++;
+            }
+
+            peg$posDetailsCache[pos] = details;
+
+            return details;
+        }
+    }
+
+    function peg$computeLocation(startPos, endPos, offset) {
+        const startPosDetails = peg$computePosDetails(startPos);
+        const endPosDetails = peg$computePosDetails(endPos);
+
+        const res = {
+            source: peg$source,
+            start: {
+                offset: startPos,
+                line: startPosDetails.line,
+                column: startPosDetails.column,
+            },
+            end: {
+                offset: endPos,
+                line: endPosDetails.line,
+                column: endPosDetails.column,
+            },
+        };
+        return res;
+    }
+
+    function peg$fail(expected) {
+        if (peg$currPos < peg$maxFailPos) {
+            return;
         }
 
-        p++;
-      }
+        if (peg$currPos > peg$maxFailPos) {
+            peg$maxFailPos = peg$currPos;
+            peg$maxFailExpected = [];
+        }
 
-      peg$posDetailsCache[pos] = details;
-
-      return details;
-    }
-  }
-
-  function peg$computeLocation(startPos, endPos, offset) {
-    const startPosDetails = peg$computePosDetails(startPos);
-    const endPosDetails = peg$computePosDetails(endPos);
-
-    const res = {
-      source: peg$source,
-      start: {
-        offset: startPos,
-        line: startPosDetails.line,
-        column: startPosDetails.column,
-      },
-      end: {
-        offset: endPos,
-        line: endPosDetails.line,
-        column: endPosDetails.column,
-      },
-    };
-    return res;
-  }
-
-  function peg$fail(expected) {
-    if (peg$currPos < peg$maxFailPos) { return; }
-
-    if (peg$currPos > peg$maxFailPos) {
-      peg$maxFailPos = peg$currPos;
-      peg$maxFailExpected = [];
+        peg$maxFailExpected.push(expected);
     }
 
-    peg$maxFailExpected.push(expected);
-  }
-
-  function peg$buildStructuredError(expected, found, location) {
-    return new peg$SyntaxError(
-      peg$SyntaxError.buildMessage(expected, found),
-      expected,
-      found,
-      location
-    );
-  }
-
-  function peg$parsestart() {
-    let s0, s1, s2;
-
-    s0 = peg$currPos;
-    s1 = [];
-    s2 = peg$parseline();
-    while (s2 !== peg$FAILED) {
-      s1.push(s2);
-      s2 = peg$parseline();
+    function peg$buildStructuredError(expected, found, location) {
+        return new peg$SyntaxError(
+            peg$SyntaxError.buildMessage(expected, found),
+            expected,
+            found,
+            location
+        );
     }
-    s1 = peg$f0();
-    s0 = s1;
 
-    return s0;
-  }
+    function peg$parsestart() {
+        let s0, s1, s2;
 
-  function peg$parseline() {
-    let s0, s1;
-
-    s0 = peg$parsedirective_line();
-    if (s0 === peg$FAILED) {
-      s0 = peg$parsecode_line();
-      if (s0 === peg$FAILED) {
         s0 = peg$currPos;
-        if (input.charCodeAt(peg$currPos) === 10) {
-          s1 = peg$c0;
-          peg$currPos++;
+        s1 = [];
+        s2 = peg$parseline();
+        while (s2 !== peg$FAILED) {
+            s1.push(s2);
+            s2 = peg$parseline();
+        }
+        s1 = peg$f0();
+        s0 = s1;
+
+        return s0;
+    }
+
+    function peg$parseline() {
+        let s0, s1;
+
+        s0 = peg$parsedirective_line();
+        if (s0 === peg$FAILED) {
+            s0 = peg$parsecode_line();
+            if (s0 === peg$FAILED) {
+                s0 = peg$currPos;
+                if (input.charCodeAt(peg$currPos) === 10) {
+                    s1 = peg$c0;
+                    peg$currPos++;
+                } else {
+                    s1 = peg$FAILED;
+                    if (peg$silentFails === 0) {
+                        peg$fail(peg$e0);
+                    }
+                }
+                if (s1 !== peg$FAILED) {
+                    s1 = peg$f1();
+                }
+                s0 = s1;
+            }
+        }
+
+        return s0;
+    }
+
+    function peg$parsedirective_line() {
+        let s0, s1, s3, s5;
+
+        s0 = peg$currPos;
+        if (input.substr(peg$currPos, 3) === peg$c1) {
+            s1 = peg$c1;
+            peg$currPos += 3;
         } else {
-          s1 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$e0); }
+            s1 = peg$FAILED;
+            if (peg$silentFails === 0) {
+                peg$fail(peg$e1);
+            }
         }
         if (s1 !== peg$FAILED) {
-          s1 = peg$f1();
+            peg$parse_();
+            s3 = peg$parseidentifier();
+            if (s3 !== peg$FAILED) {
+                peg$parse_();
+                s5 = peg$parserest_of_line();
+                s0 = peg$f2(s3, s5);
+            } else {
+                peg$currPos = s0;
+                s0 = peg$FAILED;
+            }
+        } else {
+            peg$currPos = s0;
+            s0 = peg$FAILED;
         }
-        s0 = s1;
-      }
+
+        return s0;
     }
 
-    return s0;
-  }
+    function peg$parsecode_line() {
+        let s0, s1, s2;
 
-  function peg$parsedirective_line() {
-    let s0, s1, s3, s5;
-
-    s0 = peg$currPos;
-    if (input.substr(peg$currPos, 3) === peg$c1) {
-      s1 = peg$c1;
-      peg$currPos += 3;
-    } else {
-      s1 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$e1); }
-    }
-    if (s1 !== peg$FAILED) {
-      peg$parse_();
-      s3 = peg$parseidentifier();
-      if (s3 !== peg$FAILED) {
-        peg$parse_();
-        s5 = peg$parserest_of_line();
-        s0 = peg$f2(s3, s5);
-      } else {
-        peg$currPos = s0;
-        s0 = peg$FAILED;
-      }
-    } else {
-      peg$currPos = s0;
-      s0 = peg$FAILED;
-    }
-
-    return s0;
-  }
-
-  function peg$parsecode_line() {
-    let s0, s1, s2;
-
-    s0 = peg$currPos;
-    s1 = [];
-    s2 = input.charAt(peg$currPos);
-    if (peg$r0.test(s2)) {
-      peg$currPos++;
-    } else {
-      s2 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$e2); }
-    }
-    if (s2 !== peg$FAILED) {
-      while (s2 !== peg$FAILED) {
-        s1.push(s2);
+        s0 = peg$currPos;
+        s1 = [];
         s2 = input.charAt(peg$currPos);
         if (peg$r0.test(s2)) {
-          peg$currPos++;
+            peg$currPos++;
         } else {
-          s2 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$e2); }
+            s2 = peg$FAILED;
+            if (peg$silentFails === 0) {
+                peg$fail(peg$e2);
+            }
         }
-      }
-    } else {
-      s1 = peg$FAILED;
-    }
-    if (s1 !== peg$FAILED) {
-      if (input.charCodeAt(peg$currPos) === 10) {
-        s2 = peg$c0;
-        peg$currPos++;
-      } else {
-        s2 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$e0); }
-      }
-      if (s2 === peg$FAILED) {
-        s2 = null;
-      }
-      s0 = peg$f3(s1);
-    } else {
-      peg$currPos = s0;
-      s0 = peg$FAILED;
+        if (s2 !== peg$FAILED) {
+            while (s2 !== peg$FAILED) {
+                s1.push(s2);
+                s2 = input.charAt(peg$currPos);
+                if (peg$r0.test(s2)) {
+                    peg$currPos++;
+                } else {
+                    s2 = peg$FAILED;
+                    if (peg$silentFails === 0) {
+                        peg$fail(peg$e2);
+                    }
+                }
+            }
+        } else {
+            s1 = peg$FAILED;
+        }
+        if (s1 !== peg$FAILED) {
+            if (input.charCodeAt(peg$currPos) === 10) {
+                s2 = peg$c0;
+                peg$currPos++;
+            } else {
+                s2 = peg$FAILED;
+                if (peg$silentFails === 0) {
+                    peg$fail(peg$e0);
+                }
+            }
+            if (s2 === peg$FAILED) {
+                s2 = null;
+            }
+            s0 = peg$f3(s1);
+        } else {
+            peg$currPos = s0;
+            s0 = peg$FAILED;
+        }
+
+        return s0;
     }
 
-    return s0;
-  }
+    function peg$parseidentifier() {
+        let s0, s1, s2;
 
-  function peg$parseidentifier() {
-    let s0, s1, s2;
-
-    s0 = peg$currPos;
-    s1 = [];
-    s2 = input.charAt(peg$currPos);
-    if (peg$r1.test(s2)) {
-      peg$currPos++;
-    } else {
-      s2 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$e3); }
-    }
-    if (s2 !== peg$FAILED) {
-      while (s2 !== peg$FAILED) {
-        s1.push(s2);
+        s0 = peg$currPos;
+        s1 = [];
         s2 = input.charAt(peg$currPos);
         if (peg$r1.test(s2)) {
-          peg$currPos++;
+            peg$currPos++;
         } else {
-          s2 = peg$FAILED;
-          if (peg$silentFails === 0) { peg$fail(peg$e3); }
+            s2 = peg$FAILED;
+            if (peg$silentFails === 0) {
+                peg$fail(peg$e3);
+            }
         }
-      }
+        if (s2 !== peg$FAILED) {
+            while (s2 !== peg$FAILED) {
+                s1.push(s2);
+                s2 = input.charAt(peg$currPos);
+                if (peg$r1.test(s2)) {
+                    peg$currPos++;
+                } else {
+                    s2 = peg$FAILED;
+                    if (peg$silentFails === 0) {
+                        peg$fail(peg$e3);
+                    }
+                }
+            }
+        } else {
+            s1 = peg$FAILED;
+        }
+        if (s1 !== peg$FAILED) {
+            s0 = input.substring(s0, peg$currPos);
+        } else {
+            s0 = s1;
+        }
+
+        return s0;
+    }
+
+    function peg$parserest_of_line() {
+        let s0, s1, s2;
+
+        s0 = peg$currPos;
+        s1 = [];
+        s2 = input.charAt(peg$currPos);
+        if (peg$r0.test(s2)) {
+            peg$currPos++;
+        } else {
+            s2 = peg$FAILED;
+            if (peg$silentFails === 0) {
+                peg$fail(peg$e2);
+            }
+        }
+        while (s2 !== peg$FAILED) {
+            s1.push(s2);
+            s2 = input.charAt(peg$currPos);
+            if (peg$r0.test(s2)) {
+                peg$currPos++;
+            } else {
+                s2 = peg$FAILED;
+                if (peg$silentFails === 0) {
+                    peg$fail(peg$e2);
+                }
+            }
+        }
+        s0 = input.substring(s0, peg$currPos);
+
+        return s0;
+    }
+
+    function peg$parse_() {
+        let s0, s1;
+
+        s0 = [];
+        s1 = input.charAt(peg$currPos);
+        if (peg$r2.test(s1)) {
+            peg$currPos++;
+        } else {
+            s1 = peg$FAILED;
+            if (peg$silentFails === 0) {
+                peg$fail(peg$e4);
+            }
+        }
+        while (s1 !== peg$FAILED) {
+            s0.push(s1);
+            s1 = input.charAt(peg$currPos);
+            if (peg$r2.test(s1)) {
+                peg$currPos++;
+            } else {
+                s1 = peg$FAILED;
+                if (peg$silentFails === 0) {
+                    peg$fail(peg$e4);
+                }
+            }
+        }
+
+        return s0;
+    }
+
+
+    // Initialize the Intermediate Representation (IR) structure.
+    // 初始化 IR 結構
+    const shaderInfo = {
+        metadata: {use: {}, capability: {}},
+        parameters: [],
+        textures: [],
+        samplers: [],
+        passes: [],
+        commonCode: ''
+    };
+
+    // Tracks the currently active block type (e.g., 'PARAMETER', 'TEXTURE', 'PASS').
+    // 追蹤當前活動的區塊類型 (例如：'PARAMETER', 'TEXTURE', 'PASS')。
+    let currentBlock = null;
+    // Stores data for the current block being parsed.
+    // 儲存當前正在解析的區塊資料。
+    let currentData = null;
+    // Buffer to accumulate code lines within a 'PASS' block.
+    // 用於在 'PASS' 區塊內累積程式碼行的緩衝區。
+    let passCodeBuffer = [];
+
+    /**
+     * Commits the parsed data of a block to the main shaderInfo structure.
+     * 將解析後的區塊資料提交到主要的 shaderInfo 結構中。
+     * @param {string} blockType - The type of the block (e.g., 'PARAMETER', 'COMMON').
+     * @param {object} data - The parsed data for the block.
+     */
+    function commitBlock(blockType, data) {
+        if (!blockType || !data || data.isTemplate) {
+            currentData = null;
+            return;
+        }
+        switch (blockType) {
+            case 'PARAMETER':
+                shaderInfo.parameters.push(data);
+                break;
+            case 'COMMON':
+                shaderInfo.commonCode = data.lines.join('\n');
+                break;
+            case 'TEXTURE':
+                shaderInfo.textures.push(data);
+                break;
+            case 'SAMPLER':
+                shaderInfo.samplers.push(data);
+                break;
+            case 'PASS':
+                shaderInfo.passes.push(data);
+                break;
+            case 'VERSION':
+                shaderInfo.metadata.version = parseInt(data.id, 10);
+                break;
+            case 'SORT_NAME':
+                shaderInfo.metadata.sortName = data.id;
+                break;
+            case 'USE':
+                data.id.split(',').forEach(f => shaderInfo.metadata.use[f.trim().toUpperCase()] = true);
+                break;
+            case 'CAPABILITY':
+                data.id.split(',').forEach(f => shaderInfo.metadata.capability[f.trim().toUpperCase()] = true);
+                break;
+        }
+        currentData = null;
+    }
+
+    /**
+     * Parses sub-directives within a block (e.g., //! DEFAULT, //! MIN for PARAMETER).
+     * 解析區塊內部的子指令 (例如 PARAMETER 的 //! DEFAULT, //! MIN)。
+     * @param {object} data - The current block's data object to populate.
+     * @param {string} directive - The name of the sub-directive.
+     * @param {string} value - The value of the sub-directive.
+     */
+    function parseSubDirective(data, directive, value) {
+        const key = directive.toLowerCase();
+        switch (key) {
+            case 'in':
+            case 'out':
+                data[key] = value.split(',').map(s => s.trim());
+                break;
+            case 'block_size':
+                data.blockSize = value.split(',').map(Number);
+                if (data.blockSize.length === 1) data.blockSize.push(data.blockSize[0]); // Handle single value for block_size
+                break;
+            case 'num_threads':
+                data.numThreads = value.split(',').map(Number);
+                while (data.numThreads.length < 3) data.numThreads.push(1); // Ensure 3 components for num_threads
+                break;
+            case 'default':
+            case 'min':
+            case 'max':
+            case 'step':
+                data[key] = parseFloat(value);
+                break;
+            case 'format':
+                data[key] = value.toLowerCase() === 'r16g16b16a16_float' ? 'rgba16float' : value;
+                break;
+            default:
+                data[key] = value;
+        }
+    }
+
+    peg$result = peg$startRuleFunction();
+
+    const peg$success = (peg$result !== peg$FAILED && peg$currPos === input.length);
+
+    function peg$throw() {
+        if (peg$result !== peg$FAILED && peg$currPos < input.length) {
+            peg$fail(peg$endExpectation());
+        }
+
+        throw peg$buildStructuredError(
+            peg$maxFailExpected,
+            peg$maxFailPos < input.length ? peg$getUnicode(peg$maxFailPos) : null,
+            peg$maxFailPos < input.length
+                ? peg$computeLocation(peg$maxFailPos, peg$maxFailPos + 1)
+                : peg$computeLocation(peg$maxFailPos, peg$maxFailPos)
+        );
+    }
+
+    if (options.peg$library) {
+        return /** @type {any} */ ({
+            peg$result,
+            peg$currPos,
+            peg$FAILED,
+            peg$maxFailExpected,
+            peg$maxFailPos,
+            peg$success,
+            peg$throw: peg$success ? undefined : peg$throw,
+        });
+    }
+    if (peg$success) {
+        return peg$result;
     } else {
-      s1 = peg$FAILED;
+        peg$throw();
     }
-    if (s1 !== peg$FAILED) {
-      s0 = input.substring(s0, peg$currPos);
-    } else {
-      s0 = s1;
-    }
-
-    return s0;
-  }
-
-  function peg$parserest_of_line() {
-    let s0, s1, s2;
-
-    s0 = peg$currPos;
-    s1 = [];
-    s2 = input.charAt(peg$currPos);
-    if (peg$r0.test(s2)) {
-      peg$currPos++;
-    } else {
-      s2 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$e2); }
-    }
-    while (s2 !== peg$FAILED) {
-      s1.push(s2);
-      s2 = input.charAt(peg$currPos);
-      if (peg$r0.test(s2)) {
-        peg$currPos++;
-      } else {
-        s2 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$e2); }
-      }
-    }
-    s0 = input.substring(s0, peg$currPos);
-
-    return s0;
-  }
-
-  function peg$parse_() {
-    let s0, s1;
-
-    s0 = [];
-    s1 = input.charAt(peg$currPos);
-    if (peg$r2.test(s1)) {
-      peg$currPos++;
-    } else {
-      s1 = peg$FAILED;
-      if (peg$silentFails === 0) { peg$fail(peg$e4); }
-    }
-    while (s1 !== peg$FAILED) {
-      s0.push(s1);
-      s1 = input.charAt(peg$currPos);
-      if (peg$r2.test(s1)) {
-        peg$currPos++;
-      } else {
-        s1 = peg$FAILED;
-        if (peg$silentFails === 0) { peg$fail(peg$e4); }
-      }
-    }
-
-    return s0;
-  }
-
-
-  // Initialize the Intermediate Representation (IR) structure.
-  // 初始化 IR 結構
-  const shaderInfo = {
-    metadata: { use: {}, capability: {} },
-    parameters: [],
-    textures: [],
-    samplers: [],
-    passes: [],
-    commonCode: ''
-  };
-
-  // Tracks the currently active block type (e.g., 'PARAMETER', 'TEXTURE', 'PASS').
-  // 追蹤當前活動的區塊類型 (例如：'PARAMETER', 'TEXTURE', 'PASS')。
-  let currentBlock = null;
-  // Stores data for the current block being parsed.
-  // 儲存當前正在解析的區塊資料。
-  let currentData = null;
-  // Buffer to accumulate code lines within a 'PASS' block.
-  // 用於在 'PASS' 區塊內累積程式碼行的緩衝區。
-  let passCodeBuffer = [];
-
-  /**
-   * Commits the parsed data of a block to the main shaderInfo structure.
-   * 將解析後的區塊資料提交到主要的 shaderInfo 結構中。
-   * @param {string} blockType - The type of the block (e.g., 'PARAMETER', 'COMMON').
-   * @param {object} data - The parsed data for the block.
-   */
-  function commitBlock(blockType, data) {
-    if (!blockType || !data || data.isTemplate) {
-      currentData = null;
-      return;
-    }
-    switch(blockType) {
-      case 'PARAMETER': shaderInfo.parameters.push(data); break;
-      case 'COMMON': shaderInfo.commonCode = data.lines.join('\n'); break;
-      case 'TEXTURE': shaderInfo.textures.push(data); break;
-      case 'SAMPLER': shaderInfo.samplers.push(data); break;
-      case 'PASS': shaderInfo.passes.push(data); break;
-      case 'VERSION': shaderInfo.metadata.version = parseInt(data.id,10); break;
-      case 'SORT_NAME': shaderInfo.metadata.sortName = data.id; break;
-      case 'USE': data.id.split(',').forEach(f=>shaderInfo.metadata.use[f.trim().toUpperCase()]=true); break;
-      case 'CAPABILITY': data.id.split(',').forEach(f=>shaderInfo.metadata.capability[f.trim().toUpperCase()]=true); break;
-    }
-    currentData = null;
-  }
-
-  /**
-   * Parses sub-directives within a block (e.g., //! DEFAULT, //! MIN for PARAMETER).
-   * 解析區塊內部的子指令 (例如 PARAMETER 的 //! DEFAULT, //! MIN)。
-   * @param {object} data - The current block's data object to populate.
-   * @param {string} directive - The name of the sub-directive.
-   * @param {string} value - The value of the sub-directive.
-   */
-  function parseSubDirective(data, directive, value) {
-    const key = directive.toLowerCase();
-    switch(key){
-      case 'in':
-      case 'out':
-        data[key] = value.split(',').map(s=>s.trim()); break;
-      case 'block_size':
-        data.blockSize = value.split(',').map(Number);
-        if(data.blockSize.length===1) data.blockSize.push(data.blockSize[0]); // Handle single value for block_size
-        break;
-      case 'num_threads':
-        data.numThreads = value.split(',').map(Number);
-        while(data.numThreads.length<3) data.numThreads.push(1); // Ensure 3 components for num_threads
-        break;
-      case 'default':
-      case 'min':
-      case 'max':
-      case 'step':
-        data[key] = parseFloat(value); break;
-      case 'format':
-        data[key] = value.toLowerCase()==='r16g16b16a16_float' ? 'rgba16float' : value;
-        break;
-      default:
-        data[key] = value;
-    }
-  }
-
-  peg$result = peg$startRuleFunction();
-
-  const peg$success = (peg$result !== peg$FAILED && peg$currPos === input.length);
-  function peg$throw() {
-    if (peg$result !== peg$FAILED && peg$currPos < input.length) {
-      peg$fail(peg$endExpectation());
-    }
-
-    throw peg$buildStructuredError(
-      peg$maxFailExpected,
-      peg$maxFailPos < input.length ? peg$getUnicode(peg$maxFailPos) : null,
-      peg$maxFailPos < input.length
-        ? peg$computeLocation(peg$maxFailPos, peg$maxFailPos + 1)
-        : peg$computeLocation(peg$maxFailPos, peg$maxFailPos)
-    );
-  }
-  if (options.peg$library) {
-    return /** @type {any} */ ({
-      peg$result,
-      peg$currPos,
-      peg$FAILED,
-      peg$maxFailExpected,
-      peg$maxFailPos,
-      peg$success,
-      peg$throw: peg$success ? undefined : peg$throw,
-    });
-  }
-  if (peg$success) {
-    return peg$result;
-  } else {
-    peg$throw();
-  }
 }
 
 // src/runtime/ResourceManager.js
@@ -809,31 +863,6 @@ class ResourceManager {
          * @type {import('./WebGPU-mock.js').GPUBuffer}
          */
         this.uniformBuffer = null;
-
-        /**
-         * - EN: Pre-create INPUT and OUTPUT textures with default descriptors.
-         *   These textures can be replaced by external textures later.
-         * - TW: 使用預設描述符預先建立 INPUT 和 OUTPUT 紋理。
-         *   這些紋理稍後可以被外部紋理替換。
-         */
-        this.createTexture('INPUT', {
-            size: [1, 1],
-            /**
-             * - EN: Default size, should be overridden by actual input.
-             * - TW: 預設大小，應由實際輸入覆蓋。
-             */
-            format: 'rgba8unorm',
-            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-        });
-        this.createTexture('OUTPUT', {
-            size: [1, 1],
-            /**
-             * - EN: Default size, should be overridden by actual input.
-             * - TW: 預設大小，應由實際輸入覆蓋。
-             */
-            format: 'rgba8unorm',
-            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING,
-        });
     }
 
     /**
@@ -843,28 +872,151 @@ class ResourceManager {
      * - EN: Parsed shader information from Parser.js.
      * - TW: 來自 Parser.js 的解析後著色器資訊。
      */
-    initialize(shaderInfo) {
+    /**
+     * - EN: Initializes all GPU resources based on the parsed shader IR.
+     * - TW: 根據解析後的著色器 IR 初始化所有 GPU 資源。
+     * @param {import('./ShaderParser.js').WGFXShaderInfo} shaderInfo
+     * - EN: Parsed shader information from Parser.js.
+     * - TW: 來自 Parser.js 的解析後著色器資訊。
+     */
+    /**
+     * - EN: Initializes all GPU resources based on the parsed shader IR.
+     * - TW: 根據解析後的著色器 IR 初始化所有 GPU 資源。
+     * @param {import('./ShaderParser.js').WGFXShaderInfo} shaderInfo
+     * - EN: Parsed shader information from Parser.js.
+     * - TW: 來自 Parser.js 的解析後著色器資訊。
+     */
+    initialize(shaderInfo, externalResources = {}) {
+        const context = {};
+
+        // 1. [優先] 載入外部定義的常數 (如 INPUT_WIDTH/HEIGHT)
+        if (externalResources.defines) {
+            Object.assign(context, externalResources.defines);
+        }
+
+        // 2. 建立外部紋理 (INPUT, OUTPUT 等)
+        if (externalResources.textures) {
+            for (const [name, descriptor] of Object.entries(externalResources.textures)) {
+                this.createTexture(name, descriptor);
+            }
+        }
+
+        // 3. [後備] 如果 defines 沒給尺寸，嘗試從剛剛建立的 INPUT 紋理反查
+        if ((!context['INPUT_WIDTH'] || !context['INPUT_HEIGHT']) && this.textures.has('INPUT')) {
+            const inputTexture = this.getTexture('INPUT');
+            if (inputTexture) {
+                if (!context['INPUT_WIDTH']) context['INPUT_WIDTH'] = inputTexture.width;
+                if (!context['INPUT_HEIGHT']) context['INPUT_HEIGHT'] = inputTexture.height;
+            }
+        }
+
+        // --- Safe Math Parser (CSP Compliant: No eval/new Function) ---
+        // 實作一個簡單的遞迴下降解析器，支援 +, -, *, /, %, () 和小數
+        const parseMathExpression = (str) => {
+            let pos = 0;
+            // 移除所有空白
+            str = str.replace(/\s+/g, '');
+
+            const peek = () => str[pos];
+            const consume = () => str[pos++];
+
+            const parseFactor = () => {
+                if (peek() === '(') {
+                    consume(); // 吃掉 '('
+                    const result = parseExpr();
+                    if (peek() !== ')') throw new Error("Expected ')'");
+                    consume(); // 吃掉 ')'
+                    return result;
+                }
+
+                // 解析數字 (含負號和小數點)
+                let numStr = '';
+                if (peek() === '-') {
+                    numStr += consume();
+                }
+                while (pos < str.length && (/[0-9.]/).test(peek())) {
+                    numStr += consume();
+                }
+                if (numStr === '') throw new Error(`Unexpected char: '${peek()}' at pos ${pos}`);
+                return parseFloat(numStr);
+            };
+
+            const parseTerm = () => {
+                let left = parseFactor();
+                while (pos < str.length) {
+                    const op = peek();
+                    if (op === '*' || op === '/' || op === '%') {
+                        consume();
+                        const right = parseFactor();
+                        if (op === '*') left *= right;
+                        else if (op === '/') left /= right;
+                        else if (op === '%') left %= right;
+                    } else {
+                        break;
+                    }
+                }
+                return left;
+            };
+
+            const parseExpr = () => {
+                let left = parseTerm();
+                while (pos < str.length) {
+                    const op = peek();
+                    if (op === '+' || op === '-') {
+                        consume();
+                        const right = parseTerm();
+                        if (op === '+') left += right;
+                        else if (op === '-') left -= right;
+                    } else {
+                        break;
+                    }
+                }
+                return left;
+            };
+
+            const result = parseExpr();
+            return result;
+        };
+
+        const evaluate = (expr, ctx) => {
+            if (typeof expr !== 'string') return expr;
+
+            // 替換變數
+            let evaluatedExpr = expr;
+            for (const key in ctx) {
+                const regex = new RegExp('\\b' + key + '\\b', 'g');
+                evaluatedExpr = evaluatedExpr.replace(regex, ctx[key]);
+            }
+
+            try {
+                // 如果替換後只是單純的數字字串，直接轉換 (最快)
+                if (!isNaN(Number(evaluatedExpr))) {
+                    return Math.ceil(Number(evaluatedExpr));
+                }
+                // 否則使用安全的解析器計算
+                return Math.ceil(parseMathExpression(evaluatedExpr));
+            } catch (e) {
+                console.error("Evaluation failed. Context:", ctx);
+                throw new Error(`Cannot evaluate expression: "${expr}". Resulted in: "${evaluatedExpr}". Error: ${e.message}`);
+            }
+        };
+
         /**
          * - EN: Create textures defined in the shader.
          * - TW: 建立著色器中定義的紋理。
          */
         shaderInfo.textures.forEach(tex => {
-            /**
-             * - EN: INPUT and OUTPUT are special cases, assumed to be managed externally or already created.
-             * - TW: INPUT 和 OUTPUT 是特殊情況，假定由外部管理或已建立。
-             */
-            if (tex.name === 'INPUT' || tex.name === 'OUTPUT') return;
+            if (this.textures.has(tex.name)) return; // Already created externally
 
-            /**
-             * - EN: TODO: A more robust implementation would parse width/height expressions (e.g., "INPUT_WIDTH * 0.5").
-             * - TW: TODO: 更穩健的實作將解析寬度/高度表達式 (例如："INPUT_WIDTH * 0.5")。
-             */
+            const width = evaluate(tex.width, context);
+            const height = evaluate(tex.height, context);
+
+            if (!width || !height) {
+                throw new Error(`Could not determine size for texture ${tex.name}. Width or height expression is invalid.`);
+            }
+
             const descriptor = {
-                size: [1920, 1080],
-                /**
-                 * - EN: Current placeholder size.
-                 * - TW: 目前的佔位符大小。
-                 */
+                size: [width, height],
                 format: tex.format?.toLowerCase() || 'rgba8unorm',
                 usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC,
             };
@@ -890,27 +1042,13 @@ class ResourceManager {
          * - TW: 建立一個單一的 uniform 緩衝區來儲存所有參數。
          */
         if (shaderInfo.parameters.length > 0) {
-            /**
-             * - EN: Calculate offset and size for each parameter.
-             *   Note: This is a simplified packing strategy. Real implementations must adhere to std140/std430 layout rules.
-             * - TW: 計算每個參數的偏移量和大小。
-             *   注意：這是一個簡化的打包策略。實際實作必須遵守 std140/std430 佈局規則。
-             */
             let totalSize = 0;
             shaderInfo.parameters.forEach(param => {
-                const size = param.type === 'int' ? 4 : 4;
-                /**
-                 * - EN: i32 and f32 are both 4 bytes.
-                 * - TW: i32 和 f32 都是 4 位元組。
-                 */
+                const size = 4; // Assuming 4 bytes (f32/i32) for simplicity
                 this.uniforms.set(param.name, {buffer: null, offset: totalSize, size});
                 totalSize += size;
             });
 
-            /**
-             * - EN: Uniform buffer offsets must be aligned to multiples of 16.
-             * - TW: uniform 緩衝區偏移量必須對齊 16 的倍數。
-             */
             const alignedSize = Math.ceil(totalSize / 16) * 16;
 
             this.uniformBuffer = this.device.createBuffer({
@@ -918,24 +1056,16 @@ class ResourceManager {
                 usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             });
 
-            /**
-             * - EN: Update metadata for each uniform to point to the created buffer.
-             * - TW: 更新每個 uniform 的元資料以指向建立的緩衝區。
-             */
             this.uniforms.forEach(u => u.buffer = this.uniformBuffer);
         }
 
-        /**
-         * - EN: Resources initialized.
-         * - TW: 資源已初始化。
-         */
         console.log("ResourceManager: Resources initialized.", {
             textures: [...this.textures.keys()],
             samplers: [...this.samplers.keys()],
             uniforms: [...this.uniforms.keys()],
+            context: context
         });
     }
-
     /**
      * - EN: Creates or replaces a GPUTexture in the manager.
      * - TW: 在管理器中建立或替換 GPUTexture。
@@ -998,6 +1128,36 @@ class ResourceManager {
         const sampler = this.device.createSampler(descriptor);
         this.samplers.set(name, sampler);
         return sampler;
+    }
+
+    /**
+     * - EN: Uploads image data (ImageBitmap, VideoFrame, etc.) to a specified GPUTexture.
+     * - TW: 將圖像資料 (ImageBitmap, VideoFrame 等) 上傳到指定的 GPUTexture。
+     * @param {string} name - The name of the texture (e.g., 'INPUT').
+     * @param {ImageBitmap | VideoFrame | HTMLCanvasElement} image - The source image data.
+     */
+    updateTextureFromImage(name, image) {
+        const texture = this.getTexture(name);
+
+        if (!texture) {
+            throw new Error(`Texture '${name}' not found for update.`);
+        }
+
+        // Ensure the texture has COPY_DST usage, which is usually included for dynamic textures.
+        // We assume 'INPUT' is correctly set up with the right dimensions/format during compile/external setup.
+
+        if (texture.width !== image.width || texture.height !== image.height) {
+            // In a real implementation, you might resize the texture or throw an error.
+            // For simplicity, we assume the input size matches the texture size (e.g., INPUT is pre-sized).
+            console.warn(`Input image size (${image.width}x${image.height}) does not match texture size (${texture.width}x${texture.height}).`);
+        }
+
+        this.device.queue.copyExternalImageToBufferOrTexture(
+            { source: image },
+            { texture: texture },
+            [image.width, image.height]
+        );
+        console.log(`Texture '${name}' updated from image source.`);
     }
 
     /**
@@ -1479,7 +1639,7 @@ class WGSLCodeGenerator {
          * - TW: 注入通用程式碼區塊。如果存在,將 'type' 替換為 'alias' 才能符合 WGSL 相容性。
          */
         const commonCode = shaderInfo.commonCode
-            ? `// --- 通用程式碼 ---\n${shaderInfo.commonCode.replace(/type\s+/g, 'alias ')}\n\n`
+            ? `// --- 通用程式碼 ---\n${shaderInfo.commonCode}\n\n`
             : '';
 
         /**
@@ -1863,7 +2023,9 @@ class WGFXRuntime {
      * - EN: A Promise that resolves when compilation is complete.
      * - TW: 編譯完成時解析的 Promise。
      */
-    async compile(effectCode) {
+    async compile(effectCode, externalResources = {}) {
+        // FIXME: This is a temporary solution to pass external resources.
+        // A more robust solution would be to have a dedicated method to set resources.
         /**
          * - EN: Starting effect compilation.
          * - TW: 開始效果編譯。
@@ -1896,7 +2058,7 @@ class WGFXRuntime {
          * - EN: 3. Initialize all GPU resources (textures, samplers, buffers) based on the IR.
          * - TW: 3. 根據 IR 初始化所有 GPU 資源 (紋理、取樣器、緩衝區)。
          */
-        this.resourceManager.initialize(this.shaderInfo);
+        this.resourceManager.initialize(this.shaderInfo, externalResources);
         /**
          * - EN: Resources initialized.
          * - TW: 資源已初始化。
@@ -2041,9 +2203,9 @@ let runtimeInstance = null;
  * - EN: A Promise that resolves when compilation is complete.
  * - TW: 編譯完成時解析的 Promise。
  */
-async function compile(effectCode, device) {
+async function compile(effectCode, device, externalResources = {}) {
     runtimeInstance = new WGFXRuntime(device);
-    await runtimeInstance.compile(effectCode);
+    await runtimeInstance.compile(effectCode, externalResources);
     return runtimeInstance.shaderInfo;
 }
 

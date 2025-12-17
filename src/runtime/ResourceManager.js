@@ -99,41 +99,135 @@ export class ResourceManager {
      * - EN: Parsed shader information from Parser.js.
      * - TW: 來自 Parser.js 的解析後著色器資訊。
      */
+
+    /**
+     * - EN: Initializes all GPU resources based on the parsed shader IR.
+     * - TW: 根據解析後的著色器 IR 初始化所有 GPU 資源。
+     * @param {import('./ShaderParser.js').WGFXShaderInfo} shaderInfo
+     * - EN: Parsed shader information from Parser.js.
+     * - TW: 來自 Parser.js 的解析後著色器資訊。
+     */
+    /**
+     * - EN: Initializes all GPU resources based on the parsed shader IR.
+     * - TW: 根據解析後的著色器 IR 初始化所有 GPU 資源。
+     * @param {import('./ShaderParser.js').WGFXShaderInfo} shaderInfo
+     * - EN: Parsed shader information from Parser.js.
+     * - TW: 來自 Parser.js 的解析後著色器資訊。
+     */
     initialize(shaderInfo, externalResources = {}) {
-        // Create external textures first, especially INPUT and OUTPUT
+        const context = {};
+
+        // 1. [優先] 載入外部定義的常數 (如 INPUT_WIDTH/HEIGHT)
+        if (externalResources.defines) {
+            Object.assign(context, externalResources.defines);
+        }
+
+        // 2. 建立外部紋理 (INPUT, OUTPUT 等)
         if (externalResources.textures) {
             for (const [name, descriptor] of Object.entries(externalResources.textures)) {
                 this.createTexture(name, descriptor);
             }
         }
 
-        const inputTexture = this.getTexture('INPUT');
-        const context = {};
-        if (inputTexture) {
-            context['INPUT_WIDTH'] = inputTexture.width;
-            context['INPUT_HEIGHT'] = inputTexture.height;
+        // 3. [後備] 如果 defines 沒給尺寸，嘗試從剛剛建立的 INPUT 紋理反查
+        if ((!context['INPUT_WIDTH'] || !context['INPUT_HEIGHT']) && this.textures.has('INPUT')) {
+            const inputTexture = this.getTexture('INPUT');
+            if (inputTexture) {
+                if (!context['INPUT_WIDTH']) context['INPUT_WIDTH'] = inputTexture.width;
+                if (!context['INPUT_HEIGHT']) context['INPUT_HEIGHT'] = inputTexture.height;
+            }
         }
 
-        // A simple expression evaluator
-        const evaluate = (expr, ctx) => {
-            if (typeof expr !== 'string') return expr; // It's already a number
+        // --- Safe Math Parser (CSP Compliant: No eval/new Function) ---
+        // 實作一個簡單的遞迴下降解析器，支援 +, -, *, /, %, () 和小數
+        const parseMathExpression = (str) => {
+            let pos = 0;
+            // 移除所有空白
+            str = str.replace(/\s+/g, '');
 
-            // Replace variables with their values
+            const peek = () => str[pos];
+            const consume = () => str[pos++];
+
+            const parseFactor = () => {
+                if (peek() === '(') {
+                    consume(); // 吃掉 '('
+                    const result = parseExpr();
+                    if (peek() !== ')') throw new Error("Expected ')'");
+                    consume(); // 吃掉 ')'
+                    return result;
+                }
+
+                // 解析數字 (含負號和小數點)
+                let numStr = '';
+                if (peek() === '-') {
+                    numStr += consume();
+                }
+                while (pos < str.length && (/[0-9.]/).test(peek())) {
+                    numStr += consume();
+                }
+                if (numStr === '') throw new Error(`Unexpected char: '${peek()}' at pos ${pos}`);
+                return parseFloat(numStr);
+            };
+
+            const parseTerm = () => {
+                let left = parseFactor();
+                while (pos < str.length) {
+                    const op = peek();
+                    if (op === '*' || op === '/' || op === '%') {
+                        consume();
+                        const right = parseFactor();
+                        if (op === '*') left *= right;
+                        else if (op === '/') left /= right;
+                        else if (op === '%') left %= right;
+                    } else {
+                        break;
+                    }
+                }
+                return left;
+            };
+
+            const parseExpr = () => {
+                let left = parseTerm();
+                while (pos < str.length) {
+                    const op = peek();
+                    if (op === '+' || op === '-') {
+                        consume();
+                        const right = parseTerm();
+                        if (op === '+') left += right;
+                        else if (op === '-') left -= right;
+                    } else {
+                        break;
+                    }
+                }
+                return left;
+            };
+
+            const result = parseExpr();
+            return result;
+        };
+
+        const evaluate = (expr, ctx) => {
+            if (typeof expr !== 'string') return expr;
+
+            // 替換變數
             let evaluatedExpr = expr;
             for (const key in ctx) {
-                // Use a regex to replace whole words only to avoid replacing parts of other words
                 const regex = new RegExp('\\b' + key + '\\b', 'g');
                 evaluatedExpr = evaluatedExpr.replace(regex, ctx[key]);
             }
 
             try {
-                // Use Function constructor for safe evaluation
-                return Math.ceil(new Function('return ' + evaluatedExpr)());
+                // 如果替換後只是單純的數字字串，直接轉換 (最快)
+                if (!isNaN(Number(evaluatedExpr))) {
+                    return Math.ceil(Number(evaluatedExpr));
+                }
+                // 否則使用安全的解析器計算
+                return Math.ceil(parseMathExpression(evaluatedExpr));
             } catch (e) {
-                throw new Error(`Cannot evaluate expression: "${expr}"`);
+                console.error("Evaluation failed. Context:", ctx);
+                throw new Error(`Cannot evaluate expression: "${expr}". Resulted in: "${evaluatedExpr}". Error: ${e.message}`);
             }
         };
-
 
         /**
          * - EN: Create textures defined in the shader.
@@ -176,27 +270,13 @@ export class ResourceManager {
          * - TW: 建立一個單一的 uniform 緩衝區來儲存所有參數。
          */
         if (shaderInfo.parameters.length > 0) {
-            /**
-             * - EN: Calculate offset and size for each parameter.
-             *   Note: This is a simplified packing strategy. Real implementations must adhere to std140/std430 layout rules.
-             * - TW: 計算每個參數的偏移量和大小。
-             *   注意：這是一個簡化的打包策略。實際實作必須遵守 std140/std430 佈局規則。
-             */
             let totalSize = 0;
             shaderInfo.parameters.forEach(param => {
-                const size = param.type === 'int' ? 4 : 4;
-                /**
-                 * - EN: i32 and f32 are both 4 bytes.
-                 * - TW: i32 和 f32 都是 4 位元組。
-                 */
+                const size = 4; // Assuming 4 bytes (f32/i32) for simplicity
                 this.uniforms.set(param.name, {buffer: null, offset: totalSize, size});
                 totalSize += size;
             });
 
-            /**
-             * - EN: Uniform buffer offsets must be aligned to multiples of 16.
-             * - TW: uniform 緩衝區偏移量必須對齊 16 的倍數。
-             */
             const alignedSize = Math.ceil(totalSize / 16) * 16;
 
             this.uniformBuffer = this.device.createBuffer({
@@ -204,24 +284,16 @@ export class ResourceManager {
                 usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             });
 
-            /**
-             * - EN: Update metadata for each uniform to point to the created buffer.
-             * - TW: 更新每個 uniform 的元資料以指向建立的緩衝區。
-             */
             this.uniforms.forEach(u => u.buffer = this.uniformBuffer);
         }
 
-        /**
-         * - EN: Resources initialized.
-         * - TW: 資源已初始化。
-         */
         console.log("ResourceManager: Resources initialized.", {
             textures: [...this.textures.keys()],
             samplers: [...this.samplers.keys()],
             uniforms: [...this.uniforms.keys()],
+            context: context
         });
     }
-
     /**
      * - EN: Creates or replaces a GPUTexture in the manager.
      * - TW: 在管理器中建立或替換 GPUTexture。
@@ -284,6 +356,36 @@ export class ResourceManager {
         const sampler = this.device.createSampler(descriptor);
         this.samplers.set(name, sampler);
         return sampler;
+    }
+
+    /**
+     * - EN: Uploads image data (ImageBitmap, VideoFrame, etc.) to a specified GPUTexture.
+     * - TW: 將圖像資料 (ImageBitmap, VideoFrame 等) 上傳到指定的 GPUTexture。
+     * @param {string} name - The name of the texture (e.g., 'INPUT').
+     * @param {ImageBitmap | VideoFrame | HTMLCanvasElement} image - The source image data.
+     */
+    updateTextureFromImage(name, image) {
+        const texture = this.getTexture(name);
+
+        if (!texture) {
+            throw new Error(`Texture '${name}' not found for update.`);
+        }
+
+        // Ensure the texture has COPY_DST usage, which is usually included for dynamic textures.
+        // We assume 'INPUT' is correctly set up with the right dimensions/format during compile/external setup.
+
+        if (texture.width !== image.width || texture.height !== image.height) {
+            // In a real implementation, you might resize the texture or throw an error.
+            // For simplicity, we assume the input size matches the texture size (e.g., INPUT is pre-sized).
+            console.warn(`Input image size (${image.width}x${image.height}) does not match texture size (${texture.width}x${texture.height}).`);
+        }
+
+        this.device.queue.copyExternalImageToBufferOrTexture(
+            {source: image},
+            {texture: texture},
+            [image.width, image.height]
+        );
+        console.log(`Texture '${name}' updated from image source.`);
     }
 
     /**

@@ -16,9 +16,11 @@
   },
   "type": "module",
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "peggy": "^5.0.6",
     "rollup": "^4.53.3",
+    "rollup-plugin-peggy": "^6.1.0",
     "rollup-plugin-polyfill-node": "^0.13.0"
   }
 }

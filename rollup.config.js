@@ -1,28 +1,45 @@
 // rollup.config.js
 import resolve from '@rollup/plugin-node-resolve';
+import commonjs from '@rollup/plugin-commonjs';
 import polyfillNode from 'rollup-plugin-polyfill-node';
+import peggy from 'rollup-plugin-peggy';
 
-export default {
-    input: 'src/index.js', // 專案入口
-    output: [
-        {
+export default [
+    // CLI / Node.js build for the main executable
+    {
+        input: 'src/index.js',
+        output: {
             file: 'dist/wgfx.js',
-            format: 'cjs',   // Node.js 使用
+            format: 'cjs',
         },
-        {
-            file: 'dist/wgfx.esm.js',
-            format: 'esm',   // ESM 模組
-        },
-        {
-            file: 'dist/wgfx.umd.js',
-            format: 'umd',   // 瀏覽器可用
-            name: 'WGFX',    // 全域變數名稱
-            globals: {},     // 若有 external 可在此對應
-        },
-    ],
-    plugins: [
-        resolve({browser: true}), // node_modules 模組解析，支援瀏覽器
-        polyfillNode(),             // Node.js built-ins polyfill（fs、path 等）
-    ],
-    external: [],                 // 若有 external 模組，可在此列出
-};
+        plugins: [
+            peggy({cache: true}),
+            resolve({preferBuiltins: true}),
+            commonjs(),
+        ],
+        external: ['fs', 'path', 'yargs'] // Externalize node built-ins and yargs
+    },
+    // Browser Library build
+    {
+        input: 'src/WGFX.js', // Entry point for the browser library
+        output: [
+            {
+                file: 'dist/wgfx.browser.esm.js',
+                format: 'esm',
+                sourcemap: true
+            },
+            {
+                file: 'dist/wgfx.browser.umd.js',
+                format: 'umd',
+                name: 'WGFX', // Global variable name for UMD build
+                sourcemap: true
+            },
+        ],
+        plugins: [
+            peggy({cache: true}),
+            resolve({browser: true}),
+            commonjs(),
+            polyfillNode(),
+        ],
+    }
+];
