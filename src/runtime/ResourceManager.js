@@ -99,117 +99,42 @@ export class ResourceManager {
      * - EN: Parsed shader information from Parser.js.
      * - TW: 來自 Parser.js 的解析後著色器資訊。
      */
-
-    /**
-     * - EN: Initializes all GPU resources based on the parsed shader IR.
-     * - TW: 根據解析後的著色器 IR 初始化所有 GPU 資源。
-     * @param {import('./ShaderParser.js').WGFXShaderInfo} shaderInfo
-     * - EN: Parsed shader information from Parser.js.
-     * - TW: 來自 Parser.js 的解析後著色器資訊。
-     */
-    /**
-     * - EN: Initializes all GPU resources based on the parsed shader IR.
-     * - TW: 根據解析後的著色器 IR 初始化所有 GPU 資源。
-     * @param {import('./ShaderParser.js').WGFXShaderInfo} shaderInfo
-     * - EN: Parsed shader information from Parser.js.
-     * - TW: 來自 Parser.js 的解析後著色器資訊。
-     */
     initialize(shaderInfo, externalResources = {}) {
         const context = {};
 
-        // 1. [優先] 載入外部定義的常數 (如 INPUT_WIDTH/HEIGHT)
+        // 1. 優先載入外部定義
         if (externalResources.defines) {
             Object.assign(context, externalResources.defines);
+            console.log('載入外部定義:', context);
         }
 
-        // 2. 建立外部紋理 (INPUT, OUTPUT 等)
+        // 2. 建立外部紋理
         if (externalResources.textures) {
             for (const [name, descriptor] of Object.entries(externalResources.textures)) {
+                console.log(`建立外部紋理: ${name}`, descriptor);
                 this.createTexture(name, descriptor);
             }
         }
 
-        // 3. [後備] 如果 defines 沒給尺寸，嘗試從剛剛建立的 INPUT 紋理反查
-        if ((!context['INPUT_WIDTH'] || !context['INPUT_HEIGHT']) && this.textures.has('INPUT')) {
+        // 3. 回填尺寸常數(如果未提供)
+        if ((!context['INPUT_WIDTH'] || !context['INPUT_HEIGHT']) &&
+            this.textures.has('INPUT')) {
             const inputTexture = this.getTexture('INPUT');
             if (inputTexture) {
-                if (!context['INPUT_WIDTH']) context['INPUT_WIDTH'] = inputTexture.width;
-                if (!context['INPUT_HEIGHT']) context['INPUT_HEIGHT'] = inputTexture.height;
+                if (!context['INPUT_WIDTH']) {
+                    context['INPUT_WIDTH'] = inputTexture.width;
+                }
+                if (!context['INPUT_HEIGHT']) {
+                    context['INPUT_HEIGHT'] = inputTexture.height;
+                }
+                console.log('從 INPUT 紋理回填尺寸:', context);
             }
         }
 
-        // --- Safe Math Parser (CSP Compliant: No eval/new Function) ---
-        // 實作一個簡單的遞迴下降解析器，支援 +, -, *, /, %, () 和小數
-        const parseMathExpression = (str) => {
-            let pos = 0;
-            // 移除所有空白
-            str = str.replace(/\s+/g, '');
-
-            const peek = () => str[pos];
-            const consume = () => str[pos++];
-
-            const parseFactor = () => {
-                if (peek() === '(') {
-                    consume(); // 吃掉 '('
-                    const result = parseExpr();
-                    if (peek() !== ')') throw new Error("Expected ')'");
-                    consume(); // 吃掉 ')'
-                    return result;
-                }
-
-                // 解析數字 (含負號和小數點)
-                let numStr = '';
-                if (peek() === '-') {
-                    numStr += consume();
-                }
-                while (pos < str.length && (/[0-9.]/).test(peek())) {
-                    numStr += consume();
-                }
-                if (numStr === '') throw new Error(`Unexpected char: '${peek()}' at pos ${pos}`);
-                return parseFloat(numStr);
-            };
-
-            const parseTerm = () => {
-                let left = parseFactor();
-                while (pos < str.length) {
-                    const op = peek();
-                    if (op === '*' || op === '/' || op === '%') {
-                        consume();
-                        const right = parseFactor();
-                        if (op === '*') left *= right;
-                        else if (op === '/') left /= right;
-                        else if (op === '%') left %= right;
-                    } else {
-                        break;
-                    }
-                }
-                return left;
-            };
-
-            const parseExpr = () => {
-                let left = parseTerm();
-                while (pos < str.length) {
-                    const op = peek();
-                    if (op === '+' || op === '-') {
-                        consume();
-                        const right = parseTerm();
-                        if (op === '+') left += right;
-                        else if (op === '-') left -= right;
-                    } else {
-                        break;
-                    }
-                }
-                return left;
-            };
-
-            const result = parseExpr();
-            return result;
-        };
-
+        // 安全的數學表達式求值函數(已在原程式碼中實作)
         const evaluate = (expr, ctx) => {
             if (typeof expr !== 'string') return expr;
 
-            // 替換變數
             let evaluatedExpr = expr;
             for (const key in ctx) {
                 const regex = new RegExp('\\b' + key + '\\b', 'g');
@@ -217,44 +142,69 @@ export class ResourceManager {
             }
 
             try {
-                // 如果替換後只是單純的數字字串，直接轉換 (最快)
                 if (!isNaN(Number(evaluatedExpr))) {
                     return Math.ceil(Number(evaluatedExpr));
                 }
-                // 否則使用安全的解析器計算
-                return Math.ceil(parseMathExpression(evaluatedExpr));
+                return Math.ceil(this._parseMathExpression(evaluatedExpr));
             } catch (e) {
-                console.error("Evaluation failed. Context:", ctx);
-                throw new Error(`Cannot evaluate expression: "${expr}". Resulted in: "${evaluatedExpr}". Error: ${e.message}`);
+                console.error("表達式求值失敗:", {
+                    original: expr,
+                    evaluated: evaluatedExpr,
+                    context: ctx,
+                    error: e.message
+                });
+                throw new Error(
+                    `無法計算表達式: "${expr}" -> "${evaluatedExpr}". ` +
+                    `錯誤: ${e.message}`
+                );
             }
         };
 
-        /**
-         * - EN: Create textures defined in the shader.
-         * - TW: 建立著色器中定義的紋理。
-         */
+        // 4. 建立著色器定義的紋理
         shaderInfo.textures.forEach(tex => {
-            if (this.textures.has(tex.name)) return; // Already created externally
+            if (this.textures.has(tex.name)) {
+                console.log(`跳過已存在的紋理: ${tex.name}`);
+                return;
+            }
 
             const width = evaluate(tex.width, context);
             const height = evaluate(tex.height, context);
 
             if (!width || !height) {
-                throw new Error(`Could not determine size for texture ${tex.name}. Width or height expression is invalid.`);
+                throw new Error(
+                    `無法確定紋理 ${tex.name} 的尺寸。` +
+                    `width="${tex.width}", height="${tex.height}"`
+                );
+            }
+
+            // 關鍵:為可能作為 Storage 的紋理預先升級格式
+            let format = (tex.format || 'rgba8unorm').toLowerCase();
+
+            // 如果紋理可能被用作輸出,預先升級格式
+            const mightBeStorage = tex.name !== 'INPUT';
+            if (mightBeStorage && !this._isValidStorageFormat(format)) {
+                const originalFormat = format;
+                format = this._upgradeToStorageFormat(format);
+                console.log(
+                    `紋理 ${tex.name} 格式從 ${originalFormat} ` +
+                    `升級為 ${format} (預防性)`
+                );
             }
 
             const descriptor = {
                 size: [width, height],
-                format: tex.format?.toLowerCase() || 'rgba8unorm',
-                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC,
+                format: format,
+                usage: GPUTextureUsage.TEXTURE_BINDING |
+                    GPUTextureUsage.STORAGE_BINDING |
+                    GPUTextureUsage.COPY_DST |
+                    GPUTextureUsage.COPY_SRC,
             };
+
             this.createTexture(tex.name, descriptor);
+            console.log(`建立紋理: ${tex.name} (${width}x${height}, ${format})`);
         });
 
-        /**
-         * - EN: Create samplers defined in the shader.
-         * - TW: 建立著色器中定義的取樣器。
-         */
+        // 5. 建立取樣器
         shaderInfo.samplers.forEach(samp => {
             const descriptor = {
                 magFilter: samp.filter === 'LINEAR' ? 'linear' : 'nearest',
@@ -263,17 +213,19 @@ export class ResourceManager {
                 addressModeV: samp.address === 'WRAP' ? 'repeat' : 'clamp-to-edge',
             };
             this.createSampler(samp.name, descriptor);
+            console.log(`建立取樣器: ${samp.name}`);
         });
 
-        /**
-         * - EN: Create a single uniform buffer to store all parameters.
-         * - TW: 建立一個單一的 uniform 緩衝區來儲存所有參數。
-         */
+        // 6. 建立 Uniform Buffer
         if (shaderInfo.parameters.length > 0) {
             let totalSize = 0;
             shaderInfo.parameters.forEach(param => {
-                const size = 4; // Assuming 4 bytes (f32/i32) for simplicity
-                this.uniforms.set(param.name, {buffer: null, offset: totalSize, size});
+                const size = 4; // f32/i32
+                this.uniforms.set(param.name, {
+                    buffer: null,
+                    offset: totalSize,
+                    size
+                });
                 totalSize += size;
             });
 
@@ -285,15 +237,48 @@ export class ResourceManager {
             });
 
             this.uniforms.forEach(u => u.buffer = this.uniformBuffer);
+            console.log(`建立 Uniform Buffer: ${alignedSize} bytes`);
         }
 
-        console.log("ResourceManager: Resources initialized.", {
+        console.log("ResourceManager 初始化完成:", {
             textures: [...this.textures.keys()],
             samplers: [...this.samplers.keys()],
             uniforms: [...this.uniforms.keys()],
             context: context
         });
     }
+
+// 輔助方法:判斷格式是否為 Storage 相容
+    _isValidStorageFormat(format) {
+        const validFormats = [
+            'r32float', 'r32sint', 'r32uint',
+            'rgba16float', 'rgba16sint', 'rgba16uint',
+            'rgba32float', 'rgba32sint', 'rgba32uint',
+            'rg32float', 'rg32sint', 'rg32uint'
+        ];
+        return validFormats.includes(format.toLowerCase().replace(/_/g, ''));
+    }
+
+// 輔助方法:升級格式到 Storage 相容版本
+    _upgradeToStorageFormat(format) {
+        const normalized = format.toLowerCase().replace(/_/g, '');
+
+        if (normalized === 'rgba8unorm' || normalized === 'bgra8unorm') {
+            return 'rgba16float';
+        }
+
+        if (normalized.includes('rgba16') || normalized.includes('r16')) {
+            return normalized;
+        }
+
+        if (normalized.includes('32')) {
+            return normalized;
+        }
+
+        console.warn(`未知格式 "${format}" 升級為 rgba16float`);
+        return 'rgba16float';
+    }
+
     /**
      * - EN: Creates or replaces a GPUTexture in the manager.
      * - TW: 在管理器中建立或替換 GPUTexture。
@@ -359,56 +344,46 @@ export class ResourceManager {
     }
 
     /**
-     * - EN: Uploads image data (ImageBitmap, VideoFrame, etc.) to a specified GPUTexture.
-     * - TW: 將圖像資料 (ImageBitmap, VideoFrame 等) 上傳到指定的 GPUTexture。
-     * @param {string} name - The name of the texture (e.g., 'INPUT').
-     * @param {ImageBitmap | VideoFrame | HTMLCanvasElement} image - The source image data.
-     */
-    /**
-     * - EN: Updates a texture's content from an ImageBitmap, HTMLVideoElement, HTMLCanvasElement, or OffscreenCanvas
-     * - TW: 從 ImageBitmap、HTMLVideoElement、HTMLCanvasElement 或 OffscreenCanvas 更新紋理內容
-     *
-     * @param {string} textureName - The name of the texture to update
-     * @param {ImageBitmap | HTMLVideoElement | HTMLCanvasElement | OffscreenCanvas} imageSource - The image source
+     * 從圖像源更新紋理內容
+     * @param {string} textureName - 紋理名稱
+     * @param {ImageBitmap | HTMLVideoElement | HTMLCanvasElement | OffscreenCanvas} imageSource - 圖像源
      */
     updateTextureFromImage(textureName, imageSource) {
         const texture = this.textures.get(textureName);
         if (!texture) {
-            throw new Error(`Texture "${textureName}" not found in ResourceManager.`);
+            throw new Error(`紋理 "${textureName}" 不存在於 ResourceManager 中`);
         }
 
-        // Get the size of the image source
+        // 獲取圖像源尺寸
         let width, height;
         if (imageSource instanceof HTMLVideoElement) {
             width = imageSource.videoWidth;
             height = imageSource.videoHeight;
+        } else if (imageSource instanceof VideoFrame) {
+            width = imageSource.displayWidth;
+            height = imageSource.displayHeight;
         } else {
             width = imageSource.width;
             height = imageSource.height;
         }
 
-        // Validate dimensions
+        // 驗證尺寸
         if (width === 0 || height === 0) {
-            throw new Error(`Image source has invalid dimensions: ${width}x${height}`);
+            throw new Error(`圖像源尺寸無效: ${width}x${height}`);
         }
 
-        // Validate texture size matches
         if (texture.width !== width || texture.height !== height) {
-            console.warn(
-                `Texture "${textureName}" size (${texture.width}x${texture.height}) ` +
-                `does not match image size (${width}x${height}). Texture will be recreated.`
+            throw new Error(
+                `紋理 "${textureName}" 尺寸 (${texture.width}x${texture.height}) ` +
+                `與圖像尺寸 (${width}x${height}) 不符`
             );
-            // In production, you might want to recreate the texture here
-            // For now, we'll throw an error
-            throw new Error(`Texture size mismatch for "${textureName}"`);
         }
 
-        // CRITICAL FIX: Use the correct WebGPU API method
-        // The correct method name is copyExternalImageToTexture, not copyExternalImageToBufferOrTexture
+        // 正確的 API 方法名稱
         this.device.queue.copyExternalImageToTexture(
             {
                 source: imageSource,
-                flipY: false  // Set to true if you need to flip the image vertically
+                flipY: false
             },
             {
                 texture: texture,

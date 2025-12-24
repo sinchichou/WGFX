@@ -151,48 +151,53 @@ export class WGSLCodeGenerator {
             let bindingIndex = (shaderInfo.parameters.length > 0) ? 2 : 1;
 
             // Process textures
+            // 在 generate 方法的紋理處理部分,確保格式正規化
             shaderInfo.textures.forEach(tex => {
-                // Check if this texture is used by this pass
                 const isUsed = [...usedTextureNames].some(usedName =>
                     tex.name === usedName || tex.name.startsWith(usedName + "_")
                 );
 
                 if (!isUsed) return;
 
-                // Determine texture usage (Sampled vs Storage)
                 const isOutputInThisPass = pass.out.includes(tex.name);
                 let isStorage = false;
 
+                // 判定邏輯
                 if (tex.name === 'OUTPUT') {
                     isStorage = true;
                 } else if (tex.name === 'INPUT') {
-                    isStorage = false; // INPUT is always read-only (Sampled)
+                    isStorage = false;
                 } else if (isOutputInThisPass) {
-                    isStorage = true; // Output textures must be Storage
+                    isStorage = true;
                 } else {
-                    isStorage = false; // Other cases (inputs) are Sampled
+                    isStorage = false;
                 }
 
-                // Process format and compatibility
+                // 格式處理
                 let format = (tex.format || 'rgba8unorm').toLowerCase().replace(/_/g, '');
 
-                // CRITICAL FIX: Upgrade format for storage textures
+                // 關鍵修正:為 Storage Texture 升級格式
                 if (isStorage) {
                     const originalFormat = format;
                     format = this._upgradeToStorageFormat(format);
 
                     if (originalFormat !== format) {
-                        console.log(`Pass ${pass.index}: Upgraded texture "${tex.name}" format from ${originalFormat} to ${format} for storage compatibility`);
+                        console.log(
+                            `Pass ${pass.index}: 紋理 "${tex.name}" 格式從 ` +
+                            `${originalFormat} 升級為 ${format} (Storage 相容)`
+                        );
                     }
 
-                    // Double-check format validity
+                    // 二次驗證
                     if (!this._isValidStorageFormat(format)) {
-                        console.error(`Pass ${pass.index}: Invalid storage format "${format}" for texture "${tex.name}"`);
-                        throw new Error(`Texture "${tex.name}" has invalid storage format "${format}". Valid formats: r32float, rgba16float, rgba32float, etc.`);
+                        throw new Error(
+                            `紋理 "${tex.name}" 的格式 "${format}" 無效。` +
+                            `有效格式: r32float, rgba16float, rgba32float 等`
+                        );
                     }
                 }
 
-                // Generate WGSL texture declaration
+                // 生成 WGSL 宣告
                 let textureType;
                 if (isStorage) {
                     textureType = `texture_storage_2d<${format}, write>`;
@@ -203,10 +208,9 @@ export class WGSLCodeGenerator {
                 const currentBinding = bindingIndex++;
                 wgsl += `@group(0) @binding(${currentBinding}) var ${tex.name}: ${textureType};\n`;
 
-                // Store resource info with corrected format
                 passResources.textures.push({
                     ...tex,
-                    format: format, // Use corrected format
+                    format: format, // 使用修正後的格式
                     binding: currentBinding,
                     group: 0,
                     isStorage: isStorage
