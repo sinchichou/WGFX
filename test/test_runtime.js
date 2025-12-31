@@ -24,7 +24,7 @@ async function main() {
     // console.log("Globals object from 'webgpu':", globals); // Remove this debug log
 
     // 在 globalThis.GPUDevice 被設置後再導入 WGFX 相關模組
-    const { compile, dispatchPass, updateUniform, getOutput } = await import('../src/index.js');
+    const { WGFXRuntime } = await import('../dist/wgfx.esm.js');
 
     try {
         // 1. Get a real GPUDevice.
@@ -46,6 +46,9 @@ async function main() {
         });
         console.log("Real GPUDevice created.");
 
+        // Initialize Runtime
+        const runtime = new WGFXRuntime(device);
+
         // 2. Read the effect file.
         // 修正檔案路徑
         const effectPath = path.join(process.cwd(), 'examples', 'Anime4K_Restore_Soft_UL.wgsl');
@@ -55,6 +58,10 @@ async function main() {
         // 3. Define external resources and compile the effect.
         console.log("Compiling effect...");
         const externalResources = {
+            defines: {
+                INPUT_WIDTH: 1280,
+                INPUT_HEIGHT: 720
+            },
             textures: {
                 'INPUT': {
                     size: [1280, 720],
@@ -63,8 +70,10 @@ async function main() {
                 }
             }
         };
-        const shaderInfo = await compile(effectCode, device, externalResources);
+
+        await runtime.compile(effectCode, externalResources);
         console.log("Effect compiled successfully.");
+        const shaderInfo = runtime.shaderInfo;
         console.log(`Found ${shaderInfo.passes.length} passes.`);
 
         // 4. Create a command encoder to dispatch the passes.
@@ -75,13 +84,13 @@ async function main() {
         for (const pass of shaderInfo.passes) {
             const passName = `PASS_${pass.index}`;
             console.log(`Dispatching pass: '${passName}'`);
-            dispatchPass(passName, commandEncoder);
+            runtime.dispatchPass(passName, commandEncoder);
             console.log(`Pass '${passName}' dispatched.`);
         }
 
         // 6. Get the output texture view.
         console.log("Getting output texture view...");
-        const outputView = getOutput();
+        const outputView = runtime.getOutput();
         console.log("Output texture view obtained:", outputView);
 
         console.log("\n--- Test Summary ---");

@@ -1,45 +1,76 @@
-// rollup.config.js
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
-import polyfillNode from 'rollup-plugin-polyfill-node';
 import peggy from 'rollup-plugin-peggy';
+import polyfillNode from 'rollup-plugin-polyfill-node';
+import typescript from 'rollup-plugin-typescript2';
 
 export default [
-    // CLI / Node.js build for the main executable
+    // Browser bundle (ESM)
     {
-        input: 'src/index.js',
+        input: 'src/index.ts',
         output: {
-            file: 'dist/wgfx.js',
-            format: 'cjs',
+            file: 'dist/wgfx.browser.esm.js',
+            format: 'es',
+            sourcemap: true
         },
         plugins: [
-            peggy({cache: true}),
-            resolve({preferBuiltins: true}),
-            commonjs(),
-        ],
-        external: ['fs', 'path', 'yargs'] // Externalize node built-ins and yargs
-    },
-    // Browser Library build
-    {
-        input: 'src/WGFX.js', // Entry point for the browser library
-        output: [
-            {
-                file: 'dist/wgfx.browser.esm.js',
-                format: 'esm',
-                sourcemap: true
-            },
-            {
-                file: 'dist/wgfx.browser.umd.js',
-                format: 'umd',
-                name: 'WGFX', // Global variable name for UMD build
-                sourcemap: true
-            },
-        ],
-        plugins: [
-            peggy({cache: true}),
-            resolve({browser: true}),
+            resolve({
+                browser: true,
+                preferBuiltins: false
+            }),
             commonjs(),
             polyfillNode(),
+            peggy({
+                // Peggy options
+            }),
+            typescript({
+                compilerOptions: { target: "esnext" }
+            })
+        ]
+    },
+    // Browser bundle (UMD)
+    {
+        input: 'src/index.ts',
+        output: {
+            name: 'WGFX',
+            file: 'dist/wgfx.browser.umd.js',
+            format: 'umd',
+            sourcemap: true
+        },
+        plugins: [
+            resolve({
+                browser: true,
+                preferBuiltins: false
+            }),
+            commonjs(),
+            polyfillNode(),
+            peggy(),
+            typescript({
+                compilerOptions: { target: "es5" }
+            })
+        ]
+    },
+    // Node.js / Bundler (ESM & CJS)
+    {
+        input: 'src/index.ts',
+        output: [
+            {
+                file: 'dist/wgfx.js',
+                format: 'cjs',
+                sourcemap: true
+            },
+            {
+                file: 'dist/wgfx.esm.js',
+                format: 'es',
+                sourcemap: true
+            }
         ],
+        plugins: [
+            resolve(),
+            commonjs(),
+            peggy(),
+            typescript()
+        ],
+        external: ['webgpu', 'fs', 'path']
     }
 ];
