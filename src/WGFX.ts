@@ -1,3 +1,4 @@
+//WGFX.ts
 import { WGFXShaderInfo, ParameterInfo } from './types/shader';
 import { WGFXRuntime } from './runtime/WGFXRuntime';
 

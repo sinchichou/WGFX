@@ -64,7 +64,7 @@ export class WGSLCodeGenerator {
 }
 @group(0) @binding(4) var<uniform> scene: SceneInfo;
 
-`;
+// `;
 
         shaderInfo.passes.forEach(pass => {
             let wgsl = `// Pass ${pass.index}\n\n`;
@@ -161,7 +161,7 @@ export class WGSLCodeGenerator {
             
             const numThreads = pass.numThreads || [1, 1, 1];
             processedPassCode = processedPassCode.replace(/@compute\s*@workgroup_size\([^)]+\)\s*/g, '');
-             processedPassCode = processedPassCode.replace(
+            processedPassCode = processedPassCode.replace(
                 new RegExp(`fn Pass${pass.index}`),
                 `fn main_cs `
             );
