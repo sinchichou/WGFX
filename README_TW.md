@@ -92,11 +92,16 @@ WGFX/
 
 - **`WGSLCodeGenerator.ts` (WGSL 程式碼生成)**
 
-  - **職責**: 將 `Parser.js` 產生的 IR 轉換為合法的 WGSL Shader 程式碼。
+    - **職責**: 將 `ShaderParser.js` 產生的 IR 轉換為合法的 WGSL Shader 程式碼。
   - **功能**: 插入 `Common` 區塊、展開宏、處理函數重載、根據配置決定參數是 `inline` 還是 `uniform buffer`。
 
 - **`UniformBinder.ts` (Uniform 更新)**
+
   - **職責**: 提供 `updateUniform(name, value)` 接口，用於動態更新 Uniform Buffer 的內容。
+
+- **`utils/Logger.ts` (日誌工具)**
+    - **職責**: 統一日誌系統，支援不同層級 (DEBUG, INFO, WARN, ERROR)。
+    - **偵錯模式**: 透過 `WGFX.setDebug(true)` 切換詳細日誌輸出。
 
 ## 2. WGFX 特效檔案格式規格 (`.wgsl`)
 
