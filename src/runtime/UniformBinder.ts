@@ -1,5 +1,5 @@
 import { ResourceManager } from './ResourceManager';
-import {Logger} from '../utils/Logger';
+import {Logger} from '@/utils/Logger';
 
 /**
  * Handles the binding and updating of WebGPU uniform buffers.

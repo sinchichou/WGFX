@@ -1,6 +1,6 @@
 /// <reference types="@webgpu/types" />
 import { ResourceManager } from './ResourceManager';
-import {Logger} from '../utils/Logger';
+import {Logger} from '@/utils/Logger';
 
 /**
  * Metadata for a stored WebGPU pipeline and its associated layouts.
