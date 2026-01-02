@@ -37,10 +37,10 @@ fn GetInputPt() -> MF2 {
     return scene.inputPt;
 }
 
-fn Rmp8x8(k: u32) -> uint2 {
-    var x = (k & 1u) | ((k & 4u) >> 1u) | ((k & 16u) >> 2u);
-    var y = ((k & 2u) >> 1u) | ((k & 8u) >> 2u) | ((k & 32u) >> 3u);
-    return uint2(x, y);
+fn Rmp8x8(a: u32) -> vec2<u32> {
+    let x: u32 = a % 8u;   // 欄座標
+    let y: u32 = a / 8u;   // 列座標
+    return vec2<u32>(x, y);
 }
 //!END COMMON
 
@@ -141,7 +141,7 @@ fn Pass1(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
             let sb: MF4 = textureGather(2, INPUT, sam, tpos);
 
             // w z -> x z
-		    // x y   y w
+		    // x y -> y w
             src[i][j] = MF3(sr.x, sg.x, sb.x);
             src[i][j + 1u] = MF3(sr.y, sg.y, sb.y);
             src[i + 1u][j] = MF3(sr.z, sg.z, sb.z);
@@ -494,7 +494,7 @@ fn Pass2(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
 fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
-    let gxy = (Rmp8x8(local_id.x) << uint2(1u)) + (workgroup_id.xy * 16u);
+    let gxy: uint2 = (Rmp8x8(local_id.x)) + (workgroup_id.xy * 8u);
     let inputSize: uint2 = GetInputSize();
     if gxy.x >= inputSize.x || gxy.y >= inputSize.y {
         return;
@@ -784,7 +784,7 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
 fn Pass4(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
-    let gxy = (Rmp8x8(local_id.x) << uint2(1u)) + (workgroup_id.xy * 16u);
+    let gxy: uint2 = (Rmp8x8(local_id.x)) + (workgroup_id.xy * 8u);
     let inputSize: uint2 = GetInputSize();
     if gxy.x >= inputSize.x || gxy.y >= inputSize.y {
         return;
@@ -1076,7 +1076,7 @@ fn Pass4(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
 fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
-    let gxy = (Rmp8x8(local_id.x) << uint2(1u)) + (workgroup_id.xy * 16u);
+    let gxy: uint2 = (Rmp8x8(local_id.x)) + (workgroup_id.xy * 8u);
     let inputSize: uint2 = GetInputSize();
     if gxy.x >= inputSize.x || gxy.y >= inputSize.y {
         return;
@@ -1382,7 +1382,7 @@ fn Pass5(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
 fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
-    let gxy = (Rmp8x8(local_id.x) << uint2(1u)) + (workgroup_id.xy * 16u);
+    let gxy: uint2 = (Rmp8x8(local_id.x)) + (workgroup_id.xy * 8u);
     let inputSize: uint2 = GetInputSize();
     if gxy.x >= inputSize.x || gxy.y >= inputSize.y {
         return;
@@ -1690,7 +1690,7 @@ fn Pass6(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
 fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
-    let gxy = (Rmp8x8(local_id.x) << uint2(1u)) + (workgroup_id.xy * 16u);
+    let gxy: uint2 = (Rmp8x8(local_id.x)) + (workgroup_id.xy * 8u);
     let inputSize: uint2 = GetInputSize();
     if gxy.x >= inputSize.x || gxy.y >= inputSize.y {
         return;
@@ -1702,7 +1702,7 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 	// [ a, d, g ]
 	// [ b, e, h ]
 	// [ c, f, i ]
-// =========================================================
+    // =========================================================
     // GROUP 1: Texture 4 (處理 tex4 -> a1, b1...)
     // =========================================================
     var a1: MF4 = textureSampleLevel(tex4_sampled, sam, pos + MF2(-inputPt.x, -inputPt.y), 0.0);
@@ -1997,7 +1997,7 @@ fn Pass7(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
 fn Pass8(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
-    let gxy: uint2 = Rmp8x8(local_id.x) + workgroup_id.xy;
+    let gxy: uint2 = (Rmp8x8(local_id.x)) + (workgroup_id.xy * 8u);
     let outputSize: uint2 = textureDimensions(OUTPUT);
     if gxy.x >= outputSize.x || gxy.y >= outputSize.y {
         return;
