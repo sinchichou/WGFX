@@ -124,7 +124,7 @@ fn Rmp8x8(k: u32) -> uint2 {
 
 @compute @workgroup_size(64, 1, 1)
 fn Pass1(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
-    let gxy: uint2 = (Rmp8x8(local_id.x) << uint2(1u)) + (workgroup_id.xy * 16u);
+    let gxy: uint2 = (Rmp8x8(local_id.x)) + (workgroup_id.xy * 16u);
     let inputSize = GetInputSize();
     if gxy.x >= inputSize.x || gxy.y >= inputSize.y {
         return;
@@ -209,7 +209,7 @@ fn Pass1(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 
 @compute @workgroup_size(64, 1, 1)
 fn Pass2(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
-    let gxy: uint2 = (Rmp8x8(local_id.x) << uint2(1u)) + (workgroup_id.xy * 16u);
+    let gxy: uint2 = (Rmp8x8(local_id.x)) + (workgroup_id.xy * 8u);
     let inputSize = GetInputSize();
     if gxy.x >= inputSize.x || gxy.y >= inputSize.y {
         return;
