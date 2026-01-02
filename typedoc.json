@@ -1,0 +1,19 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/index.ts"
+  ],
+  "out": "docs",
+  "name": "WGFX API Documentation",
+  "includeVersion": true,
+  "categorizeByGroup": true,
+  "highlightLanguages": [
+    "typescript",
+    "javascript",
+    "wgsl",
+    "hlsl",
+    "json"
+  ],
+  "excludeInternal": true,
+  "searchInComments": true
+}

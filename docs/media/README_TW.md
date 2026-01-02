@@ -47,57 +47,57 @@ WGFX/
 
 - **`index.ts` (Runtime 對外接口)**
 
-  - **職責**: 統一管理並封裝 Runtime API，作為外部調用的唯一入口。
-  - **提供 API**:
-    - `compile()`: 編譯特效檔案。
-    - `dispatchPass()`: 執行一個渲染通道 (Pass)。
-    - `updateUniform()`: 更新一個 Uniform 參數。
-    - `getOutput()`: 獲取最終渲染結果。
+    - **職責**: 統一管理並封裝 Runtime API，作為外部調用的唯一入口。
+    - **提供 API**:
+        - `compile()`: 編譯特效檔案。
+        - `dispatchPass()`: 執行一個渲染通道 (Pass)。
+        - `updateUniform()`: 更新一個 Uniform 參數。
+        - `getOutput()`: 獲取最終渲染結果。
 
 - **`WGFXRuntime.ts` (Runtime 核心流程)**
 
-  - **職責**: 控制整個 Runtime 的生命週期。
-  - **流程**:
-    1. 調用 `ShaderParser.js` 解析 `.wgsl` 檔案，生成中間表示 (IR)。
-    2. 調用 `ResourceManager.ts` 根據 IR 初始化 GPU 資源 (Texture, Sampler, Uniform Buffer)。
-    3. 調用 `PipelineManager.ts` 建立 Compute/Render Pipeline 與 Bind Group。
-    4. 根據 Pass 之間的依賴關係進行排序。
-    5. 管理 Workgroup 配置並執行 Pass (Dispatch)。
+    - **職責**: 控制整個 Runtime 的生命週期。
+    - **流程**:
+        1. 調用 `ShaderParser.js` 解析 `.wgsl` 檔案，生成中間表示 (IR)。
+        2. 調用 `ResourceManager.ts` 根據 IR 初始化 GPU 資源 (Texture, Sampler, Uniform Buffer)。
+        3. 調用 `PipelineManager.ts` 建立 Compute/Render Pipeline 與 Bind Group。
+        4. 根據 Pass 之間的依賴關係進行排序。
+        5. 管理 Workgroup 配置並執行 Pass (Dispatch)。
 
 - **`ShaderParser.js` (核心解析器)**
 
-  - **職責**: Runtime 與 CLI 共享的核心模組，負責讀取 `.wgsl` 檔案並轉換為結構化的中間表示 (IR)。
-  - **解析內容**: `Header`, `Parameter`, `Texture`, `Sampler`, `Common`, `Pass` 等區塊。
-  - **資訊收集**: 收集函數多載、宏定義 (`MP_*`, `MF`, `MULADD`)。
-  - **輸出 (IR)**:
-    ```json
-    {
-      "commonCode": "...",
-      "passes": [...],
-      "textures": [...],
-      "samplers": [...],
-      "parameters": [...]
-    }
-    ```
+    - **職責**: Runtime 與 CLI 共享的核心模組，負責讀取 `.wgsl` 檔案並轉換為結構化的中間表示 (IR)。
+    - **解析內容**: `Header`, `Parameter`, `Texture`, `Sampler`, `Common`, `Pass` 等區塊。
+    - **資訊收集**: 收集函數多載、宏定義 (`MP_*`, `MF`, `MULADD`)。
+    - **輸出 (IR)**:
+      ```json
+      {
+        "commonCode": "...",
+        "passes": [...],
+        "textures": [...],
+        "samplers": [...],
+        "parameters": [...]
+      }
+      ```
 
 - **`ResourceManager.ts` (GPU 資源管理)**
 
-  - **職責**: 處理所有與 GPU 資源創建和維護相關的任務。
-  - **功能**: 創建 Texture, Sampler, Uniform Buffer，並維護一個名稱對應表 (e.g., `"MyTex" -> GPUTexture Object`)。
+    - **職責**: 處理所有與 GPU 資源創建和維護相關的任務。
+    - **功能**: 創建 Texture, Sampler, Uniform Buffer，並維護一個名稱對應表 (e.g., `"MyTex" -> GPUTexture Object`)。
 
 - **`PipelineManager.ts` (Pipeline 管理)**
 
-  - **職責**: 負責 Pass 的依賴分析、排序，並創建執行所需的 GPU 物件。
-  - **功能**: 創建 Pipeline Layout, Bind Group, Compute Pipeline，並分派 Shader 執行。
+    - **職責**: 負責 Pass 的依賴分析、排序，並創建執行所需的 GPU 物件。
+    - **功能**: 創建 Pipeline Layout, Bind Group, Compute Pipeline，並分派 Shader 執行。
 
 - **`WGSLCodeGenerator.ts` (WGSL 程式碼生成)**
 
     - **職責**: 將 `ShaderParser.js` 產生的 IR 轉換為合法的 WGSL Shader 程式碼。
-  - **功能**: 插入 `Common` 區塊、展開宏、處理函數重載、根據配置決定參數是 `inline` 還是 `uniform buffer`。
+    - **功能**: 插入 `Common` 區塊、展開宏、處理函數重載、根據配置決定參數是 `inline` 還是 `uniform buffer`。
 
 - **`UniformBinder.ts` (Uniform 更新)**
 
-  - **職責**: 提供 `updateUniform(name, value)` 接口，用於動態更新 Uniform Buffer 的內容。
+    - **職責**: 提供 `updateUniform(name, value)` 接口，用於動態更新 Uniform Buffer 的內容。
 
 - **`utils/Logger.ts` (日誌工具)**
     - **職責**: 統一日誌系統，支援不同層級 (DEBUG, INFO, WARN, ERROR)。
@@ -135,8 +135,8 @@ WGFX/
 | `type name;`           | **必需** | 區塊結尾必須是 HLSL 格式的變數宣告。類型僅支援 `float` 或 `int`。 | `float Brightness;`        |
 
 - **驗證規則**:
-  - `DEFAULT`, `MIN`, `MAX`, `STEP` 四個指令必須全部存在。
-  - 數值必須滿足 `MIN <= DEFAULT <= MAX`。
+    - `DEFAULT`, `MIN`, `MAX`, `STEP` 四個指令必須全部存在。
+    - 數值必須滿足 `MIN <= DEFAULT <= MAX`。
 
 ### 2.3. 紋理區塊 (Texture Block)
 
@@ -152,9 +152,9 @@ WGFX/
 | `Texture2D name;`     | **必需** | 區塊結尾必須是 HLSL 格式的紋理宣告。            | `Texture2D MyTex;`          |
 
 - **特殊內建紋理**:
-  - `INPUT`: 預設的輸入紋理 (index 0)。
-  - `OUTPUT`: 預設的輸出紋理 (index 1)。
-  - 解析器會對這兩個名稱進行特殊處理。
+    - `INPUT`: 預設的輸入紋理 (index 0)。
+    - `OUTPUT`: 預設的輸出紋理 (index 1)。
+    - 解析器會對這兩個名稱進行特殊處理。
 
 ### 2.4. 採樣器區塊 (Sampler Block)
 
@@ -196,10 +196,10 @@ float3 grayscale(float3 color) {
 | `//! DESC <string>`       | 可選      | Pass 的描述文字，可用於除錯或 UI 顯示。                                          | `//! DESC "First Gaussian Blur Pass"` |
 
 - **驗證規則**:
-  - `IN` 和 `OUT` 是每個 Pass 的必需指令。
-  - 若 `STYLE` 為 `CS` (或未指定)，則 `BLOCK_SIZE` 和 `NUM_THREADS` 必需提供。
-  - 最後一個 Pass 的 `OUT` 必須是 `OUTPUT`。
-  - 中間 Pass 的 `OUT` 不能是 `INPUT` 或 `OUTPUT`。
+    - `IN` 和 `OUT` 是每個 Pass 的必需指令。
+    - 若 `STYLE` 為 `CS` (或未指定)，則 `BLOCK_SIZE` 和 `NUM_THREADS` 必需提供。
+    - 最後一個 Pass 的 `OUT` 必須是 `OUTPUT`。
+    - 中間 Pass 的 `OUT` 不能是 `INPUT` 或 `OUTPUT`。
 
 ### 2.7. 內建全域變數 (Built-in Global Variables)
 
@@ -221,33 +221,33 @@ struct SceneInfo {
 
 1. **解析與生成 IR**:
 
-   - `WGFXRuntime` 調用 `ShaderParser.js` 讀取 `.wgsl` 檔案。
-   - `ShaderParser.js` 逐一解析 `Header`, `Parameter`, `Texture`, `Sampler`, `Common`, `Pass` 等區塊。
-   - 生成一份結構化的中間表示 (IR)，包含所有解析出的元數據和程式碼片段。
+    - `WGFXRuntime` 調用 `ShaderParser.js` 讀取 `.wgsl` 檔案。
+    - `ShaderParser.js` 逐一解析 `Header`, `Parameter`, `Texture`, `Sampler`, `Common`, `Pass` 等區塊。
+    - 生成一份結構化的中間表示 (IR)，包含所有解析出的元數據和程式碼片段。
 
 2. **GPU 資源創建**:
 
-   - `ResourceManager.ts` 根據 IR 中的 `textures`, `samplers`, `parameters` 列表，創建對應的 `GPUTexture`, `GPUSampler`,
-     `GPUBuffer` (for uniforms)。
-   - 建立一個從資源名稱到 GPU 物件的映射表，供後續使用。
+    - `ResourceManager.ts` 根據 IR 中的 `textures`, `samplers`, `parameters` 列表，創建對應的 `GPUTexture`, `GPUSampler`,
+      `GPUBuffer` (for uniforms)。
+    - 建立一個從資源名稱到 GPU 物件的映射表，供後續使用。
 
 3. **Pipeline 建立**:
 
-   - `PipelineManager.ts` 遍歷 IR 中的 `passes` 列表。
-   - 對於每個 Pass，`WGSLCodeGenerator.ts` 將其 HLSL 片段與 `commonCode` 結合，並轉換成完整的 WGSL Compute Shader 程式碼。
-   - `PipelineManager.ts` 根據 Pass 的 `IN` 和 `OUT` 資源，推導出 `GPUBindGroupLayout`。
-   - 使用生成的 WGSL Shader 和 Layout 創建 `GPUComputePipeline`。
+    - `PipelineManager.ts` 遍歷 IR 中的 `passes` 列表。
+    - 對於每個 Pass，`WGSLCodeGenerator.ts` 將其 HLSL 片段與 `commonCode` 結合，並轉換成完整的 WGSL Compute Shader 程式碼。
+    - `PipelineManager.ts` 根據 Pass 的 `IN` 和 `OUT` 資源，推導出 `GPUBindGroupLayout`。
+    - 使用生成的 WGSL Shader 和 Layout 創建 `GPUComputePipeline`。
 
 4. **執行與渲染**:
 
-   - 當外部調用 `dispatchPass(index)` 時：
-   - `PipelineManager.ts` 根據 Pass 所需的資源，從 `ResourceManager` 獲取對應的 GPU 物件，並創建 `GPUBindGroup`。
-   - `WGFXRuntime` 發出 `setPipeline`, `setBindGroup`, `dispatchWorkgroups` 等 GPU 命令。
-   - GPU 執行 Compute Shader，將運算結果寫入 `OUT` 指定的紋理。
+    - 當外部調用 `dispatchPass(index)` 時：
+    - `PipelineManager.ts` 根據 Pass 所需的資源，從 `ResourceManager` 獲取對應的 GPU 物件，並創建 `GPUBindGroup`。
+    - `WGFXRuntime` 發出 `setPipeline`, `setBindGroup`, `dispatchWorkgroups` 等 GPU 命令。
+    - GPU 執行 Compute Shader，將運算結果寫入 `OUT` 指定的紋理。
 
 5. **動態更新**:
-   - 當外部調用 `updateUniform(name, value)` 時：
-   - `UniformBinder.ts` 將新值寫入對應的 `GPUBuffer` 中，實現參數的動態更新。
+    - 當外部調用 `updateUniform(name, value)` 時：
+    - `UniformBinder.ts` 將新值寫入對應的 `GPUBuffer` 中，實現參數的動態更新。
 
 ## 4. HLSL/Magpie 至 WGSL/WebGPU 轉換指南
 
