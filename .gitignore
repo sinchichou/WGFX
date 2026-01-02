@@ -3,3 +3,5 @@
 
 # Dependencies
 node_modules/
+*.zip
+dist/*
