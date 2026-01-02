@@ -22,6 +22,7 @@ WGFX/
 ├─ README.md                 # 專案說明、使用指南
 ├─ src/
 │   ├─ index.ts              # 專案對外的主要接口 (API Entry Point)
+│   ├─ WGFX.ts               # 高階 API 類別
 │   │
 │   ├─ runtime/              # Runtime 核心邏輯
 │   │   ├─ WGFXRuntime.ts    # Runtime 核心流程控制器
@@ -32,18 +33,14 @@ WGFX/
 │   │   ├─ WGSLCodeGenerator.ts # 從中間表示 (IR) 生成 WGSL Shader Code
 │   │   └─ UniformBinder.ts    # 提供更新 Uniform Buffer 的接口
 │   │
-│   ├─ cli/                  # 命令列工具相關 (待實作)
+│   ├─ types/                # TypeScript 類型定義
+│   │   └─ shader.ts         # Shader 相關介面
 │   │
-│   └─ types/                # TypeScript 類型定義
-│       ├─ index.ts
-│       └─ shader.ts
+│   └─ utils/                # 共用工具函式
+│       └─ Logger.ts         # 統一日誌與偵錯模式控制
 │
 ├─ test/                     # 測試檔案
-│   └─ test_runtime.js       # Runtime API 測試範例
-│
 └─ examples/                 # 範例
-    ├─ Anime4K_Restore_Soft_UL.wgsl # 範例特效檔案
-    └─ test.wgsl             # 測試用特效檔案
 ```
 
 ### 1.1. 核心模組詳解
@@ -208,7 +205,7 @@ struct SceneInfo {
     inputSize: vec2<u32>, // 輸入來源的寬高 (e.g. 1920, 1080)
     inputPt: vec2<f32>,   // 像素大小倒數 (1.0/width, 1.0/height)
 }
-@group(0) @binding(2) var<uniform> scene: SceneInfo;
+@group(0) @binding(4) var<uniform> scene: SceneInfo;
 ```
 
 - **使用方式**: 直接在程式碼中存取 `scene.inputSize` 或 `scene.inputPt`。
@@ -279,14 +276,12 @@ WebGPU 使用 Bind Group 模型，取代了 HLSL 的 `register(t0, u0, s0)`。
   `@group(N) @binding(M)` 索引，並在生成 WGSL 時寫入。
 - **範例綁定**:
 
-| 資源            | WGSL 綁定                 |
-| :-------------- | :------------------------ |
-| `sam` (Sampler) | `@group(0) @binding(0)`   |
-| `uniforms`      | `@group(0) @binding(1)`   |
-| `scene`         | `@group(0) @binding(2)`   |
-| `INPUT`         | `@group(0) @binding(3)`   |
-| `OUTPUT`        | `@group(0) @binding(4)`   |
-| `TexN`          | `@group(0) @binding(N+4)` |
+| 資源            | WGSL 綁定                |
+| :-------------- | :----------------------- |
+| `sam` (Sampler) | `@group(0) @binding(0)`  |
+| `uniforms`      | `@group(0) @binding(1)`  |
+| `scene`         | `@group(0) @binding(4)`  |
+| `TexN`          | `@group(0) @binding(6+)` |
 
 ### 4.5. 基礎型態與函式映射
 
