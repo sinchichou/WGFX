@@ -185,7 +185,7 @@ export class PipelineManager {
         const dx = Math.ceil(outTex.width / blockW);
         const dy = Math.ceil(outTex.height / blockH);
         
-        console.log(`Dispatch Pass ${passInfo.index}: outTex=${outTex.width}x${outTex.height}, block=${blockW}x${blockH}, dispatch=${dx}x${dy}`);
+        // console.log(`Dispatch Pass ${passInfo.index}: outTex=${outTex.width}x${outTex.height}, block=${blockW}x${blockH}, dispatch=${dx}x${dy}`);
 
         passEncoder.dispatchWorkgroups(dx, dy, 1);
         passEncoder.end();
