@@ -50,9 +50,15 @@ export class WGSLCodeGenerator {
         }
 
         // 3. Generate SceneInfo struct (Resolution data) / 產生場景資訊結構體（解析度數據）
-        const sceneInfoCode = `struct SceneInfo {
-        inputSize: vec2<u32>,
-        inputPt: vec2<f32>,
+        const sceneInfoCode = `alias vec2<u32> uint2;
+        alias vec2<f32> MF2;
+
+        struct SceneInfo {
+            inputSize: uint2,
+            inputPt: MF2,
+            outputSize: uint2,
+            outputPt: MF2,
+            scale: MF2,
         }
         @group(0) @binding(4) var<uniform> scene: SceneInfo;\n\n`;
 

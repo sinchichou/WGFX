@@ -1,6 +1,6 @@
 import { WGFXShaderInfo, ParameterInfo } from './types/shader';
 import { WGFXRuntime } from './runtime/WGFXRuntime';
-import {Logger} from './utils/Logger';
+import {Logger, LogLevel} from './utils/Logger';
 
 /**
  * Options for creating a WGFX instance.
@@ -105,6 +105,18 @@ export class WGFX {
      */
     public static setDebug(enabled: boolean): void {
         Logger.setDebug(enabled);
+    }
+
+    /**
+     * Set the current log level globally.
+     * ---
+     * 全域設定目前日誌層級。
+     *
+     * @group Configuration
+     * @param level - The target {@link LogLevel} / 目標日誌層級
+     */
+    public static setLevel(level: LogLevel): void {
+        Logger.setLevel(level);
     }
 
     /**
@@ -248,10 +260,14 @@ export class WGFX {
      *
      * @group Rendering
      * @param inputSource - The image/video source to process / 要處理的影像來源
+     * @param options - Optional parameters including target output dimensions / 選用參數，包含目標輸出尺寸
      * @returns A promise that resolves to the output {@link GPUTexture}
      * @throws {Error} 當輸入來源維度與初始化不符時拋出錯誤
      */
-    public async process(inputSource: ImageBitmap | VideoFrame | HTMLVideoElement | HTMLCanvasElement): Promise<GPUTexture> {
+    public async process(
+        inputSource: ImageBitmap | VideoFrame | HTMLVideoElement | HTMLCanvasElement,
+        options: { outWidth?: number; outHeight?: number } = {}
+    ): Promise<GPUTexture> {
         if (!this.initialized) {
             const error = 'Instance not initialized';
             Logger.error(error);
@@ -285,7 +301,7 @@ export class WGFX {
         }
 
         try {
-            this.runtime.resourceManager.updateTextureFromImage('INPUT', inputSource);
+            this.runtime.resourceManager.updateTextureFromImage('INPUT', inputSource, options.outWidth, options.outHeight);
 
             const commandEncoder = this.runtime.device.createCommandEncoder({
                 label: 'WGFX Frame Processing'

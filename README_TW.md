@@ -207,8 +207,11 @@ float3 grayscale(float3 color) {
 
 ```wgsl
 struct SceneInfo {
-    inputSize: vec2<u32>, // 輸入來源的寬高 (e.g. 1920, 1080)
-    inputPt: vec2<f32>,   // 像素大小倒數 (1.0/width, 1.0/height)
+    inputSize: uint2,  // 輸入來源的寬高 (e.g. 1920, 1080)
+    inputPt: MF2,      // 輸入像素大小倒數 (1.0/width, 1.0/height)
+    outputSize: uint2, // 輸出目標的寬高
+    outputPt: MF2,     // 輸出像素大小倒數
+    scale: MF2,        // 縮放比例 (outputSize / inputSize)
 }
 @group(0) @binding(4) var<uniform> scene: SceneInfo;
 ```

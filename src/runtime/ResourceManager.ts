@@ -285,7 +285,7 @@ export class ResourceManager {
      * @param name - Target texture name (usually 'INPUT') / 目標紋理名稱
      * @param source - Source visual element / 來源影像元素
      */
-    public updateTextureFromImage(name: string, source: ImageBitmap | HTMLVideoElement | HTMLCanvasElement | VideoFrame | OffscreenCanvas): void {
+    public updateTextureFromImage(name: string, source: ImageBitmap | HTMLVideoElement | HTMLCanvasElement | VideoFrame | OffscreenCanvas, outWidth?: number, outHeight?: number): void {
         const texture = this.textures.get(name);
         if (!texture) {
             Logger.warn(`Texture ${name} not found`);
@@ -303,7 +303,18 @@ export class ResourceManager {
         if (name === 'INPUT' && (source instanceof HTMLVideoElement || source instanceof ImageBitmap || source instanceof VideoFrame)) {
             const width = (source instanceof VideoFrame) ? source.displayWidth : source.width;
             const height = (source instanceof VideoFrame) ? source.displayHeight : source.height;
-            this.updateSceneBuffer(width, height);
+
+            // Use provided output dimensions or fallback to OUTPUT texture dimensions / 使用提供的輸出維度或獲取輸出紋理維度
+            let outW = outWidth;
+            let outH = outHeight;
+
+            if (outW === undefined || outH === undefined) {
+                const output = this.textures.get('OUTPUT');
+                outW = output ? output.width : width;
+                outH = output ? output.height : height;
+            }
+
+            this.updateSceneBuffer(width, height, outW, outH);
         }
     }
 
@@ -322,7 +333,7 @@ export class ResourceManager {
     public createSceneBuffer(): void {
         if (this.sceneBuffer) return;
         this.sceneBuffer = this.device.createBuffer({
-            size: 16, // 4 * float32
+            size: 40, // Expanded for SceneInfo struct
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             label: 'SceneInfo'
         });
@@ -335,20 +346,38 @@ export class ResourceManager {
      *
      * @group Update
      */
-    public updateSceneBuffer(width: number, height: number): void {
+    public updateSceneBuffer(width: number, height: number, outWidth: number = 0, outHeight: number = 0): void {
         if (!this.sceneBuffer || width === 0 || height === 0) return;
 
-        const data = new ArrayBuffer(16);
+        if (outWidth === 0) outWidth = width;
+        if (outHeight === 0) outHeight = height;
+
+        const data = new ArrayBuffer(40);
         const u32 = new Uint32Array(data);
         const f32 = new Float32Array(data);
 
-        u32[0] = width;          // width
-        u32[1] = height;         // height
-        f32[2] = 1.0 / width;    // 1.0 / width
-        f32[3] = 1.0 / height;   // 1.0 / height
+        // inputSize: uint2 (8 bytes)
+        u32[0] = width;
+        u32[1] = height;
+
+        // inputPt: MF2 (8 bytes)
+        f32[2] = 1.0 / width;
+        f32[3] = 1.0 / height;
+
+        // outputSize: uint2 (8 bytes)
+        u32[4] = outWidth;
+        u32[5] = outHeight;
+
+        // outputPt: MF2 (8 bytes)
+        f32[6] = 1.0 / outWidth;
+        f32[7] = 1.0 / outHeight;
+
+        // scale: MF2 (8 bytes)
+        f32[8] = outWidth / width;
+        f32[9] = outHeight / height;
 
         this.device.queue.writeBuffer(this.sceneBuffer, 0, data);
-        Logger.debug(`Updated scene buffer: ${width}x${height}`);
+        Logger.debug(`Updated scene buffer: IN(${width}x${height}), OUT(${outWidth}x${outHeight}), SCALE(${f32[8].toFixed(2)}, ${f32[9].toFixed(2)})`);
     }
 
     /** @group Query */
