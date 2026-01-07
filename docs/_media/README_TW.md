@@ -93,7 +93,7 @@ WGFX/
 - **`WGSLCodeGenerator.ts` (WGSL 程式碼生成)**
 
     - **職責**: 將 `ShaderParser.js` 產生的 IR 轉換為合法的 WGSL Shader 程式碼。
-    - **功能**: 插入 `Common` 區塊、展開宏、處理函數重載、根據配置決定參數是 `inline` 還是 `uniform buffer`。
+  - **功能**: 插入 `Common` 區塊、展開宏、處理函數重載、根據配置決定參數是 `inline` 還是 `uniform buffer`。
 
 - **`UniformBinder.ts` (Uniform 更新)**
 
@@ -207,8 +207,11 @@ float3 grayscale(float3 color) {
 
 ```wgsl
 struct SceneInfo {
-    inputSize: vec2<u32>, // 輸入來源的寬高 (e.g. 1920, 1080)
-    inputPt: vec2<f32>,   // 像素大小倒數 (1.0/width, 1.0/height)
+    inputSize: uint2,  // 輸入來源的寬高 (e.g. 1920, 1080)
+    inputPt: MF2,      // 輸入像素大小倒數 (1.0/width, 1.0/height)
+    outputSize: uint2, // 輸出目標的寬高
+    outputPt: MF2,     // 輸出像素大小倒數
+    scale: MF2,        // 縮放比例 (outputSize / inputSize)
 }
 @group(0) @binding(4) var<uniform> scene: SceneInfo;
 ```

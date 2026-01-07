@@ -1,13 +1,13 @@
-[**WGFX API Documentation v1.0.0**](../README.md)
+[**WGFX API Documentation v1.0.0**](../../../README.md)
 
 ***
 
-[WGFX API Documentation](../globals.md) / ResourceManager
+[WGFX API Documentation](../../../modules.md) / [runtime/ResourceManager](../README.md) / ResourceManager
 
 # Class: ResourceManager
 
 Defined
-in: [runtime/ResourceManager.ts:13](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L13)
+in: [runtime/ResourceManager.ts:13](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L13)
 
 Manages WebGPU resources including textures, views, samplers, and buffers.
 ---
@@ -20,7 +20,7 @@ Manages WebGPU resources including textures, views, samplers, and buffers.
 > **new ResourceManager**(`device`): `ResourceManager`
 
 Defined
-in: [runtime/ResourceManager.ts:36](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L36)
+in: [runtime/ResourceManager.ts:36](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L36)
 
 Initialize the resource manager.
 ---
@@ -45,7 +45,7 @@ The active WebGPU device / 有效的 WebGPU 裝置
 > **device**: `GPUDevice`
 
 Defined
-in: [runtime/ResourceManager.ts:15](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L15)
+in: [runtime/ResourceManager.ts:15](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L15)
 
 #### Zh
 
@@ -58,7 +58,7 @@ WebGPU 裝置實例
 > **samplers**: `Map`\<`string`, `GPUSampler`\>
 
 Defined
-in: [runtime/ResourceManager.ts:21](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L21)
+in: [runtime/ResourceManager.ts:21](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L21)
 
 #### Zh
 
@@ -71,7 +71,7 @@ in: [runtime/ResourceManager.ts:21](https://github.com/sinchichou/WGFX/blob/d5d5
 > **sceneBuffer**: `GPUBuffer` \| `null` = `null`
 
 Defined
-in: [runtime/ResourceManager.ts:27](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L27)
+in: [runtime/ResourceManager.ts:27](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L27)
 
 #### Zh
 
@@ -81,10 +81,10 @@ in: [runtime/ResourceManager.ts:27](https://github.com/sinchichou/WGFX/blob/d5d5
 
 ### textures
 
-> **textures**: `Map`\<`string`, `GPUTexture`\>
+> **textures**: `Map`\<`string`, [`GPUTexture`](https://www.w3.org/TR/webgpu/#gpu-texture)\>
 
 Defined
-in: [runtime/ResourceManager.ts:17](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L17)
+in: [runtime/ResourceManager.ts:17](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L17)
 
 #### Zh
 
@@ -97,7 +97,7 @@ in: [runtime/ResourceManager.ts:17](https://github.com/sinchichou/WGFX/blob/d5d5
 > **uniformBuffer**: `GPUBuffer` \| `null`
 
 Defined
-in: [runtime/ResourceManager.ts:25](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L25)
+in: [runtime/ResourceManager.ts:25](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L25)
 
 #### Zh
 
@@ -110,7 +110,7 @@ in: [runtime/ResourceManager.ts:25](https://github.com/sinchichou/WGFX/blob/d5d5
 > **uniforms**: `Map`\<`string`, \{ `buffer`: `GPUBuffer`; `offset`: `number`; `size`: `number`; \}\>
 
 Defined
-in: [runtime/ResourceManager.ts:23](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L23)
+in: [runtime/ResourceManager.ts:23](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L23)
 
 #### Zh
 
@@ -120,10 +120,11 @@ Uniform 映射表：名稱 -> 緩衝區區段資訊
 
 ### views
 
-> **views**: `Map`\<`string`, \{ `sampled`: `GPUTextureView`; `storage`: `GPUTextureView`; \}\>
+> **views**: `Map`\<`string`, \{ `sampled`: [`GPUTextureView`](https://www.w3.org/TR/webgpu/#gputextureview);
+`storage`: [`GPUTextureView`](https://www.w3.org/TR/webgpu/#gputextureview); \}\>
 
 Defined
-in: [runtime/ResourceManager.ts:19](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L19)
+in: [runtime/ResourceManager.ts:19](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L19)
 
 #### Zh
 
@@ -136,7 +137,7 @@ in: [runtime/ResourceManager.ts:19](https://github.com/sinchichou/WGFX/blob/d5d5
 > **dispose**(): `void`
 
 Defined
-in: [runtime/ResourceManager.ts:366](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L366)
+in: [runtime/ResourceManager.ts:395](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L395)
 
 Dispose all textures and buffers to prevent memory leaks.
 ---
@@ -153,7 +154,7 @@ Dispose all textures and buffers to prevent memory leaks.
 > **initialize**(`shaderInfo`, `externalResources`): `void`
 
 Defined
-in: [runtime/ResourceManager.ts:57](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L57)
+in: [runtime/ResourceManager.ts:57](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L57)
 
 Initialize resources based on shader info and external definitions.
 ---
@@ -163,7 +164,7 @@ Initialize resources based on shader info and external definitions.
 
 ##### shaderInfo
 
-`WGFXShaderInfo`
+[`WGFXShaderInfo`](../../../types/shader/interfaces/WGFXShaderInfo.md)
 
 Parsed shader metadata / 解析後的著色器資訊
 
@@ -184,7 +185,7 @@ External resource definitions / 外部資源定義
 > **createSampler**(`name`, `descriptor`): `GPUSampler`
 
 Defined
-in: [runtime/ResourceManager.ts:250](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L250)
+in: [runtime/ResourceManager.ts:250](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L250)
 
 Create and register a sampler.
 ---
@@ -211,7 +212,7 @@ Create and register a sampler.
 > **createSceneBuffer**(): `void`
 
 Defined
-in: [runtime/ResourceManager.ts:322](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L322)
+in: [runtime/ResourceManager.ts:333](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L333)
 
 Create the scene info uniform buffer (Width, Height, InvWidth, InvHeight).
 ---
@@ -225,10 +226,10 @@ Create the scene info uniform buffer (Width, Height, InvWidth, InvHeight).
 
 ### createTexture()
 
-> **createTexture**(`name`, `descriptor`): `GPUTexture`
+> **createTexture**(`name`, `descriptor`): [`GPUTexture`](https://www.w3.org/TR/webgpu/#gpu-texture)
 
 Defined
-in: [runtime/ResourceManager.ts:195](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L195)
+in: [runtime/ResourceManager.ts:195](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L195)
 
 Create or update a texture and its dual views (Sampled & Storage).
 ---
@@ -250,9 +251,9 @@ WebGPU texture descriptor / 紋理描述符
 
 #### Returns
 
-`GPUTexture`
+[`GPUTexture`](https://www.w3.org/TR/webgpu/#gpu-texture)
 
-The newly created GPUTexture
+The newly created [GPUTexture](https://www.w3.org/TR/webgpu/#gpu-texture)
 
 ## Query
 
@@ -261,7 +262,7 @@ The newly created GPUTexture
 > **getSampler**(`name`): `GPUSampler` \| `undefined`
 
 Defined
-in: [runtime/ResourceManager.ts:264](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L264)
+in: [runtime/ResourceManager.ts:264](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L264)
 
 Get a GPUSampler object by name.
 ---
@@ -284,7 +285,7 @@ Get a GPUSampler object by name.
 > **getSceneBuffer**(): `GPUBuffer` \| `null`
 
 Defined
-in: [runtime/ResourceManager.ts:355](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L355)
+in: [runtime/ResourceManager.ts:384](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L384)
 
 #### Returns
 
@@ -294,10 +295,10 @@ in: [runtime/ResourceManager.ts:355](https://github.com/sinchichou/WGFX/blob/d5d
 
 ### getTexture()
 
-> **getTexture**(`name`): `GPUTexture` \| `undefined`
+> **getTexture**(`name`): [`GPUTexture`](https://www.w3.org/TR/webgpu/#gpu-texture) \| `undefined`
 
 Defined
-in: [runtime/ResourceManager.ts:239](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L239)
+in: [runtime/ResourceManager.ts:239](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L239)
 
 Get a GPUTexture object by name.
 ---
@@ -313,16 +314,16 @@ Texture name / 紋理名稱
 
 #### Returns
 
-`GPUTexture` \| `undefined`
+[`GPUTexture`](https://www.w3.org/TR/webgpu/#gpu-texture) \| `undefined`
 
 ***
 
 ### getTextureView()
 
-> **getTextureView**(`name`, `type`): `GPUTextureView`
+> **getTextureView**(`name`, `type`): [`GPUTextureView`](https://www.w3.org/TR/webgpu/#gputextureview)
 
 Defined
-in: [runtime/ResourceManager.ts:223](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L223)
+in: [runtime/ResourceManager.ts:223](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L223)
 
 Get a specific view of a texture by name and type.
 ---
@@ -344,9 +345,9 @@ View type: 'sampled' (for texture()) or 'storage' (for imageStore())
 
 #### Returns
 
-`GPUTextureView`
+[`GPUTextureView`](https://www.w3.org/TR/webgpu/#gputextureview)
 
-The requested GPUTextureView
+The requested [GPUTextureView](https://www.w3.org/TR/webgpu/#gputextureview)
 
 ***
 
@@ -355,7 +356,7 @@ The requested GPUTextureView
 > **getUniform**(`name`): \{ `buffer`: `GPUBuffer`; `offset`: `number`; `size`: `number`; \} \| `undefined`
 
 Defined
-in: [runtime/ResourceManager.ts:275](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L275)
+in: [runtime/ResourceManager.ts:275](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L275)
 
 Get uniform buffer segment info for a specific parameter.
 ---
@@ -378,7 +379,7 @@ Get uniform buffer segment info for a specific parameter.
 > **getUniformBuffer**(): `GPUBuffer` \| `null`
 
 Defined
-in: [runtime/ResourceManager.ts:311](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L311)
+in: [runtime/ResourceManager.ts:322](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L322)
 
 #### Returns
 
@@ -388,10 +389,10 @@ in: [runtime/ResourceManager.ts:311](https://github.com/sinchichou/WGFX/blob/d5d
 
 ### updateSceneBuffer()
 
-> **updateSceneBuffer**(`width`, `height`): `void`
+> **updateSceneBuffer**(`width`, `height`, `outWidth`, `outHeight`): `void`
 
 Defined
-in: [runtime/ResourceManager.ts:338](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L338)
+in: [runtime/ResourceManager.ts:349](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L349)
 
 Update scene buffer with current source dimensions.
 ---
@@ -407,6 +408,14 @@ Update scene buffer with current source dimensions.
 
 `number`
 
+##### outWidth
+
+`number` = `0`
+
+##### outHeight
+
+`number` = `0`
+
 #### Returns
 
 `void`
@@ -415,10 +424,10 @@ Update scene buffer with current source dimensions.
 
 ### updateTextureFromImage()
 
-> **updateTextureFromImage**(`name`, `source`): `void`
+> **updateTextureFromImage**(`name`, `source`, `outWidth?`, `outHeight?`): `void`
 
 Defined
-in: [runtime/ResourceManager.ts:288](https://github.com/sinchichou/WGFX/blob/d5d57c73d3c7e8023844a7ca17c4e832db074ccb/src/runtime/ResourceManager.ts#L288)
+in: [runtime/ResourceManager.ts:288](https://github.com/sinchichou/WGFX/blob/ad83ced4c672cff4a7fff2e5c89ce9c666b81e27/src/runtime/ResourceManager.ts#L288)
 
 Update a texture's content from an external image source.
 ---
@@ -437,6 +446,14 @@ Target texture name (usually 'INPUT') / 目標紋理名稱
 Source visual element / 來源影像元素
 
 `ImageBitmap` | `HTMLVideoElement` | `HTMLCanvasElement` | `VideoFrame` | `OffscreenCanvas`
+
+##### outWidth?
+
+`number`
+
+##### outHeight?
+
+`number`
 
 #### Returns
 

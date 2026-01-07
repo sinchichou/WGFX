@@ -10,7 +10,7 @@ import {Logger} from '@/utils/Logger';
  * @internal
  * @category Interfaces
  */
-interface StoredPipeline {
+export interface StoredPipeline {
     /** The WebGPU compute pipeline / WebGPU 計算管線 */
     computePipeline: GPUComputePipeline;
     /** The bind group layout / 綁定組佈局 */

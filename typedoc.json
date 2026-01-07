@@ -1,7 +1,12 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": [
-    "src/index.ts"
+    "src/WGFX.ts",
+    "src/runtime/PipelineManager.ts",
+    "src/runtime/ResourceManager.ts",
+    "src/runtime/UniformBinder.ts",
+    "src/types/shader.ts",
+    "src/utils/Logger.ts"
   ],
   "out": "docs",
   "name": "WGFX API Documentation",
@@ -17,6 +22,26 @@
     "hlsl",
     "json"
   ],
+  "blockTags": [
+    "@param",
+    "@returns",
+    "@throws",
+    "@see",
+    "@description",
+    "@example",
+    "@zh",
+    "@compute",
+    "@group",
+    "@category",
+    "@defaultValue",
+    "@module"
+  ],
+  "externalSymbolLinkMappings": {
+    "@webgpu/types": {
+      "GPUTexture": "https://www.w3.org/TR/webgpu/#gpu-texture",
+      "GPUTextureView": "https://www.w3.org/TR/webgpu/#gputextureview"
+    }
+  },
   "excludeInternal": true,
   "searchInComments": true
 }
