@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html class="default" data-base="../" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="IE=edge" http-equiv="x-ua-compatible"/>
+    <title>PipelineManager | WGFX API Documentation - v1.0.0</title>
+    <meta content="Documentation for WGFX API Documentation" name="description"/>
+    <meta content="width=device-width, initial-scale=1" name="viewport"/>
+    <link href="../assets/style.css" rel="stylesheet"/>
+    <link href="../assets/highlight.css" rel="stylesheet"/>
+    <script defer src="../assets/main.js"></script>
+    <script async id="tsd-icons-script" src="../assets/icons.js"></script>
+    <script async id="tsd-search-script" src="../assets/search.js"></script>
+    <script async id="tsd-nav-script" src="../assets/navigation.js"></script>
+</head>
+<body>
+<script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";
+document.body.style.display = "none";
+setTimeout(() => window.app ? app.showPage() : document.body.style.removeProperty("display"), 500)</script>
+<header class="tsd-page-toolbar">
+    <div class="tsd-toolbar-contents container"><a class="title" href="../index.html">WGFX API Documentation -
+        v1.0.0</a>
+        <div id="tsd-toolbar-links"></div>
+        <button aria-label="Search" class="tsd-widget" id="tsd-search-trigger">
+            <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16">
+                <use href="../assets/icons.svg#icon-search"></use>
+            </svg>
+        </button>
+        <dialog aria-label="Search" id="tsd-search"><input aria-autocomplete="list" aria-controls="tsd-search-results"
+                                                           aria-expanded="true" autocapitalize="off"
+                                                           autocomplete="off" id="tsd-search-input" maxLength="100"
+                                                           placeholder="Search the docs" role="combobox"/>
+            <ul id="tsd-search-results" role="listbox"></ul>
+            <div aria-atomic="true" aria-live="polite" id="tsd-search-status">
+                <div>Preparing search index...</div>
+            </div>
+        </dialog>
+        <a aria-label="Menu" class="tsd-widget menu" data-toggle="menu" href="#" id="tsd-toolbar-menu-trigger">
+            <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16">
+                <use href="../assets/icons.svg#icon-menu"></use>
+            </svg>
+        </a></div>
+</header>
+<div class="container container-main">
+    <div class="col-content">
+        <div class="tsd-page-title">
+            <ul aria-label="Breadcrumb" class="tsd-breadcrumb">
+                <li><a href="../modules/runtime_PipelineManager.html">runtime/PipelineManager</a></li>
+                <li><a aria-current="page" href="">PipelineManager</a></li>
+            </ul>
+            <h1>Class PipelineManager</h1></div>
+        <section class="tsd-panel tsd-comment">
+            <div class="tsd-comment tsd-typography">
+                <h2 class="tsd-anchor-link" id="manages-the-creation-and-execution-of-compute-pipelines">Manages the
+                    creation and execution of compute pipelines.<a
+                            aria-label="Permalink" class="tsd-anchor-icon"
+                            href="#manages-the-creation-and-execution-of-compute-pipelines">
+                        <svg aria-hidden="true" viewBox="0 0 24 24">
+                            <use href="../assets/icons.svg#icon-anchor"></use>
+                        </svg>
+                    </a></h2>
+                <p>管理 WebGPU 計算管線的建立、編譯監控與執行分發。</p>
+            </div>
+        </section>
+        <aside class="tsd-sources">
+            <ul>
+                <li>Defined in <a
+                        href="https://github.com/sinchichou/WGFX/blob/613f1776aca7ad605eb6e5d83c98e5c80ffa997a/src/runtime/PipelineManager.ts#L31">runtime/PipelineManager.ts:31</a>
+                </li>
+            </ul>
+        </aside>
+        <section class="tsd-panel-group tsd-index-group">
+            <section class="tsd-panel tsd-index-panel">
+                <details class="tsd-index-content tsd-accordion" open>
+                    <summary class="tsd-accordion-summary tsd-index-summary">
+                        <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+                            <use href="../assets/icons.svg#icon-chevronDown"></use>
+                        </svg>
+                        <h5 class="tsd-index-heading uppercase">Index</h5></summary>
+                    <div class="tsd-accordion-details">
+                        <section class="tsd-index-section"><h3 class="tsd-index-heading">Constructors</h3>
+                            <div class="tsd-index-list"><a class="tsd-index-link" href="#constructor">
+                                <svg aria-label="Constructor" class="tsd-kind-icon" viewBox="0 0 24 24">
+                                    <use href="../assets/icons.svg#icon-512"></use>
+                                </svg>
+                                <span>constructor</span></a>
+                            </div>
+                        </section>
+                        <section class="tsd-index-section"><h3 class="tsd-index-heading">Properties</h3>
+                            <div class="tsd-index-list"><a class="tsd-index-link" href="#device">
+                                <svg aria-label="Property" class="tsd-kind-icon" viewBox="0 0 24 24">
+                                    <use href="../assets/icons.svg#icon-1024"></use>
+                                </svg>
+                                <span>device</span></a>
+                                <a class="tsd-index-link" href="#pipelines">
+                                    <svg aria-label="Property" class="tsd-kind-icon" viewBox="0 0 24 24">
+                                        <use href="../assets/icons.svg#icon-1024"></use>
+                                    </svg>
+                                    <span>pipelines</span></a>
+                                <a class="tsd-index-link" href="#resourcemanager">
+                                    <svg aria-label="Property" class="tsd-kind-icon" viewBox="0 0 24 24">
+                                        <use href="../assets/icons.svg#icon-1024"></use>
+                                    </svg>
+                                    <span>resource<wbr/>Manager</span></a>
+                            </div>
+                        </section>
+                        <section class="tsd-index-section"><h3 class="tsd-index-heading">Execution</h3>
+                            <div class="tsd-index-list"><a class="tsd-index-link" href="#dispatchpass">
+                                <svg aria-label="Method" class="tsd-kind-icon" viewBox="0 0 24 24">
+                                    <use href="../assets/icons.svg#icon-2048"></use>
+                                </svg>
+                                <span>dispatch<wbr/>Pass</span></a>
+                            </div>
+                        </section>
+                        <section class="tsd-index-section"><h3 class="tsd-index-heading">Lifecycle</h3>
+                            <div class="tsd-index-list"><a class="tsd-index-link" href="#dispose">
+                                <svg aria-label="Method" class="tsd-kind-icon" viewBox="0 0 24 24">
+                                    <use href="../assets/icons.svg#icon-2048"></use>
+                                </svg>
+                                <span>dispose</span></a>
+                            </div>
+                        </section>
+                        <section class="tsd-index-section"><h3 class="tsd-index-heading">Pipelines</h3>
+                            <div class="tsd-index-list"><a class="tsd-index-link" href="#createpipelines">
+                                <svg aria-label="Method" class="tsd-kind-icon" viewBox="0 0 24 24">
+                                    <use href="../assets/icons.svg#icon-2048"></use>
+                                </svg>
+                                <span>create<wbr/>Pipelines</span></a>
+                            </div>
+                        </section>
+                    </div>
+                </details>
+            </section>
+        </section>
+        <details class="tsd-panel-group tsd-member-group tsd-accordion" open>
+            <summary class="tsd-accordion-summary" data-key="section-Constructors">
+                <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+                    <use href="../assets/icons.svg#icon-chevronDown"></use>
+                </svg>
+                <h2>Constructors</h2></summary>
+            <section>
+                <section class="tsd-panel tsd-member">
+                    <h3 class="tsd-anchor-link" id="constructor"><span>constructor</span><a aria-label="Permalink"
+                                                                                            class="tsd-anchor-icon"
+                                                                                            href="#constructor">
+                        <svg aria-hidden="true" viewBox="0 0 24 24">
+                            <use href="../assets/icons.svg#icon-anchor"></use>
+                        </svg>
+                    </a></h3>
+                    <ul class="tsd-signatures">
+                        <li class="">
+                            <div class="tsd-signature tsd-anchor-link" id="constructorpipelinemanager"><span
+                                    class="tsd-signature-keyword">new</span> <span
+                                    class="tsd-kind-constructor-signature">PipelineManager</span><span
+                                    class="tsd-signature-symbol">(</span><br/>    <span class="tsd-kind-parameter">device</span><span
+                                    class="tsd-signature-symbol">:</span> <span
+                                    class="tsd-signature-type">GPUDevice</span><span
+                                    class="tsd-signature-symbol">,</span><br/>    <span class="tsd-kind-parameter">resourceManager</span><span
+                                    class="tsd-signature-symbol">:</span> <a
+                                    class="tsd-signature-type tsd-kind-class"
+                                    href="runtime_ResourceManager.ResourceManager.html">ResourceManager</a><span
+                                    class="tsd-signature-symbol">,</span><br/><span
+                                    class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a
+                                    class="tsd-signature-type tsd-kind-class" href="">PipelineManager</a><a
+                                    aria-label="Permalink" class="tsd-anchor-icon" href="#constructorpipelinemanager">
+                                <svg aria-hidden="true" viewBox="0 0 24 24">
+                                    <use href="../assets/icons.svg#icon-anchor"></use>
+                                </svg>
+                            </a></div>
+                            <div class="tsd-description">
+                                <div class="tsd-parameters"><h4 class="tsd-parameters-title">Parameters</h4>
+                                    <ul class="tsd-parameter-list">
+                                        <li><span><span class="tsd-kind-parameter">device</span>: <span
+                                                class="tsd-signature-type">GPUDevice</span></span></li>
+                                        <li><span><span class="tsd-kind-parameter">resourceManager</span>: <a
+                                                class="tsd-signature-type tsd-kind-class"
+                                                href="runtime_ResourceManager.ResourceManager.html">ResourceManager</a></span>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <h4 class="tsd-returns-title">Returns <a class="tsd-signature-type tsd-kind-class"
+                                                                         href="">PipelineManager</a>
+                                </h4>
+                                <aside class="tsd-sources">
+                                    <ul>
+                                        <li>Defined in <a
+                                                href="https://github.com/sinchichou/WGFX/blob/613f1776aca7ad605eb6e5d83c98e5c80ffa997a/src/runtime/PipelineManager.ts#L37">runtime/PipelineManager.ts:37</a>
+                                        </li>
+                                    </ul>
+                                </aside>
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+            </section>
+        </details>
+        <details class="tsd-panel-group tsd-member-group tsd-accordion" open>
+            <summary class="tsd-accordion-summary" data-key="section-Properties">
+                <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+                    <use href="../assets/icons.svg#icon-chevronDown"></use>
+                </svg>
+                <h2>Properties</h2></summary>
+            <section>
+                <section class="tsd-panel tsd-member">
+                    <h3 class="tsd-anchor-link" id="device"><span>device</span><a aria-label="Permalink" class="tsd-anchor-icon"
+                                                                                  href="#device">
+                        <svg aria-hidden="true" viewBox="0 0 24 24">
+                            <use href="../assets/icons.svg#icon-anchor"></use>
+                        </svg>
+                    </a></h3>
+                    <div class="tsd-signature"><span class="tsd-kind-property">device</span><span
+                            class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">GPUDevice</span>
+                    </div>
+                    <aside class="tsd-sources">
+                        <ul>
+                            <li>Defined in <a
+                                    href="https://github.com/sinchichou/WGFX/blob/613f1776aca7ad605eb6e5d83c98e5c80ffa997a/src/runtime/PipelineManager.ts#L32">runtime/PipelineManager.ts:32</a>
+                            </li>
+                        </ul>
+                    </aside>
+                </section>
+                <section class="tsd-panel tsd-member">
+                    <h3 class="tsd-anchor-link" id="pipelines"><span>pipelines</span><a aria-label="Permalink"
+                                                                                        class="tsd-anchor-icon"
+                                                                                        href="#pipelines">
+                        <svg aria-hidden="true" viewBox="0 0 24 24">
+                            <use href="../assets/icons.svg#icon-anchor"></use>
+                        </svg>
+                    </a></h3>
+                    <div class="tsd-signature"><span class="tsd-kind-property">pipelines</span><span
+                            class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Map</span><span
+                            class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">number</span><span
+                            class="tsd-signature-symbol">,</span> <span class="tsd-signature-type">StoredPipeline</span><span
+                            class="tsd-signature-symbol">&gt;</span></div>
+                    <div class="tsd-comment tsd-typography"><p>Map of pass index to pipeline / 通道索引與管線的映射</p>
+                    </div>
+                    <aside class="tsd-sources">
+                        <ul>
+                            <li>Defined in <a
+                                    href="https://github.com/sinchichou/WGFX/blob/613f1776aca7ad605eb6e5d83c98e5c80ffa997a/src/runtime/PipelineManager.ts#L35">runtime/PipelineManager.ts:35</a>
+                            </li>
+                        </ul>
+                    </aside>
+                </section>
+                <section class="tsd-panel tsd-member">
+                    <h3 class="tsd-anchor-link" id="resourcemanager"><span>resource<wbr/>Manager</span><a
+                            aria-label="Permalink" class="tsd-anchor-icon" href="#resourcemanager">
+                        <svg aria-hidden="true" viewBox="0 0 24 24">
+                            <use href="../assets/icons.svg#icon-anchor"></use>
+                        </svg>
+                    </a></h3>
+                    <div class="tsd-signature"><span class="tsd-kind-property">resourceManager</span><span
+                            class="tsd-signature-symbol">:</span> <a class="tsd-signature-type tsd-kind-class"
+                                                                     href="runtime_ResourceManager.ResourceManager.html">ResourceManager</a>
+                    </div>
+                    <aside class="tsd-sources">
+                        <ul>
+                            <li>Defined in <a
+                                    href="https://github.com/sinchichou/WGFX/blob/613f1776aca7ad605eb6e5d83c98e5c80ffa997a/src/runtime/PipelineManager.ts#L33">runtime/PipelineManager.ts:33</a>
+                            </li>
+                        </ul>
+                    </aside>
+                </section>
+            </section>
+        </details>
+        <details class="tsd-panel-group tsd-member-group tsd-accordion" open>
+            <summary class="tsd-accordion-summary" data-key="section-Execution">
+                <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+                    <use href="../assets/icons.svg#icon-chevronDown"></use>
+                </svg>
+                <h2>Execution</h2></summary>
+            <section>
+                <section class="tsd-panel tsd-member">
+                    <h3 class="tsd-anchor-link" id="dispatchpass"><span>dispatch<wbr/>Pass</span><a aria-label="Permalink"
+                                                                                                    class="tsd-anchor-icon"
+                                                                                                    href="#dispatchpass">
+                        <svg aria-hidden="true" viewBox="0 0 24 24">
+                            <use href="../assets/icons.svg#icon-anchor"></use>
+                        </svg>
+                    </a></h3>
+                    <ul class="tsd-signatures">
+                        <li class="">
+                            <div class="tsd-signature tsd-anchor-link" id="dispatchpass-1"><span
+                                    class="tsd-kind-call-signature">dispatchPass</span><span
+                                    class="tsd-signature-symbol">(</span><span
+                                    class="tsd-kind-parameter">passInfo</span><span
+                                    class="tsd-signature-symbol">:</span> <span
+                                    class="tsd-signature-type">any</span><span class="tsd-signature-symbol">,</span>
+                                <span class="tsd-kind-parameter">commandEncoder</span><span
+                                        class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">GPUCommandEncoder</span><span
+                                        class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span>
+                                <span class="tsd-signature-type">void</span><a aria-label="Permalink"
+                                                                               class="tsd-anchor-icon"
+                                                                               href="#dispatchpass-1">
+                                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                                        <use href="../assets/icons.svg#icon-anchor"></use>
+                                    </svg>
+                                </a></div>
+                            <div class="tsd-description">
+                                <div class="tsd-comment tsd-typography">
+                                    <h2 class="tsd-anchor-link" id="dispatch-a-compute-pass">Dispatch a compute pass.<a
+                                            aria-label="Permalink" class="tsd-anchor-icon"
+                                            href="#dispatch-a-compute-pass">
+                                        <svg aria-hidden="true" viewBox="0 0 24 24">
+                                            <use href="../assets/icons.svg#icon-anchor"></use>
+                                        </svg>
+                                    </a></h2>
+                                    <p>執行計算通道。</p>
+                                </div>
+                                <div class="tsd-parameters"><h4 class="tsd-parameters-title">Parameters</h4>
+                                    <ul class="tsd-parameter-list">
+                                        <li><span><span class="tsd-kind-parameter">passInfo</span>: <span
+                                                class="tsd-signature-type">any</span></span>
+                                            <div class="tsd-comment tsd-typography"><p>Pass metadata / 通道元數據</p>
+                                            </div>
+                                        </li>
+                                        <li><span><span class="tsd-kind-parameter">commandEncoder</span>: <span
+                                                class="tsd-signature-type">GPUCommandEncoder</span></span>
+                                            <div class="tsd-comment tsd-typography"><p>GPU command encoder /
+                                                指令編碼器</p>
+                                            </div>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+                                <aside class="tsd-sources">
+                                    <ul>
+                                        <li>Defined in <a
+                                                href="https://github.com/sinchichou/WGFX/blob/613f1776aca7ad605eb6e5d83c98e5c80ffa997a/src/runtime/PipelineManager.ts#L159">runtime/PipelineManager.ts:159</a>
+                                        </li>
+                                    </ul>
+                                </aside>
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+            </section>
+        </details>
+        <details class="tsd-panel-group tsd-member-group tsd-accordion" open>
+            <summary class="tsd-accordion-summary" data-key="section-Lifecycle">
+                <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+                    <use href="../assets/icons.svg#icon-chevronDown"></use>
+                </svg>
+                <h2>Lifecycle</h2></summary>
+            <section>
+                <section class="tsd-panel tsd-member">
+                    <h3 class="tsd-anchor-link" id="dispose"><span>dispose</span><a aria-label="Permalink"
+                                                                                    class="tsd-anchor-icon"
+                                                                                    href="#dispose">
+                        <svg aria-hidden="true" viewBox="0 0 24 24">
+                            <use href="../assets/icons.svg#icon-anchor"></use>
+                        </svg>
+                    </a></h3>
+                    <ul class="tsd-signatures">
+                        <li class="">
+                            <div class="tsd-signature tsd-anchor-link" id="dispose-1"><span
+                                    class="tsd-kind-call-signature">dispose</span><span
+                                    class="tsd-signature-symbol">()</span><span class="tsd-signature-symbol">:</span>
+                                <span class="tsd-signature-type">void</span><a aria-label="Permalink" class="tsd-anchor-icon"
+                                                                               href="#dispose-1">
+                                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                                        <use href="../assets/icons.svg#icon-anchor"></use>
+                                    </svg>
+                                </a></div>
+                            <div class="tsd-description">
+                                <div class="tsd-comment tsd-typography">
+                                    <h2 class="tsd-anchor-link" id="clear-all-cached-pipelines">Clear all cached
+                                        pipelines.<a aria-label="Permalink" class="tsd-anchor-icon"
+                                                     href="#clear-all-cached-pipelines">
+                                            <svg aria-hidden="true" viewBox="0 0 24 24">
+                                                <use href="../assets/icons.svg#icon-anchor"></use>
+                                            </svg>
+                                        </a></h2>
+                                    <p>清除所有管線緩存。</p>
+                                </div>
+                                <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4>
+                                <aside class="tsd-sources">
+                                    <ul>
+                                        <li>Defined in <a
+                                                href="https://github.com/sinchichou/WGFX/blob/613f1776aca7ad605eb6e5d83c98e5c80ffa997a/src/runtime/PipelineManager.ts#L236">runtime/PipelineManager.ts:236</a>
+                                        </li>
+                                    </ul>
+                                </aside>
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+            </section>
+        </details>
+        <details class="tsd-panel-group tsd-member-group tsd-accordion" open>
+            <summary class="tsd-accordion-summary" data-key="section-Pipelines">
+                <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+                    <use href="../assets/icons.svg#icon-chevronDown"></use>
+                </svg>
+                <h2>Pipelines</h2></summary>
+            <section>
+                <section class="tsd-panel tsd-member">
+                    <h3 class="tsd-anchor-link" id="createpipelines"><span>create<wbr/>Pipelines</span><a
+                            aria-label="Permalink" class="tsd-anchor-icon" href="#createpipelines">
+                        <svg aria-hidden="true" viewBox="0 0 24 24">
+                            <use href="../assets/icons.svg#icon-anchor"></use>
+                        </svg>
+                    </a></h3>
+                    <ul class="tsd-signatures">
+                        <li class="">
+                            <div class="tsd-signature tsd-anchor-link" id="createpipelines-1"><span
+                                    class="tsd-kind-call-signature">createPipelines</span><span
+                                    class="tsd-signature-symbol">(</span><span
+                                    class="tsd-kind-parameter">shaderInfo</span><span
+                                    class="tsd-signature-symbol">:</span> <span
+                                    class="tsd-signature-type">any</span><span class="tsd-signature-symbol">,</span>
+                                <span class="tsd-kind-parameter">generatedModules</span><span
+                                        class="tsd-signature-symbol">:</span> <span
+                                        class="tsd-signature-type">any</span><span
+                                        class="tsd-signature-symbol">[]</span><span
+                                        class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span>
+                                <span class="tsd-signature-type">Promise</span><span
+                                        class="tsd-signature-symbol">&lt;</span><span
+                                        class="tsd-signature-type">void</span><span
+                                        class="tsd-signature-symbol">&gt;</span><a aria-label="Permalink"
+                                                                                   class="tsd-anchor-icon"
+                                                                                   href="#createpipelines-1">
+                                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                                        <use href="../assets/icons.svg#icon-anchor"></use>
+                                    </svg>
+                                </a></div>
+                            <div class="tsd-description">
+                                <div class="tsd-comment tsd-typography">
+                                    <h2 class="tsd-anchor-link" id="create-pipelines-for-all-shader-modules">Create
+                                        pipelines for all shader modules.<a
+                                                aria-label="Permalink" class="tsd-anchor-icon"
+                                                href="#create-pipelines-for-all-shader-modules">
+                                            <svg aria-hidden="true" viewBox="0 0 24 24">
+                                                <use href="../assets/icons.svg#icon-anchor"></use>
+                                            </svg>
+                                        </a></h2>
+                                    <p>為所有產生的 WGSL 模組建立計算管線。</p>
+                                </div>
+                                <div class="tsd-parameters"><h4 class="tsd-parameters-title">Parameters</h4>
+                                    <ul class="tsd-parameter-list">
+                                        <li><span><span class="tsd-kind-parameter">shaderInfo</span>: <span
+                                                class="tsd-signature-type">any</span></span>
+                                            <div class="tsd-comment tsd-typography"><p>Global shader metadata /
+                                                全域著色器元數據</p>
+                                            </div>
+                                        </li>
+                                        <li><span><span class="tsd-kind-parameter">generatedModules</span>: <span
+                                                class="tsd-signature-type">any</span><span class="tsd-signature-symbol">[]</span></span>
+                                            <div class="tsd-comment tsd-typography"><p>Generated WGSL modules / 產生的
+                                                WGSL 模組</p>
+                                            </div>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <h4 class="tsd-returns-title">Returns <span
+                                        class="tsd-signature-type">Promise</span><span
+                                        class="tsd-signature-symbol">&lt;</span><span
+                                        class="tsd-signature-type">void</span><span
+                                        class="tsd-signature-symbol">&gt;</span></h4>
+                                <aside class="tsd-sources">
+                                    <ul>
+                                        <li>Defined in <a
+                                                href="https://github.com/sinchichou/WGFX/blob/613f1776aca7ad605eb6e5d83c98e5c80ffa997a/src/runtime/PipelineManager.ts#L52">runtime/PipelineManager.ts:52</a>
+                                        </li>
+                                    </ul>
+                                </aside>
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+            </section>
+        </details>
+    </div>
+    <div class="col-sidebar">
+        <div class="page-menu">
+            <div class="tsd-navigation settings">
+                <details class="tsd-accordion">
+                    <summary class="tsd-accordion-summary">
+                        <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+                            <use href="../assets/icons.svg#icon-chevronDown"></use>
+                        </svg>
+                        <h3>Settings</h3></summary>
+                    <div class="tsd-accordion-details">
+                        <div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span>
+                            <ul id="tsd-filter-options">
+                                <li class="tsd-filter-item"><label class="tsd-filter-input"><input id="tsd-filter-protected"
+                                                                                                   name="protected"
+                                                                                                   type="checkbox"/>
+                                    <svg aria-hidden="true" height="32" viewBox="0 0 32 32" width="32">
+                                        <rect class="tsd-checkbox-background" fill="none" height="30" rx="6" width="30" x="1"
+                                              y="1"></rect>
+                                        <path class="tsd-checkbox-checkmark"
+                                              d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" fill="none"
+                                              stroke="none" stroke-linejoin="round" stroke-width="3.5"></path>
+                                    </svg>
+                                    <span>Protected</span></label></li>
+                                <li class="tsd-filter-item"><label class="tsd-filter-input"><input checked
+                                                                                                   id="tsd-filter-inherited"
+                                                                                                   name="inherited"
+                                                                                                   type="checkbox"/>
+                                    <svg aria-hidden="true" height="32" viewBox="0 0 32 32" width="32">
+                                        <rect class="tsd-checkbox-background" fill="none" height="30" rx="6" width="30" x="1"
+                                              y="1"></rect>
+                                        <path class="tsd-checkbox-checkmark"
+                                              d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" fill="none"
+                                              stroke="none" stroke-linejoin="round" stroke-width="3.5"></path>
+                                    </svg>
+                                    <span>Inherited</span></label></li>
+                                <li class="tsd-filter-item"><label class="tsd-filter-input"><input id="tsd-filter-external"
+                                                                                                   name="external"
+                                                                                                   type="checkbox"/>
+                                    <svg aria-hidden="true" height="32" viewBox="0 0 32 32" width="32">
+                                        <rect class="tsd-checkbox-background" fill="none" height="30" rx="6" width="30" x="1"
+                                              y="1"></rect>
+                                        <path class="tsd-checkbox-checkmark"
+                                              d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" fill="none"
+                                              stroke="none" stroke-linejoin="round" stroke-width="3.5"></path>
+                                    </svg>
+                                    <span>External</span></label></li>
+                            </ul>
+                        </div>
+                        <div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select
+                                id="tsd-theme">
+                            <option value="os">OS</option>
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                        </select></div>
+                    </div>
+                </details>
+            </div>
+            <details class="tsd-accordion tsd-page-navigation" open>
+                <summary class="tsd-accordion-summary">
+                    <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+                        <use href="../assets/icons.svg#icon-chevronDown"></use>
+                    </svg>
+                    <h3>On This Page</h3></summary>
+                <div class="tsd-accordion-details"><a
+                        href="#manages-the-creation-and-execution-of-compute-pipelines"><span>Manages the creation and execution of compute pipelines.</span></a>
+                    <details class="tsd-accordion tsd-page-navigation-section" open>
+                        <summary class="tsd-accordion-summary" data-key="section-Constructors">
+                            <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+                                <use href="../assets/icons.svg#icon-chevronDown"></use>
+                            </svg>
+                            Constructors
+                        </summary>
+                        <div><a href="#constructor">
+                            <svg aria-label="Constructor" class="tsd-kind-icon" viewBox="0 0 24 24">
+                                <use href="../assets/icons.svg#icon-512"></use>
+                            </svg>
+                            <span>constructor</span></a></div>
+                    </details>
+                    <details class="tsd-accordion tsd-page-navigation-section" open>
+                        <summary class="tsd-accordion-summary" data-key="section-Properties">
+                            <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+                                <use href="../assets/icons.svg#icon-chevronDown"></use>
+                            </svg>
+                            Properties
+                        </summary>
+                        <div><a href="#device">
+                            <svg aria-label="Property" class="tsd-kind-icon" viewBox="0 0 24 24">
+                                <use href="../assets/icons.svg#icon-1024"></use>
+                            </svg>
+                            <span>device</span></a><a href="#pipelines">
+                            <svg aria-label="Property" class="tsd-kind-icon" viewBox="0 0 24 24">
+                                <use href="../assets/icons.svg#icon-1024"></use>
+                            </svg>
+                            <span>pipelines</span></a><a href="#resourcemanager">
+                            <svg aria-label="Property" class="tsd-kind-icon" viewBox="0 0 24 24">
+                                <use href="../assets/icons.svg#icon-1024"></use>
+                            </svg>
+                            <span>resource<wbr/>Manager</span></a></div>
+                    </details>
+                    <details class="tsd-accordion tsd-page-navigation-section" open>
+                        <summary class="tsd-accordion-summary" data-key="section-Execution">
+                            <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+                                <use href="../assets/icons.svg#icon-chevronDown"></use>
+                            </svg>
+                            Execution
+                        </summary>
+                        <div><a href="#dispatchpass">
+                            <svg aria-label="Method" class="tsd-kind-icon" viewBox="0 0 24 24">
+                                <use href="../assets/icons.svg#icon-2048"></use>
+                            </svg>
+                            <span>dispatch<wbr/>Pass</span></a>
+                            <ul>
+                                <li><a href="#dispatch-a-compute-pass"><span>Dispatch a compute pass.</span></a></li>
+                            </ul>
+                        </div>
+                    </details>
+                    <details class="tsd-accordion tsd-page-navigation-section" open>
+                        <summary class="tsd-accordion-summary" data-key="section-Lifecycle">
+                            <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+                                <use href="../assets/icons.svg#icon-chevronDown"></use>
+                            </svg>
+                            Lifecycle
+                        </summary>
+                        <div><a href="#dispose">
+                            <svg aria-label="Method" class="tsd-kind-icon" viewBox="0 0 24 24">
+                                <use href="../assets/icons.svg#icon-2048"></use>
+                            </svg>
+                            <span>dispose</span></a>
+                            <ul>
+                                <li><a href="#clear-all-cached-pipelines"><span>Clear all cached pipelines.</span></a>
+                                </li>
+                            </ul>
+                        </div>
+                    </details>
+                    <details class="tsd-accordion tsd-page-navigation-section" open>
+                        <summary class="tsd-accordion-summary" data-key="section-Pipelines">
+                            <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+                                <use href="../assets/icons.svg#icon-chevronDown"></use>
+                            </svg>
+                            Pipelines
+                        </summary>
+                        <div><a href="#createpipelines">
+                            <svg aria-label="Method" class="tsd-kind-icon" viewBox="0 0 24 24">
+                                <use href="../assets/icons.svg#icon-2048"></use>
+                            </svg>
+                            <span>create<wbr/>Pipelines</span></a>
+                            <ul>
+                                <li><a href="#create-pipelines-for-all-shader-modules"><span>Create pipelines for all shader modules.</span></a>
+                                </li>
+                            </ul>
+                        </div>
+                    </details>
+                </div>
+            </details>
+        </div>
+        <div class="site-menu">
+            <nav class="tsd-navigation"><a href="../modules.html">WGFX API Documentation - v1.0.0</a>
+                <ul class="tsd-small-nested-navigation" id="tsd-nav-container">
+                    <li>Loading...</li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+<footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer>
+<div class="overlay"></div>
+</body>
+</html>

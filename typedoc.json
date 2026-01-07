@@ -10,9 +10,6 @@
   ],
   "out": "docs",
   "name": "WGFX API Documentation",
-  "plugin": [
-    "typedoc-plugin-markdown"
-  ],
   "includeVersion": true,
   "categorizeByGroup": true,
   "highlightLanguages": [
