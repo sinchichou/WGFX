@@ -3,10 +3,10 @@
 # WGFX Project: Complete Technical Specification and Development Guide
 
 ## Development Status
-> [! WARNING]
+> [!WARNING]
 > There are still unrepaired problems
 > 
->  The adjustable parameter function is not completed
+> 	The adjustable parameter function is not completed
 
 **Status:** `Testing`
 
