@@ -25,9 +25,6 @@ alias MF2x4 = mat2x4<f32>;
 struct SceneInfo {
     inputSize: uint2,
     inputPt: MF2,
-    outputSize: uint2,
-    outputPt: MF2,
-    scale: MF2,
 }
 
 @group(0) @binding(4) var<uniform> scene: SceneInfo;
@@ -40,10 +37,10 @@ fn GetInputPt() -> MF2 {
     return scene.inputPt;
 }
 
-fn Rmp8x8(a: u32) -> vec2<u32> {
+fn Rmp8x8(a: u32) -> uint2 {
     let x: u32 = a % 8u;   // 欄座標
     let y: u32 = a / 8u;   // 列座標
-    return vec2<u32>(x, y);
+    return uint2(x, y);
 }
 //!END COMMON
 
@@ -127,7 +124,7 @@ fn Rmp8x8(a: u32) -> vec2<u32> {
 
 @compute @workgroup_size(64, 1, 1)
 fn Pass1(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
-    let gxy: uint2 = (Rmp8x8(local_id.x)) + (workgroup_id.xy * 16u);
+    let gxy: uint2 = (Rmp8x8(local_id.x) << uint2(1u)) + (workgroup_id.xy * 16u);
     let inputSize = GetInputSize();
     if gxy.x >= inputSize.x || gxy.y >= inputSize.y {
         return;

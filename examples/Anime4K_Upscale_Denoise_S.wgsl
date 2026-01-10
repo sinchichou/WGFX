@@ -49,7 +49,7 @@ struct SceneInfo {
     scale: MF2,
 }
 
-@group(0) @binding(4) var<uniform> scene: SceneInfo;
+@group(0) @binding(3) var<uniform> scene: SceneInfo;
 
 fn GetInputSize() -> uint2 {
     return scene.inputSize;
@@ -216,7 +216,7 @@ fn A4KS4(pos: MF2) -> MF4 {
 
 //!SAMPLER
 //!FILTER POINT
-@group(0) @binding(3) var sam: sampler;
+@group(0) @binding(4) var sam: sampler;
 
 //!SAMPLER
 //!FILTER LINEAR
@@ -226,7 +226,7 @@ fn A4KS4(pos: MF2) -> MF4 {
 //!PASS 1
 //!DESC Conv-4x3x3x3
 //!IN INPUT
-//!OUT tex1_storaged, tex1_sampled
+//!OUT tex1_storaged
 //!BLOCK_SIZE 16
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
@@ -267,8 +267,8 @@ fn Pass1(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 
 //!PASS 2
 //!DESC Conv-4x3x3x8
-//!IN tex1_sampled, tex1_storaged
-//!OUT tex2_storaged, tex2_sampled
+//!IN tex1_sampled
+//!OUT tex2_storaged
 //!BLOCK_SIZE 16
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
@@ -310,8 +310,8 @@ fn Pass2(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 
 //!PASS 3
 //!DESC Conv-4x3x3x8
-//!IN tex2_sampled, tex2_storaged
-//!OUT tex1_sampled, tex1_storaged
+//!IN tex2_sampled
+//!OUT tex1_storaged
 //!BLOCK_SIZE 16
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
@@ -351,8 +351,8 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 }
 //!PASS 4
 //!DESC Conv-4x3x3x8, Depth-to-Space
-//!IN INPUT, tex1_storaged, tex1_sampled
-//!OUT OUTPUT   
+//!IN INPUT, tex1_storaged
+//!OUT OUTPUT
 //!BLOCK_SIZE 16
 //!NUM_THREADS 64
 @compute @workgroup_size(64, 1, 1)
