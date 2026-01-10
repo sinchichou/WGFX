@@ -1,7 +1,26 @@
 # IDE-specific files
 .idea/
+.vscode/
+.cursor/
 
 # Dependencies
 node_modules/
+debugger/node_modules/
+
+# Build artifacts
+dist/
+debugger/dist/
+docs/api/
+
+# Temporary files and logs
 *.zip
-dist/*
+wgsl_temp/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+
+# Environment variables
+.env
+.env.*

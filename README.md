@@ -1,329 +1,153 @@
-### [中文版本 (Chinese Version)](README_TW.md)
+# WGFX (WebGPU Effect Framework)
 
-# WGFX Project: Complete Technical Specification and Development Guide
+![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)
+![Status: Beta](https://img.shields.io/badge/Status-Beta-yellow)
+![Platform: Web/Node](https://img.shields.io/badge/Platform-Web%20%7C%20Node.js-green)
 
-## Development Status
+**WGFX** is a high-performance graphics effect framework built for WebGPU. Inspired by the design philosophy of **Magpie**, it aims to provide a powerful and user-friendly platform for developing and executing effects in the Web environment. WGFX supports parsing custom `.wgsl` effect files and automatically manages GPU resources, pipeline construction, and multi-pass rendering.
 
-**Status:** `Testing`
-
-All modules (including runtime and CLI tools) in this project have been implemented according to the technical
-specifications outlined in this document. Each file has been commented to clarify its functionality and
-responsibilities. The project is now fully functional and ready for use.
-
-This document aims to provide the complete architecture of the WGFX project, detailed specifications for the `.wgsl`
-effect file format, the Runtime execution flow, and core conversion guidelines for migrating from existing HLSL (Magpie)
-to WGSL.
-
-## 1. Project Architecture and File Responsibilities
-
-The project follows the Single Responsibility Principle, ensuring modularity and maintainability. Below are the core
-files and their responsibilities:
-
-```
-WGFX/
-├─ package.json              # Node.js Project settings, dependency management
-├─ package-lock.json         # Node.js dependency lock file
-├─ README.md                 # Project description, usage guide
-├─ src/
-│   ├─ index.ts              # Main project interface (API Entry Point)
-│   ├─ WGFX.ts               # High-level API class
-│   │
-│   ├─ runtime/              # Runtime core logic
-│   │   ├─ WGFXRuntime.ts    # Runtime core process controller
-│   │   ├─ ShaderParser.js   # Generated shader parser
-│   │   ├─ ResourceManager.ts # GPU resource (Texture, Buffer, Sampler) manager
-│   │   ├─ PipelineManager.ts # Render/Compute Pipeline and Bind Group manager
-│   │   ├─ WGSLCodeGenerator.ts # Generates WGSL Shader Code from Intermediate Representation (IR)
-│   │   └─ UniformBinder.ts    # Provides interface for updating Uniform Buffer
-│   │
-│   ├─ types/                # Type definitions
-│   │   └─ shader.ts         # Shader-related interfaces
-│   │
-│   └─ utils/                # Common utility functions
-│       └─ Logger.ts         # Unified logging and debug mode control
-│
-├─ test/                     # Test files
-└─ examples/                 # Examples
-```
-
-### 1.1. Core Module Details
-
-- **`index.ts` (Runtime External Interface)**
-
-  - **Responsibility**: Unified management and encapsulation of Runtime APIs, serving as the sole entry point for
-    external calls.
-  - **Provided APIs**:
-    - `compile()`: Compiles effect files.
-    - `dispatchPass()`: Executes a rendering pass.
-    - `updateUniform()`: Updates a Uniform parameter.
-    - `getOutput()`: Retrieves the final rendering result.
-
-- **`WGFXRuntime.ts` (Runtime Core Process)**
-
-  - **Responsibility**: Controls the entire lifecycle of the Runtime.
-  - **Flow**:
-      1. Calls `ShaderParser.js` to parse `.wgsl` files, generating Intermediate Representation (IR).
-    2. Calls `ResourceManager.js` to initialize GPU resources (Texture, Sampler, Uniform Buffer) based on IR.
-    3. Calls `PipelineManager.js` to create Compute/Render Pipeline and Bind Group.
-    4. Sorts passes based on dependencies.
-    5. Manages Workgroup configuration and executes Passes (Dispatch).
-
-- **`ShaderParser.js` (Core Parser)**
-
-  - **Responsibility**: A core module shared by Runtime and CLI, responsible for reading `.wgsl` files and converting
-    them into a structured Intermediate Representation (IR).
-  - **Parsing Content**: `Header`, `Parameter`, `Texture`, `Sampler`, `Common`, `Pass` blocks, etc.
-  - **Information Collection**: Collects function overloads, macro definitions (`MP_*`, `MF`, `MULADD`).
-  - **Output (IR)**:
-    ```json
-    {
-      "commonCode": "...",
-      "passes": [...],
-      "textures": [...],
-      "samplers": [...],
-      "parameters": [...]
-    }
-    ```
-
-- **`ResourceManager.ts` (GPU Resource Management)**
-
-  - **Responsibility**: Handles all tasks related to GPU resource creation and maintenance.
-  - **Functionality**: Creates Texture, Sampler, Uniform Buffer, and maintains a name mapping table (e.g.,
-    `"MyTex" -> GPUTexture Object`).
-
-- **`PipelineManager.ts` (Pipeline Management)**
-
-  - **Responsibility**: Responsible for Pass dependency analysis, sorting, and creating necessary GPU objects for
-    execution.
-  - **Functionality**: Creates Pipeline Layout, Bind Group, Compute Pipeline, and dispatches Shader execution.
-
-- **`WGSLCodeGenerator.ts` (WGSL Code Generation)**
-
-    - **Responsibility**: Converts the IR generated by `ShaderParser.js` into valid WGSL Shader code.
-  - **Functionality**: Inserts `Common` blocks, expands macros, handles function overloads, and determines whether
-    parameters are `inline` or `uniform buffer` based on configuration.
-
-- **`UniformBinder.ts` (Uniform Update)**
-
-  - **Responsibility**: Provides the `updateUniform(name, value)` interface for dynamically updating the content of
-    the Uniform Buffer.
-
-- **`utils/Logger.ts` (Logging Utility)**
-    - **Responsibility**: Unified logging system with levels (DEBUG, INFO, WARN, ERROR).
-    - **Debug Mode**: Toggle verbose logging via `WGFX.setDebug(true)`.
-
-## 2. WGFX Effect File Format Specification (`.wgsl`)
-
-The `.wgsl` file consists of a series of directive blocks starting with `//!` and WGSL code snippets.
-
-### 2.1. Header Block
-
-The header block defines the file's metadata and global settings.
-
-| Directive                  | Required | Description                                                                  | Example                         |
-| :------------------------- | :------- | :--------------------------------------------------------------------------- | :------------------------------ |
-| `//! MAGPIE WebGPU EFFECT` | **Yes**  | Magic string for the file, must be on the first line.                        | `//! Magpie WebGPU EFFECT`      |
-| `//! VERSION <number>`     | **Yes**  | Effect format version, must match the parser's built-in version.             | `//! VERSION 4`                 |
-| `//! SORT_NAME <string>`   | Optional | Name used for UI sorting.                                                    | `//! SORT_NAME "My Effect"`     |
-| `//! USE <flags>`          | Optional | Enables specific features. Supports `MULADD`, `_DYNAMIC` (case-insensitive). | `//! USE MULADD`                |
-| `//! CAPABILITY <flags>`   | Optional | Declares required hardware capabilities. Supports `FP16` (case-insensitive). | `//! CAPABILITY FP16`           |
-| `#include <...>`           | Allowed  | The parser identifies and skips `#include` directive lines.                  | `#include "common_functions.h"` |
-
-### 2.2. Parameter Block
-
-Defines Uniform parameters that can be adjusted in the UI.
-
-| Directive              | Required     | Description                                                                                                             | Example                    |
-| :--------------------- | :----------- | :---------------------------------------------------------------------------------------------------------------------- | :------------------------- |
-| `//! PARAMETER <name>` | **Optional** | Declares the start of a parameter block and its identifier in the code. If omitted, none of the following are required. | `//! PARAMETER Brightness` |
-| `//! DEFAULT <value>`  | **Yes**      | Default value for the parameter.                                                                                        | `//! DEFAULT 1.0`          |
-| `//! MIN <value>`      | **Yes**      | Minimum value for the parameter.                                                                                        | `//! MIN 0.0`              |
-| `//! MAX <value>`      | **Yes**      | Maximum value for the parameter.                                                                                        | `//! MAX 2.0`              |
-| `//! STEP <value>`     | **Yes**      | Step value for parameter adjustment in the UI.                                                                          | `//! STEP 0.01`            |
-| `//! LABEL <string>`   | Optional     | Label name to display in the UI.                                                                                        | `//! LABEL "Brightness"`   |
-| `type name;`           | **Yes**      | The end of the block must be an HLSL-format variable declaration. Type only supports `float` or `int`.                  | `float Brightness;`        |
-
-- **Validation Rules**:
-  - All four directives `DEFAULT`, `MIN`, `MAX`, `STEP` must be present.
-  - Values must satisfy `MIN <= DEFAULT <= MAX`.
-
-### 2.3. Texture Block
-
-Defines texture resources used in the effect.
-
-| Directive             | Required   | Description                                                                           | Example                     |
-| :-------------------- | :--------- | :------------------------------------------------------------------------------------ | :-------------------------- |
-| `//! TEXTURE <name>`  | **Yes**    | Declares the start of a texture block and its identifier.                             | `//! TEXTURE MyTex`         |
-| `//! SOURCE <string>` | Optional   | Specifies the texture source from a file. If specified, no other options are allowed. | `//! SOURCE "noise.png"`    |
-| `//! FORMAT <format>` | Mostly Yes | Texture format. Format name must match a predefined list.                             | `//! FORMAT R8G8B8A8_UNORM` |
-| `//! WIDTH <expr>`    | Optional   | Texture width, can be a number or expression (e.g., `INPUT_WIDTH`).                   | `//! WIDTH 1920`            |
-| `//! HEIGHT <expr>`   | Optional   | Texture height. `WIDTH` and `HEIGHT` must appear in pairs.                            | `//! HEIGHT INPUT_HEIGHT`   |
-| `Texture2D name;`     | **Yes**    | The end of the block must be an HLSL-format texture declaration.                      | `Texture2D MyTex;`          |
-
-- **Special Built-in Textures**:
-  - `INPUT`: Default input texture (index 0).
-  - `OUTPUT`: Default output texture (index 1).
-  - The parser handles these two names specially.
-
-### 2.4. Sampler Block
-
-Defines the behavior of texture sampling.
-
-| Directive            | Required | Description                                                      | Example                   |
-| :------------------- | :------- | :--------------------------------------------------------------- | :------------------------ |
-| `//! SAMPLER <name>` | **Yes**  | Declares the start of a sampler block and its identifier.        | `//! SAMPLER MySampler`   |
-| `//! FILTER <mode>`  | **Yes**  | Filter mode. Supports `LINEAR` or `POINT`.                       | `//! FILTER LINEAR`       |
-| `//! ADDRESS <mode>` | Optional | Addressing mode. Supports `CLAMP` or `WRAP`.                     | `//! ADDRESS CLAMP`       |
-| `SamplerState name;` | **Yes**  | The end of the block must be an HLSL-format sampler declaration. | `SamplerState MySampler;` |
-
-### 2.5. Common Code Block
-
-Code within the `//! COMMON` block will be inserted before the Shader of each `PASS`, used to define common functions,
-structures, or constants.
-
-```hlsl
-//! COMMON
-float PI = 3.1415926535;
-
-float3 grayscale(float3 color) {
-    float luminance = dot(color, float3(0.299, 0.587, 0.114));
-    return float3(luminance, luminance, luminance);
-}
-```
-
-### 2.6. Pass Block
-
-Defines a single rendering/computation operation. An effect file can contain multiple Passes.
-
-| Directive                 | Required | Description                                                                                | Example                               |
-| :------------------------ | :------- | :----------------------------------------------------------------------------------------- | :------------------------------------ |
-| `//! PASS <index>`        | **Yes**  | Declares a Pass and its index. Indices must start from `1` and be consecutive.             | `//! PASS 1`                          |
-| `//! IN <tex-list>`       | **Yes**  | Specifies the input texture list for this Pass, separated by commas.                       | `//! IN INPUT, MyTex`                 |
-| `//! OUT <tex-list>`      | **Yes**  | Specifies the output texture list for this Pass, separated by commas.                      | `//! OUT TempTex`                     |
-| `//! BLOCK_SIZE <w,h>`    | `CS` Yes | **Compute Shader** specific, defines block size.                                           | `//! BLOCK_SIZE 16,16`                |
-| `//! NUM_THREADS <x,y,z>` | `CS` Yes | **Compute Shader** specific, defines the number of threads per workgroup.                  | `//! NUM_THREADS 8,8,1`               |
-| `//! STYLE <PS\|CS>`      | Optional | Specifies the Pass type as Pixel Shader (`PS`) or Compute Shader (`CS`). Defaults to `CS`. | `//! STYLE CS`                        |
-| `//! DESC <string>`       | Optional | Description text for the Pass, usable for debugging or UI display.                         | `//! DESC "First Gaussian Blur Pass"` |
-
-- **Validation Rules**:
-  - `IN` and `OUT` are required directives for each Pass.
-  - If `STYLE` is `CS` (or unspecified), then `BLOCK_SIZE` and `NUM_THREADS` must be provided.
-  - The `OUT` of the last Pass must be `OUTPUT`.
-  - The `OUT` of intermediate Passes cannot be `INPUT` or `OUTPUT`.
-
-### 2.7. Built-in Global Variables
-
-To support dynamic resolution, the Runtime provides a built-in global Uniform struct `SceneInfo` available in all Passes.
-
-```wgsl
-struct SceneInfo {
-    inputSize: uint2,  // Dimensions of the input source (e.g., 1920, 1080)
-    inputPt: MF2,      // Inverse of input dimensions (1.0/width, 1.0/height)
-    outputSize: uint2, // Dimensions of the output target
-    outputPt: MF2,     // Inverse of output dimensions
-    scale: MF2,        // Scaling ratio (outputSize / inputSize)
-}
-@group(0) @binding(4) var<uniform> scene: SceneInfo;
-```
-
-- **Usage**: Access directly via `scene.inputSize` or `scene.inputPt`.
-
-## 3. Runtime Execution Flow
-
-The complete flow from loading a `.wgsl` file to final rendering output is as follows:
-
-1. **Parse and Generate IR**:
-
-   - `WGFXRuntime` calls `Parser.js` to read the `.wgsl` file.
-   - `Parser.js` parses blocks such as `Header`, `Parameter`, `Texture`, `Sampler`, `Common`, `Pass` one by one.
-   - Generates a structured Intermediate Representation (IR), containing all parsed metadata and code snippets.
-
-2. **GPU Resource Creation**:
-
-   - `ResourceManager.js` creates corresponding `GPUTexture`, `GPUSampler`, `GPUBuffer` (for uniforms) based on the
-     `textures`, `samplers`, `parameters` lists in the IR.
-   - Establishes a mapping table from resource names to GPU objects for subsequent use.
-
-3. **Pipeline Creation**:
-
-   - `PipelineManager.js` iterates through the `passes` list in the IR.
-   - For each Pass, `WGSLCodeGenerator.js` combines its HLSL snippet with `commonCode` and converts it into complete
-     WGSL Compute Shader code.
-   - `PipelineManager.js` derives `GPUBindGroupLayout` based on the `IN` and `OUT` resources of the Pass.
-   - Creates `GPUComputePipeline` using the generated WGSL Shader and Layout.
-
-4. **Execution and Rendering**:
-
-   - When `dispatchPass(index)` is called externally:
-   - `PipelineManager.js` obtains the corresponding GPU objects from `ResourceManager` based on the resources required
-     by the Pass and creates `GPUBindGroup`.
-   - `WGFXRuntime` issues GPU commands such as `setPipeline`, `setBindGroup`, `dispatchWorkgroups`.
-   - The GPU executes the Compute Shader, writing the computation results to the texture specified by `OUT`.
-
-5. **Dynamic Update**:
-   - When `updateUniform(name, value)` is called externally:
-   - `UniformBinder.js` writes new values to the corresponding `GPUBuffer`, achieving dynamic updates of parameters.
-
-## 4. HLSL/Magpie to WGSL/WebGPU Conversion Guide
-
-### 4.1. Resource Type Mapping
-
-| HLSL / Magpie          | WGSL / WebGPU                              | Description                                                 |
-| :--------------------- | :----------------------------------------- | :---------------------------------------------------------- |
-| `Texture2D<T>` (SRV)   | `var tex: texture_2d<f32>;`                | Texture for reading, bound separately from Sampler in WGSL. |
-| `RWTexture2D<T>` (UAV) | `var tex: texture_storage_2d<fmt, write>;` | Storage Texture for writing.                                |
-| `SamplerState`         | `var smp: sampler;`                        | Sampler.                                                    |
-| `cbuffer` / `uniform`  | `var<uniform> uniforms: MyUniforms;`       | Uniform constant buffer.                                    |
-
-### 4.2. Threads and Workgroups
-
-| HLSL / Magpie           | WGSL / WebGPU                 | Description                                                         |
-| :---------------------- | :---------------------------- | :------------------------------------------------------------------ |
-| `[numthreads(x, y, z)]` | `@workgroup_size(x, y, z)`    | Attribute on Compute Shader entry function, defines workgroup size. |
-| `Dispatch(X, Y, Z)`     | `dispatchWorkgroups(X, Y, Z)` | Number of workgroup grids to dispatch.                              |
-
-### 4.3. Built-in Macros and Functions
-
-- **`MF` Macro**: Needs to be converted to `f32` or `f16` in WGSL based on the `FP16` flag in `CAPABILITY`.
-- **`MULADD`**: If `USE MULADD` is enabled, the corresponding HLSL function implementation needs to be converted to a
-  WGSL function, or `a * b + c` can be used directly.
-- **`MP_*` Macros**: Such as `MP_BLOCK_WIDTH`, etc., need to be replaced directly with constant values when generating
-  WGSL code, based on the values of directives like `//! BLOCK_SIZE`.
-
-### 4.4. Binding Model
-
-WebGPU uses the Bind Group model, replacing HLSL's `register(t0, u0, s0)`.
-
-- **Strategy**: The parser must allocate a unique set of `@group(N) @binding(M)` indices for all resources (`IN`, `OUT`,
-  `Samplers`, `Uniforms`) of each Pass and write them when generating WGSL.
-- **Example Binding**:
-
-| Resource        | WGSL Binding             |
-| :-------------- | :----------------------- |
-| `sam` (Sampler) | `@group(0) @binding(0)`  |
-| `uniforms`      | `@group(0) @binding(1)`  |
-| `scene`         | `@group(0) @binding(4)`  |
-| `TexN`          | `@group(0) @binding(6+)` |
-
-### 4.5. Basic Type and Function Mapping
-
-| HLSL                  | WGSL                 |
-| :-------------------- | :------------------- |
-| `float`, `float1`     | `f32`                |
-| `float2`              | `vec2<f32>`          |
-| `float3`              | `vec3<f32>`          |
-| `float4`              | `vec4<f32>`          |
-| `float2x2`            | `mat2x2<f32>`        |
-| `float3x3`            | `mat3x3<f32>`        |
-| `float4x4`            | `mat4x4<f32>`        |
-| `int`, `int1`         | `i32`                |
-| `int2`                | `vec2<i32>`          |
-| `uint`                | `u32`                |
-| `mul(matrix, vector)` | `matrix * vector`    |
-| `lerp(a, b, x)`       | `mix(a, b, x)`       |
-| `saturate(x)`         | `clamp(x, 0.0, 1.0)` |
-| `frac(x)`             | `fract(x)`           |
-| `ddx(v)`              | `dpdx(v)`            |
-| `ddy(v)`              | `dpdy(v)`            |
+Its core value lies in helping developers easily migrate shader effects originally written in HLSL (especially Magpie or MPDN style) to modern web browsers, enabling complex image post-processing features such as real-time upscaling and denoising.
 
 ---
+
+## 🌟 Key Features
+
+- 🚀 **High-Performance Implementation**: Direct interaction with the WebGPU API to fully leverage modern GPU parallel computing power.
+- 📝 **Enhanced WGSL Format**: Uses special metadata annotations (e.g., `//! PASS`, `//! TEXTURE`) to make shader code self-describing, simplifying resource declarations and render pass configurations.
+- ⚙️ **Automated Resource Management**: Automatically handles the lifecycle of `GPUTexture`, `GPUBuffer`, and `GPUSampler`, along with Bind Group generation.
+- 🔄 **Runtime Compilation & Optimization**: Features a built-in Peggy-based parser to dynamically parse effect files at runtime and optimize the generated WGSL code for the target device.
+- 🛠️ **Cross-Platform Architecture**: Provides pure browser support (ESM/UMD) and compatibility with Node.js environments (via `@webgpu/node`).
+
+---
+
+## �️ Technical Architecture
+
+WGFX follows the "Single Responsibility Principle," breaking down complex WebGPU workflows into several core modules. For a detailed design breakdown, see the [Technical Overview](docs/technical/OVERVIEW.md).
+
+### Project Structure
+
+```text
+WGFX/
+├── src/
+│   ├── WGFX.ts             # Main user-facing API entry point
+│   ├── runtime/            # Core runtime modules
+│   │   ├── WGFXRuntime.ts      # Engine orchestrating the entire runtime lifecycle
+│   │   ├── ShaderParser.pegjs  # Effect file grammar definition
+│   │   ├── ResourceManager.ts  # GPU resource (textures, buffers) management
+│   │   ├── PipelineManager.ts  # Render pipeline and pass scheduling center
+│   │   ├── WGSLCodeGenerator.ts# WGSL code generation and preprocessor
+│   │   └── UniformBinder.ts    # Dynamic uniform parameter binding tool
+│   ├── types/              # Type definitions
+│   └── utils/              # General utilities (e.g., Logger)
+├── examples/               # Various .wgsl effect examples (e.g., Anime4K)
+├── debugger/               # Vite-based developer testing interface
+├── dist/                   # Build artifacts
+└── docs/                   # Automatically generated API documentation
+```
+
+---
+
+## 📦 Installation & Build
+
+### Installation as a Dependency
+
+```bash
+npm install wgfx
+```
+
+### Development from Source
+
+1. **Clone the repository**:
+
+   ```bash
+   git clone https://github.com/sinchichou/WGFX.git
+   cd WGFX
+   ```
+
+2. **Install dependencies**:
+
+   ```bash
+   npm install
+   ```
+
+3. **Build the project**:
+
+   ```bash
+   npm run build
+   ```
+
+4. **Run the debugger**:
+   ```bash
+   npm run debug
+   ```
+
+---
+
+## � Quick Start
+
+### Core API Usage Example
+
+```typescript
+import { WGFX } from "wgfx";
+
+// 1. Initialize WebGPU device
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter.requestDevice();
+
+// 2. Create WGFX instance
+const effectCode = await fetch("effects/Anime4K_Upscale.wgsl").then((r) =>
+  r.text()
+);
+const wgfx = await WGFX.create({
+  device,
+  effectCode,
+  width: 1920,
+  height: 1080,
+});
+
+// 3. Process image source (Supports Video, ImageBitmap, Canvas, etc.)
+const videoElement = document.querySelector("video");
+const outputTexture = await wgfx.process(videoElement);
+
+// 4. Get output view and display
+const outputView = wgfx.getOutputView();
+// Use outputView in your render loop...
+
+// 5. Update parameters in real-time
+wgfx.updateUniforms({ Strength: 1.5 });
+```
+
+---
+
+## 📄 .wgsl Effect Format Specification
+
+WGFX effect files contain special directives and standard WGSL code:
+
+| Directive              | Description                                        | Example                   |
+| :--------------------- | :------------------------------------------------- | :------------------------ |
+| `//! PASS <index>`     | Defines a render pass                              | `//! PASS 1`              |
+| `//! TEXTURE <name>`   | Declares an intermediate texture resource          | `//! TEXTURE TempTex`     |
+| `//! PARAMETER <name>` | Defines a dynamically adjustable uniform parameter | `//! PARAMETER Sharpness` |
+| `//! COMMON`           | A shared code block for all passes                 | `//! COMMON`              |
+
+_(For detailed specifications, refer to [API Documentation](docs/index.md))_
+
+---
+
+## 🙏 Credits
+
+The development of this project is heavily inspired by the following excellent open-source projects and communities:
+
+1.  **[Magpie](https://github.com/Blinue/Magpie)**: The core design inspiration, effect format, and parts of the architectural philosophy are derived from Magpie. Special thanks to the author **Blinue** for their outstanding contributions to the image processing field, allowing high-quality scaling algorithms to thrive in the Windows desktop environment.
+2.  **[Anime4K](https://github.com/bloc97/Anime4K)**: The high-quality real-time animation upscaling algorithms in the examples are sourced from **bloc97**'s Anime4K project.
+3.  **[Peggy](https://peggyjs.org/)**: A powerful parser generator that provides WGFX with stable and flexible directive parsing capabilities.
+4.  **WebGPU Community**: Thanks to the W3C GPU for the Web Working Group for providing modern graphics specifications.
+
+---
+
+## � License
+
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+This means if you use this code in a web service (even without distributing the package), you must open-source the relevant derivative works according to AGPL requirements.
+
+See the [LICENSE](LICENSE) file for details.

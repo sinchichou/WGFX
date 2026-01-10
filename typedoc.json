@@ -9,36 +9,28 @@
     "src/utils/Logger.ts"
   ],
   "out": "docs",
+  "plugin": ["typedoc-plugin-markdown"],
   "name": "WGFX API Documentation",
   "includeVersion": true,
   "categorizeByGroup": true,
-  "highlightLanguages": [
-    "typescript",
-    "javascript",
-    "wgsl",
-    "hlsl",
-    "json"
-  ],
-  "blockTags": [
-    "@param",
-    "@returns",
-    "@throws",
-    "@see",
-    "@description",
-    "@example",
-    "@zh",
-    "@compute",
-    "@group",
-    "@category",
-    "@defaultValue",
-    "@module"
-  ],
+  "excludeInternal": true,
+  "searchInComments": true,
+  "entryFileName": "index.md",
+  "validation": {
+    "invalidLink": false
+  },
   "externalSymbolLinkMappings": {
-    "@webgpu/types": {
+    "global": {
       "GPUTexture": "https://www.w3.org/TR/webgpu/#gpu-texture",
       "GPUTextureView": "https://www.w3.org/TR/webgpu/#gputextureview"
     }
   },
-  "excludeInternal": true,
-  "searchInComments": true
+  "highlightLanguages": [
+    "typescript", "javascript", "wgsl", "hlsl", "json"
+  ],
+  "blockTags": [
+    "@param", "@returns", "@throws", "@see", "@description", 
+    "@example", "@zh", "@compute", "@group", "@category", 
+    "@defaultValue", "@module"
+  ]
 }

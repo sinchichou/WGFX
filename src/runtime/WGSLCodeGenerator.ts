@@ -1,4 +1,4 @@
-import {WGFXShaderInfo, PassInfo, TextureInfo, ParameterInfo} from '@/types';
+import { WGFXShaderInfo, PassInfo, TextureInfo, ParameterInfo } from '@/types';
 
 /**
  * Resource binding index configuration strategy.
@@ -63,19 +63,6 @@ export class WGSLCodeGenerator {
             wgsl += `// Pass ${pass.index}\n`;
             wgsl += `// ========================================\n\n`;
 
-            // Inject common code / 注入共通代碼
-            wgsl += commonCode;
-
-            // Inject scene info / 注入場景資訊
-            if (!commonCode.includes('SceneInfo')) {
-                wgsl += sceneInfoCode;
-            }
-
-            // Inject Uniforms / 注入 Uniforms
-            if (uniformBufferCode) {
-                wgsl += uniformBufferCode;
-            }
-
             // Prepare resource tracking object / 準備資源追蹤物件
             const passResources = {
                 textures: [] as any[],
@@ -84,17 +71,35 @@ export class WGSLCodeGenerator {
                 hasScene: true
             };
 
+            // Inject common code / 注入共通代碼
+            wgsl += commonCode;
+
+            // Inject SceneInfo (Resolution, scaling etc.)
+            // Only inject if not manually declared in common section
+            if (!commonCode.includes('struct SceneInfo') && !commonCode.includes('var<uniform> scene')) {
+                wgsl += sceneInfoCode;
+            }
+
+            // Inject Uniforms (Parameters)
+            // Only inject if parameters exist and not manually declared in common section
+            if (uniformBufferCode && !commonCode.includes('struct Uniforms') && !commonCode.includes('var<uniform> uniforms')) {
+                wgsl += uniformBufferCode;
+            }
+
             // Setup sampler bindings / 設定採樣器綁定
             let samplerBinding = BINDING_LAYOUT.SAMPLERS_START;
             shaderInfo.samplers.forEach(sampler => {
-                const currentBinding = samplerBinding++;
-                wgsl += `@group(0) @binding(${currentBinding}) var ${sampler.name}: sampler;\n`;
+                // Only declare if not in common code
+                if (!commonCode.includes(`var ${sampler.name}`)) {
+                    const currentBinding = samplerBinding++;
+                    wgsl += `@group(0) @binding(${currentBinding}) var ${sampler.name}: sampler;\n`;
 
-                passResources.samplers.push({
-                    ...sampler,
-                    binding: currentBinding,
-                    group: 0
-                });
+                    passResources.samplers.push({
+                        ...sampler,
+                        binding: currentBinding,
+                        group: 0
+                    });
+                }
             });
             wgsl += '\n';
 
@@ -108,24 +113,27 @@ export class WGSLCodeGenerator {
                 );
                 if (!isUsed) return;
 
-                const isOutputInThisPass = pass.out.includes(tex.name);
-                const isStorage = (tex.name === 'OUTPUT' || isOutputInThisPass);
+                // Only declare if not in common code
+                if (!commonCode.includes(`var ${tex.name}`)) {
+                    const isOutputInThisPass = pass.out.includes(tex.name);
+                    const isStorage = (tex.name === 'OUTPUT' || isOutputInThisPass);
 
-                const format = tex.format || 'rgba16float';
-                const textureType = isStorage
-                    ? `texture_storage_2d<${format}, write>`
-                    : `texture_2d<f32>`;
+                    const format = tex.format || 'rgba16float';
+                    const textureType = isStorage
+                        ? `texture_storage_2d<${format}, write>`
+                        : `texture_2d<f32>`;
 
-                const currentBinding = textureBinding++;
-                wgsl += `@group(0) @binding(${currentBinding}) var ${tex.name}: ${textureType};\n`;
+                    const currentBinding = textureBinding++;
+                    wgsl += `@group(0) @binding(${currentBinding}) var ${tex.name}: ${textureType};\n`;
 
-                passResources.textures.push({
-                    ...tex,
-                    format: format,
-                    binding: currentBinding,
-                    group: 0,
-                    isStorage: isStorage
-                });
+                    passResources.textures.push({
+                        ...tex,
+                        format: format,
+                        binding: currentBinding,
+                        group: 0,
+                        isStorage: isStorage
+                    });
+                }
             });
             wgsl += '\n';
 
@@ -157,8 +165,7 @@ struct SceneInfo {
     outputSize: vec2<u32>,
     outputPt: vec2<f32>,
     scale: vec2<f32>,
-}
-@group(0) @binding(${BINDING_LAYOUT.SCENE_INFO}) var<uniform> scene: SceneInfo;\n\n`;
+}`;
     }
 
     /**

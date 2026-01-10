@@ -29,6 +29,8 @@ export class WGFXRuntime {
     public uniformBinder: UniformBinder;
     /** @zh 目前載入的特效元數據資訊，未編譯前為 null */
     public shaderInfo: WGFXShaderInfo | null;
+    /** @zh 生成的WGSL模組，用於除錯顯示 */
+    public generatedModules: { wgslCode: string; passIndex: number; resources: any }[] | null;
 
     /**
      * Initialize the WGFX runtime environment.
@@ -50,6 +52,7 @@ export class WGFXRuntime {
         this.wgslCodeGenerator = new WGSLCodeGenerator();
         this.uniformBinder = new UniformBinder(this.device, this.resourceManager);
         this.shaderInfo = null;
+        this.generatedModules = null;
     }
 
     /**
@@ -74,6 +77,7 @@ export class WGFXRuntime {
 
             // 2. Generate optimized WGSL modules / 步驟 2：產生優化後的 WGSL 模組
             const generatedModules = this.wgslCodeGenerator.generate(shaderInfo);
+            this.generatedModules = generatedModules;
 
             // 3. Prepare GPU textures and buffers / 步驟 3：準備 GPU 紋理與緩衝區
             this.resourceManager.initialize(shaderInfo, externalResources);

@@ -25,6 +25,9 @@ alias MF2x4 = mat2x4<f32>;
 struct SceneInfo {
     inputSize: uint2,
     inputPt: MF2,
+    outputSize: uint2,
+    outputPt: MF2,
+    scale: MF2,
 }
 
 @group(0) @binding(4) var<uniform> scene: SceneInfo;
