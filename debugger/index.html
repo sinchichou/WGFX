@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="zh-TW">
-  <head>
+
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WGFX Debugger</title>
@@ -19,18 +20,22 @@
             --text-color: #cccccc;
             --text-muted: #8c8c8c;
         }
-        body, html {
+
+        body,
+        html {
             margin: 0;
             padding: 0;
             height: 100vh;
             overflow: hidden;
             background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
         }
+
         #app {
             display: flex;
             height: 100vh;
             background: var(--border-color);
         }
+
         .panel {
             display: flex;
             flex-direction: column;
@@ -40,15 +45,18 @@
             flex: 1;
             min-width: 200px;
         }
+
         .panel:first-child {
             flex: none;
             width: 50%;
         }
+
         .editor-container {
             flex: 1;
             min-height: 0;
             background: #1e1e1e;
         }
+
         .preview-container {
             flex: 1;
             display: flex;
@@ -58,7 +66,7 @@
             gap: 12px;
             box-shadow: inset 0 0 0 1px var(--border-color);
         }
-        
+
         /* Toolbar */
         .toolbar {
             padding: 12px 16px;
@@ -67,8 +75,9 @@
             gap: 12px;
             align-items: center;
             border-bottom: 1px solid var(--border-color);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
         }
+
         button {
             background: var(--primary-color);
             color: white;
@@ -78,20 +87,25 @@
             border-radius: 6px;
             font-size: 13px;
             font-weight: 500;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }
+
         button:hover {
             background: #005999;
         }
+
         button:active {
             background: #003d66;
         }
+
         button.error {
             background: var(--error-color);
         }
+
         button.error:hover {
             background: #d13438;
         }
+
         input[type="file"] {
             color: var(--text-color);
             background: var(--secondary-color);
@@ -101,10 +115,12 @@
             font-size: 13px;
             cursor: pointer;
         }
+
         input[type="file"]:hover {
             background: var(--hover-color);
             border-color: var(--primary-color);
         }
+
         select {
             background: var(--secondary-color);
             color: var(--text-color);
@@ -114,16 +130,18 @@
             font-size: 13px;
             cursor: pointer;
         }
+
         select:hover {
             background: var(--hover-color);
             border-color: var(--primary-color);
         }
+
         select:focus {
             outline: none;
             border-color: var(--primary-color);
             box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
         }
-        
+
         /* Canvas */
         .canvas-wrapper {
             flex: 1;
@@ -135,17 +153,19 @@
             border: 2px solid var(--border-color);
             border-radius: 8px;
             position: relative;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
         }
+
         canvas {
             border-radius: 6px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.6);
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
             transition: box-shadow 0.3s ease;
         }
+
         canvas:hover {
-            box-shadow: 0 0 25px rgba(0,0,0,0.7);
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.7);
         }
-        
+
         /* Debug Info */
         .debug-info {
             height: 320px;
@@ -153,14 +173,16 @@
             border-top: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
             flex: none;
         }
+
         .tabs {
             display: flex;
             background: #252526;
             border-bottom: 1px solid var(--border-color);
         }
+
         .tab {
             padding: 10px 16px;
             cursor: pointer;
@@ -172,10 +194,12 @@
             position: relative;
             font-weight: 500;
         }
+
         .tab:hover {
             background: var(--hover-color);
             color: var(--text-color);
         }
+
         .tab.active {
             background: #1e1e1e;
             color: white;
@@ -183,6 +207,7 @@
             border-bottom: 1px solid #1e1e1e;
             margin-top: -1px;
         }
+
         .tab-content {
             flex: 1;
             overflow: auto;
@@ -194,15 +219,21 @@
             background: #1e1e1e;
             line-height: 1.4;
         }
-        .log-error { color: var(--error-color); }
-        .log-success { color: var(--success-color); }
+
+        .log-error {
+            color: var(--error-color);
+        }
+
+        .log-success {
+            color: var(--success-color);
+        }
 
         /* Overlay */
         #fps-meter {
             position: absolute;
             top: 8px;
             right: 8px;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0, 0, 0, 0.8);
             padding: 4px 8px;
             border-radius: 6px;
             font-size: 11px;
@@ -210,26 +241,28 @@
             font-weight: 600;
             pointer-events: none;
             backdrop-filter: blur(4px);
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             color: var(--success-color);
         }
+
         #screen-labels {
             position: absolute;
             top: 8px;
             left: 8px;
             pointer-events: none;
         }
+
         #screen-labels .label {
             position: absolute;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0, 0, 0, 0.8);
             color: white;
             padding: 4px 8px;
             border-radius: 6px;
             font-size: 11px;
             font-weight: 600;
             backdrop-filter: blur(4px);
-            border: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         /* Video Controls */
@@ -242,8 +275,9 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         }
+
         #video-controls button {
             background: var(--primary-color);
             color: white;
@@ -253,16 +287,20 @@
             border-radius: 6px;
             font-size: 16px;
             transition: all 0.2s ease;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }
+
         #video-controls button:hover {
             background: #005999;
             transform: translateY(-1px);
         }
+
         #video-controls button:active {
             transform: translateY(0);
         }
-        #seek-bar, #volume-bar {
+
+        #seek-bar,
+        #volume-bar {
             background: var(--hover-color);
             border-radius: 4px;
             outline: none;
@@ -270,10 +308,14 @@
             cursor: pointer;
             transition: background 0.2s ease;
         }
-        #seek-bar:hover, #volume-bar:hover {
+
+        #seek-bar:hover,
+        #volume-bar:hover {
             background: var(--active-color);
         }
-        #seek-bar::-webkit-slider-thumb, #volume-bar::-webkit-slider-thumb {
+
+        #seek-bar::-webkit-slider-thumb,
+        #volume-bar::-webkit-slider-thumb {
             appearance: none;
             background: var(--primary-color);
             cursor: pointer;
@@ -283,11 +325,15 @@
             box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.3);
             transition: all 0.2s ease;
         }
-        #seek-bar::-webkit-slider-thumb:hover, #volume-bar::-webkit-slider-thumb:hover {
+
+        #seek-bar::-webkit-slider-thumb:hover,
+        #volume-bar::-webkit-slider-thumb:hover {
             transform: scale(1.2);
             box-shadow: 0 0 0 4px rgba(0, 122, 204, 0.3);
         }
-        #seek-bar::-moz-range-thumb, #volume-bar::-moz-range-thumb {
+
+        #seek-bar::-moz-range-thumb,
+        #volume-bar::-moz-range-thumb {
             background: var(--primary-color);
             cursor: pointer;
             border: none;
@@ -307,6 +353,7 @@
             pointer-events: none;
             z-index: 5;
         }
+
         .split-handle {
             position: absolute;
             top: 0;
@@ -320,15 +367,18 @@
             border-radius: 3px;
             z-index: 10;
         }
+
         .split-handle:hover {
             background: rgba(0, 122, 204, 0.7);
             width: 8px;
         }
+
         .split-handle:active,
         .split-handle.dragging {
             background: rgba(0, 122, 204, 0.9);
             width: 10px;
         }
+
         .split-line {
             position: absolute;
             top: 50%;
@@ -353,9 +403,11 @@
             gap: 8px 16px;
             align-items: center;
         }
+
         .control-row {
             display: contents;
         }
+
         .control-label {
             color: var(--text-color);
             font-size: 12px;
@@ -363,11 +415,14 @@
             margin-right: 8px;
         }
 
-        .mode-buttons, .preset-buttons {
+        .mode-buttons,
+        .preset-buttons {
             display: flex;
             gap: 8px;
         }
-        .mode-btn, .preset-btn {
+
+        .mode-btn,
+        .preset-btn {
             background: var(--secondary-color);
             color: var(--text-color);
             border: 1px solid var(--border-color);
@@ -379,12 +434,16 @@
             min-width: 50px;
             text-align: center;
         }
-        .mode-btn:hover, .preset-btn:hover {
+
+        .mode-btn:hover,
+        .preset-btn:hover {
             background: var(--hover-color);
             color: white;
             border-color: var(--primary-color);
         }
-        .mode-btn.active, .preset-btn.active {
+
+        .mode-btn.active,
+        .preset-btn.active {
             background: var(--primary-color);
             color: white;
             border-color: var(--primary-color);
@@ -396,22 +455,37 @@
             accent-color: var(--primary-color);
             cursor: pointer;
         }
-        .control-row label { font-size: 12px; color: #ccc; cursor: pointer; }
+
+        .control-row label {
+            font-size: 12px;
+            color: #ccc;
+            cursor: pointer;
+        }
 
         .split-info {
             color: var(--text-muted);
             font-size: 11px;
             line-height: 1.3;
-            background: rgba(255,255,255,0.02);
+            background: rgba(255, 255, 255, 0.02);
             padding: 4px 0;
         }
+
         #current-ratio {
             color: var(--primary-color);
             font-weight: 600;
             font-family: 'SF Mono', monospace;
         }
-        #screen-labels .left-label { left: 5px; top: 5px; }
-        #screen-labels .right-label { right: 5px; top: 5px; transform: translateX(-100%); }
+
+        #screen-labels .left-label {
+            left: 5px;
+            top: 5px;
+        }
+
+        #screen-labels .right-label {
+            right: 5px;
+            top: 5px;
+            transform: translateX(-100%);
+        }
 
         /* Panel Resizer */
         .panel-resizer {
@@ -426,12 +500,15 @@
             transition: background 0.2s ease;
             position: relative;
         }
+
         .panel-resizer:hover {
             background: var(--hover-color);
         }
+
         .panel-resizer.dragging {
             background: var(--active-color);
         }
+
         .resizer-handle {
             width: 2px;
             height: 20px;
@@ -439,9 +516,11 @@
             border-radius: 1px;
             transition: background 0.2s ease;
         }
+
         .panel-resizer:hover .resizer-handle {
             background: var(--primary-color);
         }
+
         .panel-resizer.dragging .resizer-handle {
             background: var(--primary-color);
         }
@@ -458,21 +537,26 @@
             border-bottom: 1px solid var(--border-color);
             transition: none;
         }
+
         .debug-info-resizer:hover {
             background: var(--hover-color);
         }
+
         .debug-info-resizer.dragging {
             background: var(--active-color);
         }
+
         .resizer-handle-horizontal {
             width: 20px;
             height: 2px;
             background: var(--border-color);
             border-radius: 1px;
         }
+
         .debug-info-resizer:hover .resizer-handle-horizontal {
             background: var(--primary-color);
         }
+
         .debug-info-resizer.dragging .resizer-handle-horizontal {
             background: var(--primary-color);
         }
@@ -483,10 +567,12 @@
                 padding: 8px 12px;
                 gap: 8px;
             }
+
             button {
                 padding: 6px 12px;
                 font-size: 12px;
             }
+
             select {
                 max-width: 150px;
             }
@@ -498,12 +584,14 @@
                 height: auto;
                 min-height: 100vh;
             }
+
             .panel {
                 flex: none !important;
                 width: 100% !important;
                 height: 50vh;
                 min-height: 300px;
             }
+
             .panel-resizer {
                 width: 100%;
                 height: 8px;
@@ -513,10 +601,12 @@
                 border-top: 1px solid var(--border-color);
                 border-bottom: 1px solid var(--border-color);
             }
+
             .resizer-handle {
                 width: 20px;
                 height: 2px;
             }
+
             .debug-info {
                 height: 250px;
             }
@@ -527,79 +617,93 @@
                 flex-wrap: wrap;
                 padding: 6px 8px;
             }
-            .toolbar > * {
+
+            .toolbar>* {
                 flex: 1;
                 min-width: 120px;
                 margin-bottom: 4px;
             }
+
             .debug-info {
                 height: 200px;
             }
+
             .canvas-wrapper {
                 border-radius: 4px;
             }
+
             .tab {
                 padding: 8px 12px;
                 font-size: 12px;
             }
         }
     </style>
-  </head>
-  <body>
+</head>
+
+<body>
     <div id="app">
-      <!-- Left: Editor -->
-      <div class="panel">
-        <div class="toolbar">
-            <select id="shader-selector" style="background: #333; color: white; border: 1px solid #555; padding: 4px; border-radius: 3px; max-width: 200px;">
-                <option value="" disabled selected>Select Shader...</option>
-            </select>
-            <div style="display: flex; align-items: center; gap: 5px; margin-left: 10px; border-left: 1px solid #444; padding-left: 10px;">
-                <input type="checkbox" id="chk-auto-sync" checked title="Sync with file on disk" />
-                <label for="chk-auto-sync" style="font-size: 12px; cursor: pointer;">Auto Sync</label>
-                <button id="btn-reload" style="padding: 2px 8px; font-size: 11px; background: #444;" title="Reload from disk">Reload</button>
+        <!-- Left: Editor -->
+        <div class="panel">
+            <div class="toolbar">
+                <select id="shader-selector"
+                    style="background: #333; color: white; border: 1px solid #555; padding: 4px; border-radius: 3px; max-width: 200px;">
+                    <option value="" disabled selected>Select Shader...</option>
+                </select>
+                <div
+                    style="display: flex; align-items: center; gap: 5px; margin-left: 10px; border-left: 1px solid #444; padding-left: 10px;">
+                    <input type="checkbox" id="chk-auto-sync" checked title="Sync with file on disk" />
+                    <label for="chk-auto-sync" style="font-size: 12px; cursor: pointer;">Auto Sync</label>
+                    <button id="btn-reload" style="padding: 2px 8px; font-size: 11px; background: #444;"
+                        title="Reload from disk">Reload</button>
+                </div>
+                <div style="flex:1"></div>
+                <button id="btn-compile">Compile</button>
+                <span id="status-text" style="font-size: 12px; color: #888;">Ready</span>
             </div>
-            <div style="flex:1"></div>
-            <button id="btn-compile">Compile</button>
-            <span id="status-text" style="font-size: 12px; color: #888;">Ready</span>
+            <div id="editor" class="editor-container"> </div>
         </div>
-        <div id="editor" class="editor-container">        </div>
-      </div>
 
-      <!-- Panel Resizer -->
-      <div class="panel-resizer" id="panel-resizer">
-        <div class="resizer-handle"></div>
-      </div>
+        <!-- Panel Resizer -->
+        <div class="panel-resizer" id="panel-resizer">
+            <div class="resizer-handle"></div>
+        </div>
 
-      <!-- Right: Preview & Debug -->
-      <div class="panel">
-        <div class="preview-container">
-            <div class="toolbar" style="border:none; padding: 0;">
-                <input type="file" id="input-media" accept="image/*,video/*" />
-            </div>
-            <div class="canvas-wrapper">
-                <canvas id="output-canvas"></canvas>
-                <div id="fps-meter">0 FPS</div>
-                <!-- Split control slider -->
-                <div id="split-slider" class="split-slider">
-                    <div class="split-handle" id="split-handle">
-                        <div class="split-line"></div>
+        <!-- Right: Preview & Debug -->
+        <div class="panel">
+            <div class="preview-container">
+                <div class="toolbar" style="border:none; padding: 0;">
+                    <input type="file" id="input-media" accept="image/*,video/*" />
+                </div>
+                <div class="canvas-wrapper">
+                    <canvas id="output-canvas"></canvas>
+                    <div id="fps-meter">0 FPS</div>
+                    <!-- Split control slider -->
+                    <div id="split-slider" class="split-slider">
+                        <div class="split-handle" id="split-handle">
+                            <div class="split-line"></div>
+                        </div>
+                    </div>
+                    <!-- Screen labels -->
+                    <div id="screen-labels">
+                        <div class="label left-label">Processed (Left)</div>
+                        <div class="label right-label">Original (Right)</div>
                     </div>
                 </div>
-                <!-- Screen labels -->
-                <div id="screen-labels">
-                    <div class="label left-label">Processed (Left)</div>
-                    <div class="label right-label">Original (Right)</div>
+                <!-- Video Controls -->
+                <div id="video-controls"
+                    style="display:none; flex-direction: row; gap: 10px; align-items: center; background: #252526; padding: 8px; border-radius: 4px;">
+                    <button id="btn-play-pause" title="Play/Pause">▶️</button>
+                    <button id="btn-stop" title="Stop">⏹️</button>
+                    <input type="range" id="seek-bar" value="0" min="0" max="100" step="0.1"
+                        style="flex: 1; cursor: pointer;" title="Seek">
+                    <span id="time-display"
+                        style="font-family: monospace; font-size: 12px; color: #ccc; min-width: 80px; text-align: center;">00:00
+                        / 00:00</span>
+                    <input type="range" id="volume-bar" value="100" min="0" max="100" step="1"
+                        style="width: 60px; cursor: pointer;" title="Volume">
+                    <span id="volume-display"
+                        style="font-family: monospace; font-size: 10px; color: #888; min-width: 50px;">VOL: 100%</span>
                 </div>
-            </div>
-            <!-- Video Controls -->
-            <div id="video-controls" style="display:none; flex-direction: row; gap: 10px; align-items: center; background: #252526; padding: 8px; border-radius: 4px;">
-                <button id="btn-play-pause" title="Play/Pause">▶️</button>
-                <button id="btn-stop" title="Stop">⏹️</button>
-                <input type="range" id="seek-bar" value="0" min="0" max="100" step="0.1" style="flex: 1; cursor: pointer;" title="Seek">
-                <span id="time-display" style="font-family: monospace; font-size: 12px; color: #ccc; min-width: 80px; text-align: center;">00:00 / 00:00</span>
-                <input type="range" id="volume-bar" value="100" min="0" max="100" step="1" style="width: 60px; cursor: pointer;" title="Volume">
-                <span id="volume-display" style="font-family: monospace; font-size: 10px; color: #888; min-width: 50px;">VOL: 100%</span>
-            </div>
             </div>
 
             <!-- Debug Info Resizer -->
@@ -608,48 +712,50 @@
             </div>
 
             <div class="debug-info">
-            <div class="tabs">
-                <div class="tab active" data-target="log">Logs</div>
-                <div class="tab" data-target="ir">Shader IR (JSON)</div>
-                <div class="tab" data-target="wgsl">Generated WGSL</div>
-                <div class="tab" data-target="split">Split Control</div>
-            </div>
-            <div id="log-content" class="tab-content" style="display:block;"></div>
-            <div id="ir-content" class="tab-content" style="display:none;"></div>
-            <div id="wgsl-content" class="tab-content" style="display:none;"></div>
-            <div id="split-content" class="tab-content" style="display:none;">
-                <div class="split-control-panel">
-                    <label class="control-label">Display Mode:</label>
-                    <div class="mode-buttons">
-                        <button class="mode-btn active" id="mode-split">Split</button>
-                        <button class="mode-btn" id="mode-single">Single</button>
-                    </div>
+                <div class="tabs">
+                    <div class="tab active" data-target="log">Logs</div>
+                    <div class="tab" data-target="ir">Shader IR (JSON)</div>
+                    <div class="tab" data-target="wgsl">Generated WGSL</div>
+                    <div class="tab" data-target="split">Split Control</div>
+                </div>
+                <div id="log-content" class="tab-content" style="display:block;"></div>
+                <div id="ir-content" class="tab-content" style="display:none;"></div>
+                <div id="wgsl-content" class="tab-content" style="display:none;"></div>
+                <div id="split-content" class="tab-content" style="display:none;">
+                    <div class="split-control-panel">
+                        <label class="control-label">Display Mode:</label>
+                        <div class="mode-buttons">
+                            <button class="mode-btn active" id="mode-split">Split</button>
+                            <button class="mode-btn" id="mode-single">Single</button>
+                        </div>
 
-                    <label class="control-label">Color Filters:</label>
-                    <div class="control-row">
-                        <input type="checkbox" id="chk-color-filters" checked />
-                        <label for="chk-color-filters" style="margin-left: 6px; font-size: 12px;">Enable</label>
-                    </div>
+                        <label class="control-label">Color Filters:</label>
+                        <div class="control-row">
+                            <input type="checkbox" id="chk-color-filters" checked />
+                            <label for="chk-color-filters" style="margin-left: 6px; font-size: 12px;">Enable</label>
+                        </div>
 
-                    <label class="control-label">Split Ratio:</label>
-                    <div class="preset-buttons">
-                        <button class="preset-btn" data-split="0.3">30/70</button>
-                        <button class="preset-btn active" data-split="0.5">50/50</button>
-                        <button class="preset-btn" data-split="0.7">70/30</button>
-                    </div>
+                        <label class="control-label">Split Ratio:</label>
+                        <div class="preset-buttons">
+                            <button class="preset-btn" data-split="0.3">30/70</button>
+                            <button class="preset-btn active" data-split="0.5">50/50</button>
+                            <button class="preset-btn" data-split="0.7">70/30</button>
+                        </div>
 
-                    <label class="control-label">Current Ratio:</label>
-                    <div class="split-info">
-                        <span id="current-ratio" style="font-family: 'SF Mono', monospace; color: var(--primary-color);">50%</span>
-                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-                            Drag the line on canvas to adjust manually
+                        <label class="control-label">Current Ratio:</label>
+                        <div class="split-info">
+                            <span id="current-ratio"
+                                style="font-family: 'SF Mono', monospace; color: var(--primary-color);">50%</span>
+                            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                                Drag the line on canvas to adjust manually
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
-  </body>
+</body>
+
 </html>

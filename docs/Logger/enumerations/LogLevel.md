@@ -6,7 +6,7 @@
 
 # Enumeration: LogLevel
 
-Defined in: [utils/Logger.ts:15](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/utils/Logger.ts#L15)
+Defined in: [utils/Logger.ts:15](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/utils/Logger.ts#L15)
 
 Log level enumeration.
 ---
@@ -18,7 +18,7 @@ Log level enumeration.
 
 > **DEBUG**: `0`
 
-Defined in: [utils/Logger.ts:17](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/utils/Logger.ts#L17)
+Defined in: [utils/Logger.ts:17](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/utils/Logger.ts#L17)
 
 Detailed debug information / 詳細的偵錯資訊
 
@@ -28,7 +28,7 @@ Detailed debug information / 詳細的偵錯資訊
 
 > **ERROR**: `3`
 
-Defined in: [utils/Logger.ts:23](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/utils/Logger.ts#L23)
+Defined in: [utils/Logger.ts:23](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/utils/Logger.ts#L23)
 
 Critical error messages / 致命錯誤訊息
 
@@ -38,7 +38,7 @@ Critical error messages / 致命錯誤訊息
 
 > **INFO**: `1`
 
-Defined in: [utils/Logger.ts:19](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/utils/Logger.ts#L19)
+Defined in: [utils/Logger.ts:19](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/utils/Logger.ts#L19)
 
 General operational messages / 一般運作訊息
 
@@ -48,7 +48,7 @@ General operational messages / 一般運作訊息
 
 > **NONE**: `4`
 
-Defined in: [utils/Logger.ts:25](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/utils/Logger.ts#L25)
+Defined in: [utils/Logger.ts:25](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/utils/Logger.ts#L25)
 
 Disable all logging / 停用所有日誌輸出
 
@@ -58,6 +58,6 @@ Disable all logging / 停用所有日誌輸出
 
 > **WARN**: `2`
 
-Defined in: [utils/Logger.ts:21](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/utils/Logger.ts#L21)
+Defined in: [utils/Logger.ts:21](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/utils/Logger.ts#L21)
 
 Warning messages for non-critical issues / 非致命問題的警告訊息

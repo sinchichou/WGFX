@@ -1,6 +1,6 @@
 /// <reference types="@webgpu/types" />
 import { ResourceManager } from './ResourceManager';
-import {Logger} from '@/utils/Logger';
+import { Logger } from '@/utils/Logger';
 
 /**
  * Metadata for a stored WebGPU pipeline and its associated layouts.
@@ -81,7 +81,7 @@ export class PipelineManager {
             bindingMap.set(0, {
                 binding: 0,
                 visibility: GPUShaderStage.COMPUTE,
-                sampler: {type: 'filtering'}
+                sampler: { type: 'filtering' }
             });
 
             // Binding 1: Uniform buffer for parameters / 綁定 1：存放參數的 Uniform 緩衝區
@@ -124,7 +124,7 @@ export class PipelineManager {
                     bindingMap.set(samp.binding, {
                         binding: samp.binding,
                         visibility: GPUShaderStage.COMPUTE,
-                        sampler: {type: 'filtering'}
+                        sampler: { type: 'filtering' }
                     });
                 }
             });
@@ -168,7 +168,7 @@ export class PipelineManager {
         // 1. Get or create default sampler / 獲取或建立預設取樣器
         let defaultSampler = this.resourceManager.getSampler('sam');
         if (!defaultSampler) {
-            defaultSampler = this.device.createSampler({magFilter: 'linear', minFilter: 'linear'});
+            defaultSampler = this.device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
         }
         groupEntries.push({ binding: 0, resource: defaultSampler });
 
@@ -190,14 +190,14 @@ export class PipelineManager {
         resources.samplers.forEach((samp: any) => {
             if (samp.binding !== 0) {
                 const s = this.resourceManager.getSampler(samp.name);
-                if (s) groupEntries.push({binding: samp.binding, resource: s});
+                if (s) groupEntries.push({ binding: samp.binding, resource: s });
             }
         });
 
         // 5. Bind global scene constants / 綁定全域場景常量
         const sceneBuffer = this.resourceManager.getSceneBuffer();
         if (sceneBuffer) {
-            groupEntries.push({binding: 4, resource: {buffer: sceneBuffer}});
+            groupEntries.push({ binding: 4, resource: { buffer: sceneBuffer } });
         }
 
         // Initialize compute pass / 初始化計算通道

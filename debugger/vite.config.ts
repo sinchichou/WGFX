@@ -17,15 +17,15 @@ const shaderWatcherPlugin = () => {
         const examplesDir = path.resolve(__dirname, '../examples');
         try {
           if (!fs.existsSync(examplesDir)) {
-             res.statusCode = 404;
-             res.end(JSON.stringify({ error: `Directory not found: ${examplesDir}` }));
-             return;
+            res.statusCode = 404;
+            res.end(JSON.stringify({ error: `Directory not found: ${examplesDir}` }));
+            return;
           }
 
           const files = fs.readdirSync(examplesDir)
             .filter(f => f.endsWith('.wgsl'))
             .map(f => ({ name: f, path: `examples/${f}` }));
-          
+
           res.setHeader('Content-Type', 'application/json');
           res.end(JSON.stringify(files));
         } catch (e) {

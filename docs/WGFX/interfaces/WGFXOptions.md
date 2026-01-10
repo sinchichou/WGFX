@@ -6,7 +6,7 @@
 
 # Interface: WGFXOptions
 
-Defined in: [WGFX.ts:12](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L12)
+Defined in: [WGFX.ts:12](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L12)
 
 Options for creating a WGFX instance.
 ---
@@ -18,7 +18,7 @@ Options for creating a WGFX instance.
 
 > **device**: `GPUDevice`
 
-Defined in: [WGFX.ts:17](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L17)
+Defined in: [WGFX.ts:17](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L17)
 
 The WebGPU device to use.
 
@@ -32,7 +32,7 @@ The WebGPU device to use.
 
 > **effectCode**: `string`
 
-Defined in: [WGFX.ts:22](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L22)
+Defined in: [WGFX.ts:22](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L22)
 
 The WGSL or custom effect code string.
 
@@ -46,7 +46,7 @@ WGSL 或自定義特效代碼字串
 
 > `optional` **externalResources**: `any`
 
-Defined in: [WGFX.ts:28](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L28)
+Defined in: [WGFX.ts:28](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L28)
 
 #### Zh
 
@@ -58,7 +58,7 @@ Defined in: [WGFX.ts:28](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e08359
 
 > **height**: `number`
 
-Defined in: [WGFX.ts:26](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L26)
+Defined in: [WGFX.ts:26](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L26)
 
 #### Zh
 
@@ -70,7 +70,7 @@ Defined in: [WGFX.ts:26](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e08359
 
 > **width**: `number`
 
-Defined in: [WGFX.ts:24](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L24)
+Defined in: [WGFX.ts:24](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L24)
 
 #### Zh
 

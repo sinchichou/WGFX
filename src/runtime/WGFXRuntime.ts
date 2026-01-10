@@ -4,8 +4,8 @@ import { ResourceManager } from './ResourceManager';
 import { PipelineManager } from './PipelineManager';
 import { WGSLCodeGenerator } from './WGSLCodeGenerator';
 import { UniformBinder } from './UniformBinder';
-import {WGFXShaderInfo} from '@/types';
-import {Logger} from '@/utils/Logger';
+import { WGFXShaderInfo } from '@/types';
+import { Logger } from '@/utils/Logger';
 
 /**
  * Core runtime for WGFX, managing resources, pipelines, and execution.

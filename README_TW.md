@@ -130,7 +130,7 @@ WGFX 的特效檔包含特殊的指示符 (Directives) 與標準 WGSL 代碼：
 | `//! PARAMETER <name>` | 定義一個可動態調整的 Uniform 參數 | `//! PARAMETER Sharpness` |
 | `//! COMMON`           | 所有通道共享的通用代碼塊          | `//! COMMON`              |
 
-_(詳細規格請參考 [API 文件](docs/index.md))_
+_(詳細規格請參考 [API 文件](docs/modules.md))_
 
 ---
 

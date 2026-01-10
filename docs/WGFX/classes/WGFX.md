@@ -6,7 +6,7 @@
 
 # Class: WGFX
 
-Defined in: [WGFX.ts:73](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L73)
+Defined in: [WGFX.ts:73](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L73)
 
 Main WGFX class for handling WebGPU graphics effects.
 ---
@@ -27,7 +27,7 @@ wgfx.dispose();
 
 > **currentInputSource**: `any`
 
-Defined in: [WGFX.ts:83](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L83)
+Defined in: [WGFX.ts:83](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L83)
 
 #### Zh
 
@@ -39,7 +39,7 @@ Defined in: [WGFX.ts:83](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e08359
 
 > **height**: `number`
 
-Defined in: [WGFX.ts:81](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L81)
+Defined in: [WGFX.ts:81](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L81)
 
 #### Zh
 
@@ -51,7 +51,7 @@ Defined in: [WGFX.ts:81](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e08359
 
 > **initialized**: `boolean`
 
-Defined in: [WGFX.ts:77](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L77)
+Defined in: [WGFX.ts:77](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L77)
 
 #### Zh
 
@@ -63,7 +63,7 @@ Defined in: [WGFX.ts:77](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e08359
 
 > **width**: `number`
 
-Defined in: [WGFX.ts:79](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L79)
+Defined in: [WGFX.ts:79](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L79)
 
 #### Zh
 
@@ -75,7 +75,7 @@ Defined in: [WGFX.ts:79](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e08359
 
 > `static` **setDebug**(`enabled`): `void`
 
-Defined in: [WGFX.ts:106](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L106)
+Defined in: [WGFX.ts:106](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L106)
 
 Enable or disable debug mode globally.
 ---
@@ -99,7 +99,7 @@ Whether to enable debug mode / 是否啟用偵錯模式
 
 > `static` **setLevel**(`level`): `void`
 
-Defined in: [WGFX.ts:118](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L118)
+Defined in: [WGFX.ts:118](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L118)
 
 Set the current log level globally.
 ---
@@ -123,7 +123,7 @@ The target [LogLevel](../../Logger/enumerations/LogLevel.md) / 目標日誌層�
 
 > **dispose**(): `void`
 
-Defined in: [WGFX.ts:351](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L351)
+Defined in: [WGFX.ts:351](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L351)
 
 Dispose all resources and clean up.
 ---
@@ -139,7 +139,7 @@ Dispose all resources and clean up.
 
 > `static` **create**(`options`): `Promise`\<`WGFX`\>
 
-Defined in: [WGFX.ts:132](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L132)
+Defined in: [WGFX.ts:132](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L132)
 
 Factory method to create and initialize a WGFX instance.
 ---
@@ -169,7 +169,7 @@ A promise that resolves to a WGFX instance
 
 > **initialize**(): [`WGFXInfo`](../interfaces/WGFXInfo.md)
 
-Defined in: [WGFX.ts:199](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L199)
+Defined in: [WGFX.ts:199](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L199)
 
 Get information about the initialized effect.
 ---
@@ -191,7 +191,7 @@ Metadata about the current effect / 目前特效的元數據
 
 > **getOutputView**(): `GPUTextureView`
 
-Defined in: [WGFX.ts:340](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L340)
+Defined in: [WGFX.ts:340](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L340)
 
 Get the texture view of the final output.
 ---
@@ -209,7 +209,7 @@ The output GPUTextureView
 
 > **process**(`inputSource`, `options`): `Promise`\<`GPUTexture`\>
 
-Defined in: [WGFX.ts:267](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L267)
+Defined in: [WGFX.ts:267](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L267)
 
 Process an input source and return the output texture.
 ---
@@ -251,7 +251,7 @@ A promise that resolves to the output GPUTexture
 
 > **updateUniforms**(`uniforms`): `void`
 
-Defined in: [WGFX.ts:236](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L236)
+Defined in: [WGFX.ts:236](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L236)
 
 Update shader uniform values.
 ---

@@ -1,6 +1,6 @@
 /// <reference types="@webgpu/types" />
 import { WGFXShaderInfo, TextureInfo } from '../types/shader';
-import {Logger} from '../utils/Logger';
+import { Logger } from '../utils/Logger';
 
 /**
  * Manages WebGPU resources including textures, views, samplers, and buffers.

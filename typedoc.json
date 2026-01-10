@@ -2,6 +2,7 @@
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": [
     "src/WGFX.ts",
+    "src/runtime/WGFXRuntime.ts",
     "src/runtime/PipelineManager.ts",
     "src/runtime/ResourceManager.ts",
     "src/runtime/UniformBinder.ts",
@@ -9,7 +10,9 @@
     "src/utils/Logger.ts"
   ],
   "out": "docs",
-  "plugin": ["typedoc-plugin-markdown"],
+  "plugin": [
+    "typedoc-plugin-markdown"
+  ],
   "name": "WGFX API Documentation",
   "includeVersion": true,
   "categorizeByGroup": true,
@@ -17,8 +20,9 @@
   "searchInComments": true,
   "entryFileName": "index.md",
   "validation": {
-    "invalidLink": false
+    "invalidLink": true
   },
+  "cleanOutputDir": false,
   "externalSymbolLinkMappings": {
     "global": {
       "GPUTexture": "https://www.w3.org/TR/webgpu/#gpu-texture",
@@ -26,11 +30,24 @@
     }
   },
   "highlightLanguages": [
-    "typescript", "javascript", "wgsl", "hlsl", "json"
+    "typescript",
+    "javascript",
+    "wgsl",
+    "hlsl",
+    "json"
   ],
   "blockTags": [
-    "@param", "@returns", "@throws", "@see", "@description", 
-    "@example", "@zh", "@compute", "@group", "@category", 
-    "@defaultValue", "@module"
+    "@param",
+    "@returns",
+    "@throws",
+    "@see",
+    "@description",
+    "@example",
+    "@zh",
+    "@compute",
+    "@group",
+    "@category",
+    "@defaultValue",
+    "@module"
   ]
 }

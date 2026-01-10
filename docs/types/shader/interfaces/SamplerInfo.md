@@ -6,7 +6,7 @@
 
 # Interface: SamplerInfo
 
-Defined in: [types/shader.ts:22](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/types/shader.ts#L22)
+Defined in: [types/shader.ts:22](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/types/shader.ts#L22)
 
 Information about a sampler resource used in the shader
 著色器中使用的取樣器資源資訊
@@ -17,7 +17,7 @@ Information about a sampler resource used in the shader
 
 > **address**: `string`
 
-Defined in: [types/shader.ts:28](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/types/shader.ts#L28)
+Defined in: [types/shader.ts:28](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/types/shader.ts#L28)
 
 Address mode: 'WRAP' or 'CLAMP' / 定址模式
 
@@ -27,7 +27,7 @@ Address mode: 'WRAP' or 'CLAMP' / 定址模式
 
 > **filter**: `string`
 
-Defined in: [types/shader.ts:26](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/types/shader.ts#L26)
+Defined in: [types/shader.ts:26](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/types/shader.ts#L26)
 
 Filter mode: 'LINEAR' or 'NEAREST' / 過濾模式
 
@@ -37,6 +37,6 @@ Filter mode: 'LINEAR' or 'NEAREST' / 過濾模式
 
 > **name**: `string`
 
-Defined in: [types/shader.ts:24](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/types/shader.ts#L24)
+Defined in: [types/shader.ts:24](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/types/shader.ts#L24)
 
 Sampler identifier used in code / 程式碼中使用的取樣器識別符

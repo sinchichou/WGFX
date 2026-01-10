@@ -3,7 +3,11 @@
     "target": "ES2020",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
@@ -17,10 +21,21 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["../src/*"],
-      "wgfx": ["../dist/wgfx.browser.esm.js"]
+      "@/*": [
+        "../src/*"
+      ],
+      "wgfx": [
+        "../dist/wgfx.browser.esm.js"
+      ]
     }
   },
-  "include": ["src/**/*.ts", "../src/**/*.ts"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": [
+    "src/**/*.ts",
+    "../src/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "./tsconfig.node.json"
+    }
+  ]
 }

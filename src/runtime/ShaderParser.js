@@ -191,7 +191,7 @@ function peg$parse(input, options) {
     }
 
     function peg$f1() {
-        return {type: "empty"};
+        return { type: "empty" };
     }
 
     function peg$f2(name, value) {
@@ -214,7 +214,7 @@ function peg$parse(input, options) {
             }
             currentBlock = null;
             currentData = null;
-            return {type: "directive", directive: "END"};
+            return { type: "directive", directive: "END" };
         }
 
         // Check for block-starting directives.
@@ -236,12 +236,12 @@ function peg$parse(input, options) {
             // 根據指令開始一個新區塊。
             if (["PARAMETER", "TEXTURE", "SAMPLER", "COMMON", "PASS"].includes(directive)) {
                 currentBlock = directive;
-                currentData = {id: val, lines: []}; // Initialize currentData for the new block.
+                currentData = { id: val, lines: [] }; // Initialize currentData for the new block.
                 if (directive === 'PASS') currentData.index = parseInt(val, 10); // Special handling for PASS index.
             } else { // Global directives (VERSION, SORT_NAME, USE, CAPABILITY) are self-contained and don't start a multi-line block.
                 currentBlock = null;
                 currentData = null;
-                commitBlock(directive, {id: val}); // Commit immediately as they are single-line directives.
+                commitBlock(directive, { id: val }); // Commit immediately as they are single-line directives.
             }
         } else { // This is a sub-directive within an active block.
             // If there's no active block, this sub-directive is out of place.
@@ -249,7 +249,7 @@ function peg$parse(input, options) {
             if (!currentData) throw new Error(`Directive //! ${directive} cannot be used here / 指令 //! ${directive} 不能在此處使用`);
             parseSubDirective(currentData, directive, val); // Parse the sub-directive.
         }
-        return {type: "directive", directive: directive, value: val};
+        return { type: "directive", directive: directive, value: val };
     }
 
     function peg$f3(text) {
@@ -263,7 +263,7 @@ function peg$parse(input, options) {
             if (match) {
                 currentData.isTemplate = true; // Mark as a template for resource creation.
                 const name = match[1]; // Extract the resource name.
-                const newResource = {...currentData, name: name, id: name}; // Create a new resource object.
+                const newResource = { ...currentData, name: name, id: name }; // Create a new resource object.
                 delete newResource.lines; // These are specific to COMMON blocks.
                 delete newResource.isTemplate;
 
@@ -276,7 +276,7 @@ function peg$parse(input, options) {
                 } else if (currentBlock === 'PARAMETER') {
                     shaderInfo.parameters.push(newResource);
                 }
-                return {type: "code", text: lineStr};
+                return { type: "code", text: lineStr };
             }
         }
 
@@ -287,12 +287,12 @@ function peg$parse(input, options) {
         } else if (currentBlock === 'PASS') {
             passCodeBuffer.push(lineStr);
         }
-        return {type: "code", text: lineStr};
+        return { type: "code", text: lineStr };
     }
 
     let peg$currPos = options.peg$currPos | 0;
     let peg$savedPos = peg$currPos;
-    const peg$posDetailsCache = [{line: 1, column: 1}];
+    const peg$posDetailsCache = [{ line: 1, column: 1 }];
     let peg$maxFailPos = peg$currPos;
     let peg$maxFailExpected = options.peg$maxFailExpected || [];
     let peg$silentFails = options.peg$silentFails | 0;
@@ -356,23 +356,23 @@ function peg$parse(input, options) {
     }
 
     function peg$literalExpectation(text, ignoreCase) {
-        return {type: "literal", text, ignoreCase};
+        return { type: "literal", text, ignoreCase };
     }
 
     function peg$classExpectation(parts, inverted, ignoreCase, unicode) {
-        return {type: "class", parts, inverted, ignoreCase, unicode};
+        return { type: "class", parts, inverted, ignoreCase, unicode };
     }
 
     function peg$anyExpectation() {
-        return {type: "any"};
+        return { type: "any" };
     }
 
     function peg$endExpectation() {
-        return {type: "end"};
+        return { type: "end" };
     }
 
     function peg$otherExpectation(description) {
-        return {type: "other", description};
+        return { type: "other", description };
     }
 
     function peg$computePosDetails(pos) {
@@ -697,7 +697,7 @@ function peg$parse(input, options) {
     // Initialize the Intermediate Representation (IR) structure.
     // 初始化 IR 結構
     const shaderInfo = {
-        metadata: {use: {}, capability: {}},
+        metadata: { use: {}, capability: {} },
         parameters: [],
         textures: [],
         samplers: [],

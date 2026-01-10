@@ -6,7 +6,7 @@
 
 # Class: PipelineManager
 
-Defined in: [runtime/PipelineManager.ts:31](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/runtime/PipelineManager.ts#L31)
+Defined in: [runtime/PipelineManager.ts:31](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/runtime/PipelineManager.ts#L31)
 
 Manages the creation and execution of compute pipelines.
 ---
@@ -18,7 +18,7 @@ Manages the creation and execution of compute pipelines.
 
 > **new PipelineManager**(`device`, `resourceManager`): `PipelineManager`
 
-Defined in: [runtime/PipelineManager.ts:37](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/runtime/PipelineManager.ts#L37)
+Defined in: [runtime/PipelineManager.ts:37](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/runtime/PipelineManager.ts#L37)
 
 #### Parameters
 
@@ -40,7 +40,7 @@ Defined in: [runtime/PipelineManager.ts:37](https://github.com/sinchichou/WGFX/b
 
 > **device**: `GPUDevice`
 
-Defined in: [runtime/PipelineManager.ts:32](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/runtime/PipelineManager.ts#L32)
+Defined in: [runtime/PipelineManager.ts:32](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/runtime/PipelineManager.ts#L32)
 
 ***
 
@@ -48,7 +48,7 @@ Defined in: [runtime/PipelineManager.ts:32](https://github.com/sinchichou/WGFX/b
 
 > **pipelines**: `Map`\<`number`, `StoredPipeline`\>
 
-Defined in: [runtime/PipelineManager.ts:35](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/runtime/PipelineManager.ts#L35)
+Defined in: [runtime/PipelineManager.ts:35](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/runtime/PipelineManager.ts#L35)
 
 Map of pass index to pipeline / 通道索引與管線的映射
 
@@ -58,7 +58,7 @@ Map of pass index to pipeline / 通道索引與管線的映射
 
 > **resourceManager**: [`ResourceManager`](../../ResourceManager/classes/ResourceManager.md)
 
-Defined in: [runtime/PipelineManager.ts:33](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/runtime/PipelineManager.ts#L33)
+Defined in: [runtime/PipelineManager.ts:33](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/runtime/PipelineManager.ts#L33)
 
 ## Execution
 
@@ -66,7 +66,7 @@ Defined in: [runtime/PipelineManager.ts:33](https://github.com/sinchichou/WGFX/b
 
 > **dispatchPass**(`passInfo`, `commandEncoder`): `void`
 
-Defined in: [runtime/PipelineManager.ts:159](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/runtime/PipelineManager.ts#L159)
+Defined in: [runtime/PipelineManager.ts:159](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/runtime/PipelineManager.ts#L159)
 
 Dispatch a compute pass.
 ---
@@ -96,7 +96,7 @@ GPU command encoder / 指令編碼器
 
 > **dispose**(): `void`
 
-Defined in: [runtime/PipelineManager.ts:236](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/runtime/PipelineManager.ts#L236)
+Defined in: [runtime/PipelineManager.ts:236](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/runtime/PipelineManager.ts#L236)
 
 Clear all cached pipelines.
 ---
@@ -112,7 +112,7 @@ Clear all cached pipelines.
 
 > **createPipelines**(`shaderInfo`, `generatedModules`): `Promise`\<`void`\>
 
-Defined in: [runtime/PipelineManager.ts:52](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/runtime/PipelineManager.ts#L52)
+Defined in: [runtime/PipelineManager.ts:52](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/runtime/PipelineManager.ts#L52)
 
 Create pipelines for all shader modules.
 ---

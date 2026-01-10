@@ -227,9 +227,47 @@ function updateSplitHandle() {
         splitHandle.style.display = "block";
         if (splitControls) splitControls.style.display = "flex";
 
-        const percentage = splitRatio * 100;
-        splitHandle.style.left = `${percentage}%`;
+        // Constrain split handle height to canvas dimensions
+        const canvasRect = canvas.getBoundingClientRect();
+        const canvasWrapperRect = canvas.parentElement!.getBoundingClientRect();
+
+        // Calculate the offset of canvas within its wrapper
+        const canvasOffsetTop = canvasRect.top - canvasWrapperRect.top;
+
+        // Position split handle to align exactly with canvas
+        splitHandle.style.top = `${canvasOffsetTop}px`;
+        splitHandle.style.height = `${canvasRect.height}px`;
+
+        // Ensure split handle doesn't extend beyond canvas bounds
+        const maxHeight = canvasRect.height;
+        if (parseFloat(splitHandle.style.height) > maxHeight) {
+            splitHandle.style.height = `${maxHeight}px`;
+        }
+
+        // Calculate position relative to canvas
+        const canvasRectForPosition = canvas.getBoundingClientRect();
+        const canvasWrapperRectForPosition = canvas.parentElement!.getBoundingClientRect();
+        const canvasOffsetLeft = canvasRectForPosition.left - canvasWrapperRectForPosition.left;
+
+        // 計算控制桿的中心位置（相對於 canvas wrapper）
+        // 控制桿使用 transform: translateX(-50%)，所以 left 值是中心位置
+        // 控制桿最大寬度為 10px（dragging 狀態），所以中心至少距離邊緣 5px
+        const handleHalfWidth = 5; // 控制桿最大寬度的一半
+        const canvasWidth = canvasRectForPosition.width;
+
+        // 計算控制桿中心在 canvas 內的位置（相對於 canvas 左邊）
+        const centerInCanvas = splitRatio * canvasWidth;
+
+        // 限制控制桿中心在 canvas 範圍內（考慮控制桿寬度）
+        const clampedCenter = Math.max(handleHalfWidth, Math.min(canvasWidth - handleHalfWidth, centerInCanvas));
+
+        // 轉換為相對於 wrapper 的位置
+        const leftPosition = canvasOffsetLeft + clampedCenter;
+
+        splitHandle.style.left = `${leftPosition}px`;
+
         if (currentRatioDisplay) {
+            const percentage = splitRatio * 100;
             currentRatioDisplay.textContent = `${Math.round(percentage)}%`;
         }
     }
@@ -256,12 +294,16 @@ function startSplitDrag(e: MouseEvent) {
  * Update split ratio based on mouse position during drag
  */
 function updateSplitFromMouse(e: MouseEvent) {
-    const canvasWrapper = document.getElementById("output-canvas")?.parentElement;
-    if (!canvasWrapper) return;
+    const canvas = document.getElementById("output-canvas") as HTMLCanvasElement;
+    if (!canvas) return;
 
-    const rect = canvasWrapper.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
+    // 計算滑鼠相對於 canvas 左邊的位置
     const x = e.clientX - rect.left;
-    const ratio = Math.max(0, Math.min(1, x / rect.width));
+    // 限制在 canvas 範圍內（0 到 canvas 寬度）
+    const clampedX = Math.max(0, Math.min(rect.width, x));
+    // 計算比例
+    const ratio = clampedX / rect.width;
     splitRatio = ratio;
     updateSplitHandle();
 }

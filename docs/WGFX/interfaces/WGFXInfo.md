@@ -6,7 +6,7 @@
 
 # Interface: WGFXInfo
 
-Defined in: [WGFX.ts:38](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L38)
+Defined in: [WGFX.ts:38](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L38)
 
 Information about the loaded WGFX effect metadata.
 ---
@@ -18,7 +18,7 @@ Information about the loaded WGFX effect metadata.
 
 > **height**: `number`
 
-Defined in: [WGFX.ts:42](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L42)
+Defined in: [WGFX.ts:42](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L42)
 
 #### Zh
 
@@ -30,7 +30,7 @@ Defined in: [WGFX.ts:42](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e08359
 
 > **passes**: `number`
 
-Defined in: [WGFX.ts:57](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L57)
+Defined in: [WGFX.ts:57](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L57)
 
 #### Zh
 
@@ -42,7 +42,7 @@ Defined in: [WGFX.ts:57](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e08359
 
 > **uniforms**: `object`[]
 
-Defined in: [WGFX.ts:47](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L47)
+Defined in: [WGFX.ts:47](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L47)
 
 List of adjustable uniform parameters.
 
@@ -86,7 +86,7 @@ List of adjustable uniform parameters.
 
 > **width**: `number`
 
-Defined in: [WGFX.ts:40](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/WGFX.ts#L40)
+Defined in: [WGFX.ts:40](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/WGFX.ts#L40)
 
 #### Zh
 

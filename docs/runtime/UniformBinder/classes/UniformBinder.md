@@ -6,7 +6,7 @@
 
 # Class: UniformBinder
 
-Defined in: [runtime/UniformBinder.ts:13](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/runtime/UniformBinder.ts#L13)
+Defined in: [runtime/UniformBinder.ts:13](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/runtime/UniformBinder.ts#L13)
 
 Handles the binding and updating of WebGPU uniform buffers.
 ---
@@ -19,7 +19,7 @@ Handles the binding and updating of WebGPU uniform buffers.
 
 > **new UniformBinder**(`device`, `resourceManager`): `UniformBinder`
 
-Defined in: [runtime/UniformBinder.ts:27](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/runtime/UniformBinder.ts#L27)
+Defined in: [runtime/UniformBinder.ts:27](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/runtime/UniformBinder.ts#L27)
 
 Initialize the uniform binder.
 ---
@@ -49,7 +49,7 @@ The resource manager / 資源管理員
 
 > **device**: `GPUDevice`
 
-Defined in: [runtime/UniformBinder.ts:15](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/runtime/UniformBinder.ts#L15)
+Defined in: [runtime/UniformBinder.ts:15](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/runtime/UniformBinder.ts#L15)
 
 #### Zh
 
@@ -61,7 +61,7 @@ WebGPU 裝置實例
 
 > **resourceManager**: [`ResourceManager`](../../ResourceManager/classes/ResourceManager.md)
 
-Defined in: [runtime/UniformBinder.ts:17](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/runtime/UniformBinder.ts#L17)
+Defined in: [runtime/UniformBinder.ts:17](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/runtime/UniformBinder.ts#L17)
 
 #### Zh
 
@@ -73,7 +73,7 @@ Defined in: [runtime/UniformBinder.ts:17](https://github.com/sinchichou/WGFX/blo
 
 > **updateUniform**(`name`, `value`): `void`
 
-Defined in: [runtime/UniformBinder.ts:48](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/runtime/UniformBinder.ts#L48)
+Defined in: [runtime/UniformBinder.ts:48](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/runtime/UniformBinder.ts#L48)
 
 Update a specific uniform value in the GPU buffer.
 ---

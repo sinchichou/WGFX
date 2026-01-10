@@ -6,7 +6,7 @@
 
 # Class: Logger
 
-Defined in: [utils/Logger.ts:46](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/utils/Logger.ts#L46)
+Defined in: [utils/Logger.ts:46](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/utils/Logger.ts#L46)
 
 Logger class for unified error output and debug mode control.
 ---
@@ -39,7 +39,7 @@ Logger.setLevel(LogLevel.ERROR);
 
 > `static` **setDebug**(`enabled`): `void`
 
-Defined in: [utils/Logger.ts:74](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/utils/Logger.ts#L74)
+Defined in: [utils/Logger.ts:74](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/utils/Logger.ts#L74)
 
 Quickly enable or disable debug mode.
 ---
@@ -64,7 +64,7 @@ True to see all logs / 是否啟用偵錯模式
 
 > `static` **setLevel**(`level`): `void`
 
-Defined in: [utils/Logger.ts:61](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/utils/Logger.ts#L61)
+Defined in: [utils/Logger.ts:61](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/utils/Logger.ts#L61)
 
 Set the current log level.
 ---
@@ -88,7 +88,7 @@ The target [LogLevel](../enumerations/LogLevel.md) / 目標日誌層級
 
 > `static` **debug**(`message`, ...`args`): `void`
 
-Defined in: [utils/Logger.ts:87](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/utils/Logger.ts#L87)
+Defined in: [utils/Logger.ts:87](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/utils/Logger.ts#L87)
 
 Log a debug message.
 ---
@@ -118,7 +118,7 @@ Additional contextual data / 額外的上下文參數
 
 > `static` **error**(`message`, ...`args`): `void`
 
-Defined in: [utils/Logger.ts:132](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/utils/Logger.ts#L132)
+Defined in: [utils/Logger.ts:132](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/utils/Logger.ts#L132)
 
 Log an error message.
 ---
@@ -148,7 +148,7 @@ Additional data or Error object / 額外參數或 Error 物件
 
 > `static` **info**(`message`, ...`args`): `void`
 
-Defined in: [utils/Logger.ts:102](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/utils/Logger.ts#L102)
+Defined in: [utils/Logger.ts:102](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/utils/Logger.ts#L102)
 
 Log an info message.
 ---
@@ -178,7 +178,7 @@ Additional data / 額外參數
 
 > `static` **warn**(`message`, ...`args`): `void`
 
-Defined in: [utils/Logger.ts:117](https://github.com/sinchichou/WGFX/blob/f7ebc77d9e083596c467ce00afea57991492f246/src/utils/Logger.ts#L117)
+Defined in: [utils/Logger.ts:117](https://github.com/sinchichou/WGFX/blob/e1d8323112badb471e6655823c5e8f540a5d8581/src/utils/Logger.ts#L117)
 
 Log a warning message.
 ---

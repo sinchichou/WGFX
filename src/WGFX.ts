@@ -1,6 +1,6 @@
 import { WGFXShaderInfo, ParameterInfo } from './types/shader';
 import { WGFXRuntime } from './runtime/WGFXRuntime';
-import {Logger, LogLevel} from './utils/Logger';
+import { Logger, LogLevel } from './utils/Logger';
 
 /**
  * Options for creating a WGFX instance.

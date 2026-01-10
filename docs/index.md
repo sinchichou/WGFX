@@ -8,6 +8,13 @@
 ![Status: Beta](https://img.shields.io/badge/Status-Beta-yellow)
 ![Platform: Web/Node](https://img.shields.io/badge/Platform-Web%20%7C%20Node.js-green)
 
+## Development Status
+
+> [!WARNING]
+> There are still unrepaired problems
+>
+>     The adjustable parameter function is not completed
+
 **WGFX** is a high-performance graphics effect framework built for WebGPU. Inspired by the design philosophy of **Magpie**, it aims to provide a powerful and user-friendly platform for developing and executing effects in the Web environment. WGFX supports parsing custom `.wgsl` effect files and automatically manages GPU resources, pipeline construction, and multi-pass rendering.
 
 Its core value lies in helping developers easily migrate shader effects originally written in HLSL (especially Magpie or MPDN style) to modern web browsers, enabling complex image post-processing features such as real-time upscaling and denoising.
@@ -26,7 +33,7 @@ Its core value lies in helping developers easily migrate shader effects original
 
 ## �️ Technical Architecture
 
-WGFX follows the "Single Responsibility Principle," breaking down complex WebGPU workflows into several core modules. For a detailed design breakdown, see the [Technical Overview](docs/technical/OVERVIEW.md).
+WGFX follows the "Single Responsibility Principle," breaking down complex WebGPU workflows into several core modules. For a detailed design breakdown, see the [Technical Overview](_media/OVERVIEW.md).
 
 ### Project Structure
 
@@ -134,7 +141,7 @@ WGFX effect files contain special directives and standard WGSL code:
 | `//! PARAMETER <name>` | Defines a dynamically adjustable uniform parameter | `//! PARAMETER Sharpness` |
 | `//! COMMON`           | A shared code block for all passes                 | `//! COMMON`              |
 
-_(For detailed specifications, refer to [API Documentation](docs/index.md))_
+_(For detailed specifications, refer to [API Documentation](_media/modules.md))_
 
 ---
 

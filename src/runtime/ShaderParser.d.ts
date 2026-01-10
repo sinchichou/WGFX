@@ -1,4 +1,4 @@
-import {WGFXShaderInfo} from '@/types';
+import { WGFXShaderInfo } from '@/types';
 
 /**
  * Parses the WGFX effect source code into structured shader information.
