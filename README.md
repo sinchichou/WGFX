@@ -4,6 +4,12 @@
 ![Status: Beta](https://img.shields.io/badge/Status-Beta-yellow)
 ![Platform: Web/Node](https://img.shields.io/badge/Platform-Web%20%7C%20Node.js-green)
 
+## Development Status
+> [!WARNING]
+> There are still unrepaired problems
+>
+> 	The adjustable parameter function is not completed
+
 **WGFX** is a high-performance graphics effect framework built for WebGPU. Inspired by the design philosophy of **Magpie**, it aims to provide a powerful and user-friendly platform for developing and executing effects in the Web environment. WGFX supports parsing custom `.wgsl` effect files and automatically manages GPU resources, pipeline construction, and multi-pass rendering.
 
 Its core value lies in helping developers easily migrate shader effects originally written in HLSL (especially Magpie or MPDN style) to modern web browsers, enabling complex image post-processing features such as real-time upscaling and denoising.
