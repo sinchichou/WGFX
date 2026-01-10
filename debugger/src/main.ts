@@ -2,6 +2,13 @@ import * as monaco from 'monaco-editor';
 // @ts-ignore
 import { WGFX } from 'wgfx';
 
+// 1. 修改 Import路徑：現在它是 src 的一部分了，用相對路徑 (移除錯誤的 named export)
+import initWesl, { run } from './wesl-web/wesl_web.js';
+
+// 2. 關鍵：使用 ?url 告訴 Vite 把這個當作靜態資源網址處理
+// @ts-ignore (如果沒有設定 d.ts 可能會報錯，加這行忽略即可)
+import wasmUrl from './wesl-web/wesl_web_bg.wasm?url'; 
+
 // Default shader code - using test.wgsl content for debugging
 const DEFAULT_SHADER = `//! MAGPIE EFFECT WGFX
 //! VERSION 4
@@ -300,30 +307,199 @@ function endDebugInfoDrag() {
     if (debugInfoResizer) debugInfoResizer.classList.remove('dragging');
 }
 
+async function setupWeslValidator(editorInstance: monaco.editor.IStandaloneCodeEditor) {    
+    try {
+        // 1. 初始化 WASM (使用新的參數格式以避免警告)
+        await initWesl({ module_or_path: wasmUrl });
+        console.log("WESL 語法檢查引擎已啟動");
+
+        const model = editorInstance.getModel();
+        if (!model) return;
+
+        // 2. 定義檢查邏輯
+        const performValidation = () => {
+            const code = model.getValue();
+            
+            // 使用 run 函數配合 Compile 命令進行語法檢查
+            let diagnostics: any[] = [];
+            try {
+                // 嘗試編譯，如果成功則沒有診斷信息
+                void run({
+                    command: "Compile",
+                    files: { "main.wgsl": code },
+                    root: "main.wgsl",
+                    validate: true,
+                    sourcemap: false,
+                    imports: false,
+                    condcomp: false,
+                    generics: false,
+                    strip: false,
+                    lower: false,
+                    naga: false,
+                    lazy: false,
+                    keep_root: false,
+                    mangle_root: false,
+                    features: {},
+                });
+                
+                // 如果編譯成功，沒有診斷信息
+                diagnostics = [];
+            } catch (err: any) {
+                // 如果編譯失敗，錯誤對象包含 diagnostics
+                console.log("WESL 編譯錯誤:", err);
+                if (err && err.diagnostics && Array.isArray(err.diagnostics)) {
+                    diagnostics = err.diagnostics;
+                    console.log("找到診斷信息:", diagnostics.length, "個錯誤");
+                } else if (err && err.message) {
+                    // 如果沒有 diagnostics，嘗試從錯誤消息中提取
+                    console.warn("WESL 錯誤沒有 diagnostics，錯誤消息:", err.message);
+                    // 創建一個通用的診斷信息
+                    diagnostics = [{
+                        title: err.message || 'Compilation error',
+                        span: { start: 0, end: 0 }
+                    }];
+                } else {
+                    console.error("WESL Analysis failed:", err);
+                    return;
+                }
+            }
+
+            // 3. 轉換格式為 Monaco Markers
+            // 需要將代碼轉換為行號和列號
+            const lines = code.split('\n');
+            const markers = diagnostics.map((d: any) => {
+                // 計算行號和列號
+                let lineNumber = 1;
+                let column = 1;
+                let endLineNumber = 1;
+                let endColumn = 1;
+                
+                if (d.span && typeof d.span.start === 'number') {
+                    // 根據 span.start 計算行號和列號
+                    let charCount = 0;
+                    for (let i = 0; i < lines.length; i++) {
+                        const lineLength = lines[i].length + 1; // +1 for newline
+                        if (charCount + lineLength > d.span.start) {
+                            lineNumber = i + 1;
+                            column = Math.max(1, d.span.start - charCount + 1);
+                            break;
+                        }
+                        charCount += lineLength;
+                    }
+                    
+                    // 計算結束位置
+                    endLineNumber = lineNumber;
+                    endColumn = column;
+                    if (d.span.end && typeof d.span.end === 'number' && d.span.end > d.span.start) {
+                        charCount = 0;
+                        for (let i = 0; i < lines.length; i++) {
+                            const lineLength = lines[i].length + 1;
+                            if (charCount + lineLength > d.span.end) {
+                                endLineNumber = i + 1;
+                                endColumn = Math.max(1, d.span.end - charCount + 1);
+                                break;
+                            }
+                            charCount += lineLength;
+                        }
+                    } else {
+                        // 如果沒有結束位置，使用整行
+                        endColumn = lines[lineNumber - 1]?.length || column;
+                    }
+                }
+                
+                return {
+                    message: d.title || d.message || 'Syntax error',
+                    severity: monaco.MarkerSeverity.Error,
+                    startLineNumber: lineNumber,
+                    startColumn: column,
+                    endLineNumber: endLineNumber,
+                    endColumn: endColumn
+                };
+            });
+
+            console.log(`設定 ${markers.length} 個語法錯誤標記`);
+            // 4. 設定紅線標記 (Owner 設為 'wesl' 避免與其他的衝突)
+            monaco.editor.setModelMarkers(model, "wesl", markers);
+        };
+
+        // 5. 監聽變動 (加入防抖 Debounce)
+        let debounceHandle: any;
+        editorInstance.onDidChangeModelContent(() => {
+            clearTimeout(debounceHandle);
+            debounceHandle = setTimeout(performValidation, 500); // 500ms 延遲
+        });
+
+        // 初次執行
+        performValidation();
+
+    } catch (e) {
+        console.error("無法啟動 WESL 檢查器:", e);
+        log("WESL Validator failed to load. Check console.", 'error');
+    }
+}
+
+// Configure Monaco Editor workers (避免 worker 警告)
+// 使用簡單的配置讓 worker 在主線程運行（開發環境可以接受）
+// @ts-ignore
+(window as any).MonacoEnvironment = {
+    getWorkerUrl: function () {
+        // 返回一個空字符串會讓 Monaco 回退到主線程
+        // 這會消除警告，對於我們的用例性能影響可以接受
+        return '';
+    }
+};
+
+// Register WGSL language (使用 Monarch 語法高亮)
+monaco.languages.register({ id: 'wgsl' });
+monaco.languages.setMonarchTokensProvider('wgsl', {
+    tokenizer: {
+        root: [
+            // 關鍵字
+            [/\b(fn|let|var|const|struct|if|else|loop|for|while|break|continue|return|discard|switch|case|default)\b/, 'keyword'],
+            // 類型
+            [/\b(bool|i32|u32|f32|f16|vec2|vec3|vec4|mat2x2|mat3x3|mat4x4|texture_2d|sampler|sampler_comparison|Texture2D|SamplerState)\b/, 'type'],
+            // 屬性
+            [/@\w+/, 'attribute'],
+            // 數字
+            [/\b\d+\.?\d*[f]?\b/, 'number'],
+            // 字符串
+            [/"[^"]*"/, 'string'],
+            // 註釋
+            [/\/\/.*$/, 'comment'],
+            [/\/\*[\s\S]*?\*\//, 'comment'],
+            // 運算符
+            [/[+\-*/%=<>!&|]+/, 'operator'],
+            // 標識符
+            [/\b[a-zA-Z_][a-zA-Z0-9_]*\b/, 'identifier'],
+        ]
+    }
+});
+
 // Initialize Monaco Editor
 function initEditor() {
     editor = monaco.editor.create(document.getElementById('editor')!, {
         value: DEFAULT_SHADER,
-        language: 'rust', // WGSL syntax is close to Rust
+        language: 'wgsl', // 使用註冊的 WGSL 語言
         theme: 'vs-dark',
         minimap: { enabled: false },
-        automaticLayout: true,
-        // lineNumbers: 'on', // Enable line numbers
-        // lineNumbersMinChars: 3, // Minimum characters for line numbers
-        // glyphMargin: false, // Disable glyph margin
-        // folding: false, // Disable code folding for simplicity
-        // renderLineHighlight: 'line', // Highlight current line
-        // scrollBeyondLastLine: false, // Don't scroll beyond last line
-        // wordWrap: 'off', // Disable word wrap
-        // tabSize: 4, // Set tab size
-        // insertSpaces: true, // Use spaces instead of tabs
-        // detectIndentation: false // Disable indentation detection
+        lineNumbers: 'on',
+        lineNumbersMinChars: 3,
+        glyphMargin: true, // 啟用以顯示錯誤標記
+        folding: true,
+        renderLineHighlight: 'line',
+        scrollBeyondLastLine: false,
+        wordWrap: 'off',
+        tabSize: 4,
+        insertSpaces: true,
+        detectIndentation: false
     });
 
     // Compile on Ctrl+S
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
         compileShader();
     });
+    setupWeslValidator(editor);
+
 }
 
 // Initialize WebGPU
@@ -623,7 +799,7 @@ async function compileShader() {
         // Show generated WGSL code
         if (runtime.generatedModules && runtime.generatedModules.length > 0) {
             let wgslText = "";
-            runtime.generatedModules.forEach((module, index) => {
+            runtime.generatedModules.forEach((module: { passIndex: any; wgslCode: string; }, index: any) => {
                 wgslText += `// === PASS ${module.passIndex} ===\n`;
                 wgslText += module.wgslCode;
                 wgslText += "\n\n";
@@ -856,9 +1032,24 @@ function startRenderLoop() {
                 outputTexture = null;
             }
 
-            // Clean up VideoFrame if we created one
-            if (processedInput !== inputSource && processedInput?.close) {
-                processedInput.close();
+            // Clean up VideoFrame or ImageBitmap if we created one
+            if (processedInput !== inputSource) {
+                // VideoFrame (WebCodecs)
+                if (
+                    typeof VideoFrame !== "undefined" &&
+                    processedInput instanceof VideoFrame &&
+                    typeof processedInput.close === "function"
+                ) {
+                    processedInput.close();
+                }
+                // ImageBitmap
+                else if (
+                    typeof ImageBitmap !== "undefined" &&
+                    processedInput instanceof ImageBitmap &&
+                    typeof processedInput.close === "function"
+                ) {
+                    processedInput.close();
+                }
             }
 
             //#region agent log
