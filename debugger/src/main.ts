@@ -2,11 +2,11 @@ import * as monaco from 'monaco-editor';
 // @ts-ignore
 import { WGFX } from 'wgfx';
 
-// 1. 修改 Import路徑：現在它是 src 的一部分了，用相對路徑 (移除錯誤的 named export)
+// 1. 修改 Import路�?：現?��???src ?��??��?了�??�相對路�?(移除?�誤??named export)
 import initWesl, { run } from './wesl-web/wesl_web.js';
 
-// 2. 關鍵：使用 ?url 告訴 Vite 把這個當作靜態資源網址處理
-// @ts-ignore (如果沒有設定 d.ts 可能會報錯，加這行忽略即可)
+// 2. ?�鍵：使???url ?�訴 Vite ?�這個當作�??��?源網?�?��?
+// @ts-ignore (如�?沒�?設�? d.ts ?�能?�報?��??�這�?忽略?�可)
 import wasmUrl from './wesl-web/wesl_web_bg.wasm?url'; 
 
 // Default shader code - using test.wgsl content for debugging
@@ -211,7 +211,6 @@ function updatePanelSizes() {
         // Mobile: vertical layout
         const totalHeight = window.innerHeight;
         const editorHeight = totalHeight * panelRatio;
-        const resizerHeight = 8;
 
         editorPanel.style.width = '100%';
         editorPanel.style.height = `${editorHeight}px`;
@@ -226,7 +225,6 @@ function updatePanelSizes() {
         // Desktop: horizontal layout
         const totalWidth = window.innerWidth;
         const editorWidth = totalWidth * panelRatio;
-        const resizerWidth = 8;
 
         editorPanel.style.width = `${editorWidth}px`;
         editorPanel.style.height = '100vh';
@@ -309,18 +307,18 @@ function endDebugInfoDrag() {
 
 async function setupWeslValidator(editorInstance: monaco.editor.IStandaloneCodeEditor) {    
     try {
-        // 1. 初始化 WASM (使用新的參數格式以避免警告)
+        // 1. Initialize WASM (using module_or_path parameter to avoid warnings)
         await initWesl({ module_or_path: wasmUrl });
         console.log("WESL 語法檢查引擎已啟動");
 
         const model = editorInstance.getModel();
         if (!model) return;
 
-        // 2. 定義檢查邏輯
+        // 2. Define validation logic
         const performValidation = () => {
             const code = model.getValue();
             
-            // 使用 run 函數配合 Compile 命令進行語法檢查
+            // 使用 run 參數 Compile 命令語法檢查
             let diagnostics: any[] = [];
             try {
                 // 嘗試編譯，如果成功則沒有診斷信息
@@ -353,7 +351,7 @@ async function setupWeslValidator(editorInstance: monaco.editor.IStandaloneCodeE
                 } else if (err && err.message) {
                     // 如果沒有 diagnostics，嘗試從錯誤消息中提取
                     console.warn("WESL 錯誤沒有 diagnostics，錯誤消息:", err.message);
-                    // 創建一個通用的診斷信息
+                    // Create a generic diagnostic message
                     diagnostics = [{
                         title: err.message || 'Compilation error',
                         span: { start: 0, end: 0 }
@@ -364,18 +362,18 @@ async function setupWeslValidator(editorInstance: monaco.editor.IStandaloneCodeE
                 }
             }
 
-            // 3. 轉換格式為 Monaco Markers
-            // 需要將代碼轉換為行號和列號
+            // 3. Convert to Monaco Markers
+            // Need to convert to Monaco Markers
             const lines = code.split('\n');
             const markers = diagnostics.map((d: any) => {
-                // 計算行號和列號
+                // Calculate line and column positions
                 let lineNumber = 1;
                 let column = 1;
                 let endLineNumber = 1;
                 let endColumn = 1;
-                
+
                 if (d.span && typeof d.span.start === 'number') {
-                    // 根據 span.start 計算行號和列號
+                    // Calculate start position from span.start
                     let charCount = 0;
                     for (let i = 0; i < lines.length; i++) {
                         const lineLength = lines[i].length + 1; // +1 for newline
@@ -386,23 +384,23 @@ async function setupWeslValidator(editorInstance: monaco.editor.IStandaloneCodeE
                         }
                         charCount += lineLength;
                     }
-                    
-                    // 計算結束位置
+
+                    // Calculate end position
                     endLineNumber = lineNumber;
                     endColumn = column;
                     if (d.span.end && typeof d.span.end === 'number' && d.span.end > d.span.start) {
-                        charCount = 0;
+                        let endCharCount = 0;
                         for (let i = 0; i < lines.length; i++) {
                             const lineLength = lines[i].length + 1;
-                            if (charCount + lineLength > d.span.end) {
+                            if (endCharCount + lineLength > d.span.end) {
                                 endLineNumber = i + 1;
-                                endColumn = Math.max(1, d.span.end - charCount + 1);
+                                endColumn = Math.max(1, d.span.end - endCharCount + 1);
                                 break;
                             }
-                            charCount += lineLength;
+                            endCharCount += lineLength;
                         }
                     } else {
-                        // 如果沒有結束位置，使用整行
+                        // If no end position, use entire line
                         endColumn = lines[lineNumber - 1]?.length || column;
                     }
                 }
@@ -418,18 +416,18 @@ async function setupWeslValidator(editorInstance: monaco.editor.IStandaloneCodeE
             });
 
             console.log(`設定 ${markers.length} 個語法錯誤標記`);
-            // 4. 設定紅線標記 (Owner 設為 'wesl' 避免與其他的衝突)
+            // 4. Set red error markers (Owner set to 'wesl' to avoid conflicts with other owners)
             monaco.editor.setModelMarkers(model, "wesl", markers);
         };
 
-        // 5. 監聽變動 (加入防抖 Debounce)
+        // 5. On change (debounce input)
         let debounceHandle: any;
         editorInstance.onDidChangeModelContent(() => {
             clearTimeout(debounceHandle);
             debounceHandle = setTimeout(performValidation, 500); // 500ms 延遲
         });
 
-        // 初次執行
+        // Every time
         performValidation();
 
     } catch (e) {
@@ -438,40 +436,63 @@ async function setupWeslValidator(editorInstance: monaco.editor.IStandaloneCodeE
     }
 }
 
-// Configure Monaco Editor workers (避免 worker 警告)
-// 使用簡單的配置讓 worker 在主線程運行（開發環境可以接受）
+// Configure Monaco Editor workers (worker warning)
+// Use simple setup for worker main thread (any environment can accept)
 // @ts-ignore
 (window as any).MonacoEnvironment = {
     getWorkerUrl: function () {
-        // 返回一個空字符串會讓 Monaco 回退到主線程
-        // 這會消除警告，對於我們的用例性能影響可以接受
+        // Return an empty string for Monaco main thread
+        // To avoid warning, any environment can accept
         return '';
     }
 };
 
-// Register WGSL language (使用 Monarch 語法高亮)
+// Register WGSL language (Monarch syntax highlighting)
 monaco.languages.register({ id: 'wgsl' });
 monaco.languages.setMonarchTokensProvider('wgsl', {
     tokenizer: {
         root: [
-            // 關鍵字
-            [/\b(fn|let|var|const|struct|if|else|loop|for|while|break|continue|return|discard|switch|case|default)\b/, 'keyword'],
-            // 類型
+            // Keywords            [/\b(fn|let|var|const|struct|if|else|loop|for|while|break|continue|return|discard|switch|case|default)\b/, 'keyword'],
+            // Types
             [/\b(bool|i32|u32|f32|f16|vec2|vec3|vec4|mat2x2|mat3x3|mat4x4|texture_2d|sampler|sampler_comparison|Texture2D|SamplerState)\b/, 'type'],
-            // 屬性
-            [/@\w+/, 'attribute'],
-            // 數字
+            // Attributes            [/@\w+/, 'attribute'],
+            // Numbers
             [/\b\d+\.?\d*[f]?\b/, 'number'],
-            // 字符串
-            [/"[^"]*"/, 'string'],
-            // 註釋
+            // Strings            [/"[^"]*"/, 'string'],
+            // Comments
             [/\/\/.*$/, 'comment'],
             [/\/\*[\s\S]*?\*\//, 'comment'],
-            // 運算符
-            [/[+\-*/%=<>!&|]+/, 'operator'],
-            // 標識符
-            [/\b[a-zA-Z_][a-zA-Z0-9_]*\b/, 'identifier'],
+            // Operators            [/[+\-*/%=<>!&|]+/, 'operator'],
+            // Identifiers            [/\b[a-zA-Z_][a-zA-Z0-9_]*\b/, 'identifier'],
         ]
+    }
+});
+
+// Define custom WGSL theme (based on vs-dark, but set better colors for WGSL tokens)
+monaco.editor.defineTheme('wgsl-dark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+        // 關鍵字 - 使用亮藍色（類似 TypeScript 的關鍵字）
+        { token: 'keyword', foreground: '569cd6', fontStyle: 'bold' },
+        // 類型 - 使用青藍色
+        { token: 'type', foreground: '4ec9b0' },
+        // 屬性 - 使用紫色
+        { token: 'attribute', foreground: 'c586c0' },
+        // 數字 - 使用淺綠色
+        { token: 'number', foreground: 'b5cea8' },
+        // 字符串 - 使用橙色
+        { token: 'string', foreground: 'ce9178' },
+        // 註釋 - 使用灰色
+        { token: 'comment', foreground: '6a9955', fontStyle: 'italic' },
+        // 運算符 - 使用白色（突出顯示）
+        { token: 'operator', foreground: 'd4d4d4' },
+        // 標識符 - 使用默認顏色（繼承主題）
+        { token: 'identifier', foreground: 'd4d4d4' },
+    ],
+    colors: {
+        'editor.background': '#1e1e1e',
+        'editor.foreground': '#d4d4d4',
     }
 });
 
@@ -479,13 +500,12 @@ monaco.languages.setMonarchTokensProvider('wgsl', {
 function initEditor() {
     editor = monaco.editor.create(document.getElementById('editor')!, {
         value: DEFAULT_SHADER,
-        language: 'wgsl', // 使用註冊的 WGSL 語言
-        theme: 'vs-dark',
+        language: 'wgsl', // 使用註�???WGSL 語�?
+        theme: 'wgsl-dark', // 使用自定義的 WGSL 主題
         minimap: { enabled: false },
         lineNumbers: 'on',
         lineNumbersMinChars: 3,
-        glyphMargin: true, // 啟用以顯示錯誤標記
-        folding: true,
+        glyphMargin: true, // ?�用以顯示錯誤�?�?        folding: true,
         renderLineHighlight: 'line',
         scrollBeyondLastLine: false,
         wordWrap: 'off',
@@ -584,7 +604,7 @@ async function handleFileSelect(e: Event) {
 
         // Handle video end
         video.addEventListener('ended', () => {
-            btnPlayPause.textContent = '▶️';
+            btnPlayPause.textContent = '?��?';
             seekBar.value = "0";
             timeDisplay.textContent = `00:00 / ${formatTime(video.duration)}`;
         });
@@ -607,7 +627,7 @@ async function handleFileSelect(e: Event) {
 
         // Show Controls
         videoControls.style.display = 'flex';
-        btnPlayPause.textContent = '⏸️';
+        btnPlayPause.textContent = '?��?';
         updateVolumeDisplay();
 
         log(`Video loaded: ${file.name} (${video.videoWidth}x${video.videoHeight})`, 'success');
@@ -632,8 +652,6 @@ async function handleFileSelect(e: Event) {
 }
 
 let isCanvasConfigured = false;
-let targetWidth = 0;
-let targetHeight = 0;
 
 function resizeCanvas(w: number, h: number) {
     // Set canvas to display the full video frame
@@ -698,10 +716,10 @@ btnPlayPause.addEventListener('click', () => {
     if (!currentVideoElement) return;
     if (currentVideoElement.paused) {
         currentVideoElement.play();
-        btnPlayPause.textContent = '⏸️';
+        btnPlayPause.textContent = '?��?';
     } else {
         currentVideoElement.pause();
-        btnPlayPause.textContent = '▶️';
+        btnPlayPause.textContent = '?��?';
     }
 });
 
@@ -718,7 +736,7 @@ btnStop.addEventListener('click', () => {
     currentVideoElement.currentTime = 0;
     seekBar.value = "0";
     timeDisplay.textContent = `00:00 / ${formatTime(currentVideoElement.duration)}`;
-    btnPlayPause.textContent = '▶️';
+    btnPlayPause.textContent = '?��?';
 });
 
 // Volume Control
@@ -799,7 +817,7 @@ async function compileShader() {
         // Show generated WGSL code
         if (runtime.generatedModules && runtime.generatedModules.length > 0) {
             let wgslText = "";
-            runtime.generatedModules.forEach((module: { passIndex: any; wgslCode: string; }, index: any) => {
+            runtime.generatedModules.forEach((module: { passIndex: any; wgslCode: string; }) => {
                 wgslText += `// === PASS ${module.passIndex} ===\n`;
                 wgslText += module.wgslCode;
                 wgslText += "\n\n";
@@ -996,9 +1014,9 @@ function startRenderLoop() {
 
                 // Update play/pause button state
                 if (currentVideoElement.paused) {
-                    btnPlayPause.textContent = '▶️';
+                    btnPlayPause.textContent = '?��?';
                 } else {
-                    btnPlayPause.textContent = '⏸️';
+                    btnPlayPause.textContent = '?��?';
                 }
             }
 
@@ -1027,8 +1045,8 @@ function startRenderLoop() {
             let outputTexture;
             try {
                 outputTexture = await wgfx.process(processedInput);
-            } catch (e) {
-                log(`WGFX process error: ${e.message}`, 'error');
+            } catch (e: any) {
+                log(`WGFX process error: ${e?.message || String(e)}`, 'error');
                 outputTexture = null;
             }
 
@@ -1138,11 +1156,11 @@ function startRenderLoop() {
                 fetch('http://127.0.0.1:7242/ingest/8299c694-88e8-4ba2-a532-4802af9bb93d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'main.ts:startRenderLoop',message:'Canvas rendering skipped',data:{hasCtx: !!ctx, isCanvasConfigured, hasInputTexture: !!inputTexture, hypothesisId:'E',runId:'initial'},timestamp:Date.now(),sessionId:'debug-session'})}).catch(()=>{});
                 //#endregion
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
             isAnimating = false; // Stop on error
             //#region agent log
-            fetch('http://127.0.0.1:7242/ingest/8299c694-88e8-4ba2-a532-4802af9bb93d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'main.ts:startRenderLoop',message:'Render loop error',data:{error: e.message, hypothesisId:'D',runId:'initial'},timestamp:Date.now(),sessionId:'debug-session'})}).catch(()=>{});
+            fetch('http://127.0.0.1:7242/ingest/8299c694-88e8-4ba2-a532-4802af9bb93d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'main.ts:startRenderLoop',message:'Render loop error',data:{error: e?.message || String(e), hypothesisId:'D',runId:'initial'},timestamp:Date.now(),sessionId:'debug-session'})}).catch(()=>{});
             //#endregion
             return;
         }
