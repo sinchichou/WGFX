@@ -21,6 +21,35 @@
   let passCodeBuffer = [];
 
   /**
+   * Resolves the canonical resource name from a block's parsed data.
+   * 從區塊資料解析出規範的資源名稱。
+   * Priority: explicit declaration line > //!VAR directive > block header id.
+   * 優先順序：宣告行 > //!VAR 指令 > 區塊標頭名稱。
+   * @param {object} data - The current block's data object.
+   * @returns {string|null} The resolved name, or null if unnamed.
+   */
+  function resolveName(data) {
+    if (data.name) return data.name;
+    if (data.var) return data.var;
+    const id = (data.id || '').trim();
+    return id.length > 0 ? id : null;
+  }
+
+  /**
+   * Strips surrounding double quotes from a directive value.
+   * 移除指令值前後的雙引號。
+   * @param {string} value - Raw directive value.
+   * @returns {string} Dequoted value.
+   */
+  function dequote(value) {
+    const v = value.trim();
+    if (v.length >= 2 && v.startsWith('"') && v.endsWith('"')) {
+      return v.slice(1, -1);
+    }
+    return v;
+  }
+
+  /**
    * Commits the parsed data of a block to the main shaderInfo structure.
    * 將解析後的區塊資料提交到主要的 shaderInfo 結構中。
    * @param {string} blockType - The type of the block (e.g., 'PARAMETER', 'COMMON').
@@ -32,13 +61,38 @@
       return;
     }
     switch(blockType) {
-      case 'PARAMETER': shaderInfo.parameters.push(data); break;
+      case 'PARAMETER': {
+        const name = resolveName(data);
+        if (!name) { currentData = null; return; } // Skip unnamed parameter blocks / 略過無名稱的參數區塊
+        data.name = name;
+        if (!data.type) data.type = 'float';
+        delete data.id;
+        delete data.lines;
+        shaderInfo.parameters.push(data);
+        break;
+      }
+      case 'TEXTURE': {
+        const name = resolveName(data);
+        if (!name) { currentData = null; return; } // Skip unnamed texture blocks / 略過無名稱的紋理區塊
+        data.name = name;
+        delete data.id;
+        delete data.lines;
+        shaderInfo.textures.push(data);
+        break;
+      }
+      case 'SAMPLER': {
+        const name = resolveName(data);
+        if (!name) { currentData = null; return; } // Skip unnamed sampler blocks / 略過無名稱的取樣器區塊
+        data.name = name;
+        delete data.id;
+        delete data.lines;
+        shaderInfo.samplers.push(data);
+        break;
+      }
       case 'COMMON': shaderInfo.commonCode = data.lines.join('\n'); break;
-      case 'TEXTURE': shaderInfo.textures.push(data); break;
-      case 'SAMPLER': shaderInfo.samplers.push(data); break;
       case 'PASS': shaderInfo.passes.push(data); break;
       case 'VERSION': shaderInfo.metadata.version = parseInt(data.id,10); break;
-      case 'SORT_NAME': shaderInfo.metadata.sortName = data.id; break;
+      case 'SORT_NAME': shaderInfo.metadata.sortName = dequote(data.id); break;
       case 'USE': data.id.split(',').forEach(f=>shaderInfo.metadata.use[f.trim().toUpperCase()]=true); break;
       case 'CAPABILITY': data.id.split(',').forEach(f=>shaderInfo.metadata.capability[f.trim().toUpperCase()]=true); break;
     }
@@ -74,6 +128,11 @@
       case 'format':
         data[key] = value.toLowerCase()==='r16g16b16a16_float' ? 'rgba16float' : value;
         break;
+      case 'label':
+      case 'desc':
+        data[key] = dequote(value); break;
+      case 'type':
+        data[key] = value.trim(); break;
       default:
         data[key] = value;
     }
@@ -163,13 +222,32 @@ code_line
       const trimmedLine = lineStr.trim();
 
       // Special handling for resource declarations in TEXTURE, SAMPLER, PARAMETER blocks.
+      // 支援兩種宣告風格：
+      //   (a) WGSL 風格:  var Name: texture_2d<f32>; / var Name: sampler;
+      //   (b) Magpie/HLSL 風格: Texture2D Name; / SamplerState Name; / float Name; / vec2 Name;
       // 對於 TEXTURE, SAMPLER, PARAMETER 區塊中的資源宣告進行特殊處理。
       if (currentBlock === 'TEXTURE' || currentBlock === 'SAMPLER' || currentBlock === 'PARAMETER') {
-        const match = trimmedLine.match(/var\s+([a-zA-Z0-9_]+)\s*:/); // Regex to find variable declaration.
-        if (match) {
+        // (a) WGSL-style: var <name> :
+        const isComment = trimmedLine.startsWith('//');
+        const wgslMatch = isComment ? null : trimmedLine.match(/var\s+([A-Za-z_][A-Za-z0-9_]*)\s*:/);
+        // (b) HLSL-style: <TypeKeyword> <name> ;
+        const hlslMatch = isComment ? null : trimmedLine.match(/^\s*(Texture2D|SamplerState|float|vec2|vec3|vec4|int|uint|f32|i32|u32)\s+([A-Za-z_][A-Za-z0-9_]*)\s*;/);
+        const declMatch = wgslMatch || hlslMatch;
+        if (declMatch) {
             currentData.isTemplate = true; // Mark as a template for resource creation.
-            const name = match[1]; // Extract the resource name.
+            const name = wgslMatch ? wgslMatch[1] : hlslMatch[2]; // Extract the resource name.
+            const keyword = wgslMatch ? null : hlslMatch[1];      // HLSL type keyword (if any).
+
+            // Derive the parameter type from the HLSL keyword / 由 HLSL 關鍵字推導參數型別
+            let paramType = null;
+            if (currentBlock === 'PARAMETER' && keyword) {
+              paramType = { 'float': 'float', 'f32': 'float', 'vec2': 'vec2', 'vec3': 'vec3', 'vec4': 'vec4', 'int': 'int', 'i32': 'int', 'uint': 'uint', 'u32': 'uint' }[keyword] || 'float';
+            }
+
             const newResource = { ...currentData, name: name, id: name }; // Create a new resource object.
+            if (paramType) newResource.type = paramType;
+            if (currentBlock === 'TEXTURE' && keyword === 'Texture2D') newResource.declStyle = 'hlsl';
+            if (currentBlock === 'SAMPLER' && keyword === 'SamplerState') newResource.declStyle = 'hlsl';
             delete newResource.lines; // These are specific to COMMON blocks.
             delete newResource.isTemplate;
 

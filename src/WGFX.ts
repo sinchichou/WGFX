@@ -1,4 +1,4 @@
-import { WGFXShaderInfo, ParameterInfo } from './types/shader';
+import { ParameterInfo } from './types/shader';
 import { WGFXRuntime } from './runtime/WGFXRuntime';
 import { Logger, LogLevel } from './utils/Logger';
 
@@ -48,10 +48,12 @@ export interface WGFXInfo {
         name: string;
         type: string;
         /** @defaultValue 0.0 */
-        default: number;
+        default: number | number[];
         min: number;
         max: number;
         step: number;
+        /** @zh UI 顯示標籤 */
+        label?: string;
     }[];
     /** @zh 渲染通道總數 */
     passes: number;
@@ -178,6 +180,10 @@ export class WGFX {
             throw new Error(`Shader compilation error: ${error.message}`);
         }
 
+        // Write the scene buffer once so the first dispatch has valid resolution info.
+        // 初始化時先寫入場景資訊，確保首次 dispatch 即有正確的解析度資料。
+        runtime.resourceManager.updateSceneBuffer(width, height, width, height);
+
         const instance = new WGFX(runtime);
         instance.width = width;
         instance.height = height;
@@ -215,11 +221,12 @@ export class WGFX {
             height: this.height,
             uniforms: shaderInfo.parameters.map((p: ParameterInfo) => ({
                 name: p.name,
-                type: p.type || 'f32',
-                default: (Array.isArray(p.default) ? p.default[0] : p.default) ?? 0.0,
+                type: p.type || 'float',
+                default: p.default ?? 0.0,
                 min: p.min ?? 0.0,
                 max: p.max ?? 1.0,
-                step: p.step ?? 0.01
+                step: p.step ?? 0.01,
+                label: p.label
             })),
             passes: shaderInfo.passes.length
         };

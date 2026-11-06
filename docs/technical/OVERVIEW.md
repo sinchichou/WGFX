@@ -45,11 +45,35 @@ A utility for efficiently updating uniform buffer data when parameters change at
     - Dispatch each pass in order.
     - Retrieve the `OUTPUT` texture view.
 
+> **Low-level contract**: when using `WGFXRuntime` directly, the scene uniform buffer is
+> **not** written automatically — call `resourceManager.updateSceneBuffer(inW, inH, outW, outH)`
+> after `compile()` (and whenever dimensions change), otherwise passes whose code checks
+> `scene.inputSize` bounds will silently early-return. The high-level `WGFX.create()`
+> handles this for you.
+
 ## Metadata Directives
 
 | Directive | Purpose |
 | :--- | :--- |
-| `//! PASS <n>` | Defines the start of a render pass. |
-| `//! TEXTURE <name>` | Declares a persistent or intermediate texture. |
-| `//! PARAMETER <name>` | Declares a user-adjustable uniform variable. |
-| `//! COMMON` | Shared code included in every pass. |
+| `//! VERSION <n>` | Effect format version. |
+| `//! PARAMETER <name>` | Declares a user-adjustable uniform variable (HLSL style: `float X;` / WGSL style: `var X: f32`). Supports `//! LABEL`, `//! MIN`, `//! MAX`, `//! DEFAULT`, `//! STEP`, `//! TYPE float\|int\|vec2\|...`. |
+| `//! TEXTURE <name>` | Declares a texture (HLSL style: `Texture2D X;` / WGSL style: `var X: texture_2d<f32>`). Supports `//! WIDTH`, `//! HEIGHT`, `//! FORMAT`. The `X_sampled`/`X_storaged` pair refers to one logical texture. |
+| `//! SAMPLER <name>` | Declares a sampler (`SamplerState X;`). Supports `//! FILTER LINEAR\|POINT`, `//! ADDRESS WRAP\|CLAMP`. |
+| `//! COMMON` | Shared code included in every pass. Structs/aliases/constants are emitted in all modules; helper functions are pruned to passes that call them. |
+| `//! PASS <n>` | Defines a pass. Supports `//! DESC`, `//! IN`, `//! OUT`, `//! BLOCK_SIZE`, `//! NUM_THREADS`. |
+| `//! END` | Explicitly closes the current block. |
+
+## Resource Binding Layout
+
+The WGSLCodeGenerator is the single owner of binding indices:
+
+| Binding | Resource |
+| :--- | :--- |
+| 1 | `uniforms` — adjustable parameters (16-byte slot per parameter) |
+| 4 | `scene` — `SceneInfo` (inputSize, inputPt, outputSize, outputPt, scale) |
+| 5–9 | Declared samplers |
+| 10+ | Declared textures (`X_sampled`/`X_storaged` aliases share one backing texture) |
+
+Pass modules declare only the resources their code (or called COMMON helpers) actually
+reference; each parameter occupies a 16-byte slot matching the host-side uniform buffer
+layout exactly.

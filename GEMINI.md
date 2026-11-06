@@ -51,9 +51,12 @@
 
 ### Effect File Format (`.wgsl`)
 The custom format relies on comments starting with `//!` to define metadata:
-- **Directives**: `//! PASS`, `//! TEXTURE`, `//! PARAMETER`, `//! COMMON`.
-- **Validation**: The parser enforces strict rules (e.g., specific header versions, matched `IN/OUT` declarations).
-- **Migration**: Designed to ease transition from HLSL; supports concepts like `Texture2D`, `SamplerState`, and HLSL-like intrinsics via mapping.
+- **Directives**: `//! PASS`, `//! TEXTURE`, `//! PARAMETER`, `//! SAMPLER`, `//! COMMON`, `//! VERSION`, `//! END`.
+- **Declaration styles**: both Magpie/HLSL style (`float X;`, `Texture2D X;`, `SamplerState X;`) and WGSL style (`var X: f32`, `var X: texture_2d<f32>`) are supported inside resource blocks.
+- **Binding layout (generator-owned)**: b1 = `uniforms` (parameters, 16-byte slot each), b4 = `scene` (SceneInfo), b5+ = samplers, b10+ = textures. `X_sampled`/`X_storaged` pairs share one logical texture.
+- **Parameter access**: pass code reads parameters as `uniforms.<Name>`; scene info as `scene.inputSize`/`inputPt`/`outputSize`/`outputPt`/`scale`.
+- **Pruning**: COMMON helper functions are emitted only into passes that call them (transitively); structs/aliases/constants stay in every module.
+- **Parser generation**: `src/runtime/ShaderParser.js` is GENERATED from `ShaderParser.pegjs` by `npm run generate:parser` (runs automatically in `prebuild`). Never edit the .js by hand; it is gitignored.
 
 ## User Preferences
 - **Language**: The user prefers interactions in **Traditional Chinese**. While code and internal docs are mixed/English, explanations and chat responses should prioritize Traditional Chinese.

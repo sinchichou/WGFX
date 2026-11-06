@@ -1,6 +1,5 @@
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
-import peggy from 'rollup-plugin-peggy';
 import polyfillNode from 'rollup-plugin-polyfill-node';
 import typescript from 'rollup-plugin-typescript2';
 
@@ -20,9 +19,6 @@ export default [
             }),
             commonjs(),
             polyfillNode(),
-            peggy({
-                // Peggy options
-            }),
             typescript({
                 compilerOptions: { target: "esnext" }
             })
@@ -44,9 +40,8 @@ export default [
             }),
             commonjs(),
             polyfillNode(),
-            peggy(),
             typescript({
-                compilerOptions: { target: "es5" }
+                compilerOptions: { target: "es2018" }
             })
         ]
     },
@@ -68,7 +63,6 @@ export default [
         plugins: [
             resolve(),
             commonjs(),
-            peggy(),
             typescript()
         ],
         external: ['webgpu', 'fs', 'path']

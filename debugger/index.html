@@ -228,6 +228,60 @@
             color: var(--success-color);
         }
 
+        /* Uniform 參數面板（由 compileShader() 動態重建，無參數時隱藏） */
+        #uniform-panel {
+            display: none;
+            flex-wrap: wrap;
+            gap: 8px 16px;
+            align-items: center;
+            background: #252526;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 12px;
+        }
+
+        .uniform-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1 1 260px;
+            min-width: 240px;
+        }
+
+        .uniform-row label {
+            font-size: 12px;
+            color: var(--text-color);
+            min-width: 90px;
+            max-width: 140px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: default;
+        }
+
+        .uniform-row input[type="range"] {
+            flex: 1;
+            accent-color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .uniform-value {
+            font-family: 'SF Mono', monospace;
+            font-size: 11px;
+            color: var(--primary-color);
+            min-width: 44px;
+            text-align: right;
+        }
+
+        /* 「Generated WGSL」分頁內的唯讀編輯器（約分頁高度 40%） */
+        #wgsl-editor {
+            height: 40%;
+            min-height: 140px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-bottom: 12px;
+        }
+
         /* Overlay */
         #fps-meter {
             position: absolute;
@@ -674,6 +728,8 @@
                 <div class="toolbar" style="border:none; padding: 0;">
                     <input type="file" id="input-media" accept="image/*,video/*" />
                 </div>
+                <!-- 動態參數面板：由 debugger 依 WGFX.initialize() 回傳的 uniforms 重建 -->
+                <div id="uniform-panel"></div>
                 <div class="canvas-wrapper">
                     <canvas id="output-canvas"></canvas>
                     <div id="fps-meter">0 FPS</div>
@@ -720,7 +776,11 @@
                 </div>
                 <div id="log-content" class="tab-content" style="display:block;"></div>
                 <div id="ir-content" class="tab-content" style="display:none;"></div>
-                <div id="wgsl-content" class="tab-content" style="display:none;"></div>
+                <div id="wgsl-content" class="tab-content" style="display:none;">
+                    <!-- 唯讀 WGSL 檢視編輯器（約分頁高度 40%，顯示 WESL 驗證錯誤標記） -->
+                    <div id="wgsl-editor"></div>
+                    <div id="wgsl-text"></div>
+                </div>
                 <div id="split-content" class="tab-content" style="display:none;">
                     <div class="split-control-panel">
                         <label class="control-label">Display Mode:</label>
