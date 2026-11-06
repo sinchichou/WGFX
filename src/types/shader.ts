@@ -7,10 +7,10 @@
 export interface TextureInfo {
   /** Texture identifier used in code / 程式碼中使用的紋理識別符 */
   name: string;
-  /** Width can be a numeric literal or expression / 寬度可以是數值或運算式 */
-  width: string | number;
-  /** Height can be a numeric literal or expression / 高度可以是數值或運算式 */
-  height: string | number;
+  /** Width can be a numeric literal or expression (required except INPUT) / 寬度運算式（INPUT 除外必填） */
+  width?: string | number;
+  /** Height can be a numeric literal or expression (required except INPUT) / 高度運算式（INPUT 除外必填） */
+  height?: string | number;
   /** GPU texture format / GPU 紋理格式 */
   format?: GPUTextureFormat;
 }
@@ -35,7 +35,10 @@ export interface SamplerInfo {
 export interface ParameterInfo {
   /** Parameter identifier / 參數識別符 */
   name: string;
-  /** Data type: 'float' or 'int' / 資料類型 */
+  /**
+   * Data type / 資料類型
+   * 'float' | 'vec2' | 'vec3' | 'vec4' | 'int' | 'uint' | 'int2' | 'uint2' ...
+   */
   type: string;
   /** Default value or array of values / 預設值或數值陣列 */
   default: number | number[];
@@ -45,6 +48,8 @@ export interface ParameterInfo {
   max?: number;
   /** Step value for UI adjustment / UI 調整的步進值 */
   step?: number;
+  /** UI display label / UI 顯示標籤 */
+  label?: string;
 }
 
 /**
@@ -67,11 +72,26 @@ export interface PassInfo {
 }
 
 /**
+ * Parsed effect-file metadata directives
+ * 特效檔元數據指令的解析結果
+ */
+export interface ShaderMetadata {
+  /** Required feature flags (//! USE) / 必要功能旗標 */
+  use: Record<string, boolean>;
+  /** Required capability flags (//! CAPABILITY) / 必要硬體能力旗標 */
+  capability: Record<string, boolean>;
+  /** Effect format version (//! VERSION) / 特效格式版本 */
+  version?: number;
+  /** Sort name for UI listing (//! SORT_NAME) / UI 排序名稱 */
+  sortName?: string;
+}
+
+/**
  * Structured information of a complete WGFX shader
  * 完整 WGFX 著色器的結構化資訊
  */
 export interface WGFXShaderInfo {
-  /** List of all textures / 所有紋理的列表 */
+  /** List of all textures (sampled/storaged pairs share one logical texture) / 所有紋理列表 */
   textures: TextureInfo[];
   /** List of all samplers / 所有取樣器的列表 */
   samplers: SamplerInfo[];
@@ -81,4 +101,6 @@ export interface WGFXShaderInfo {
   passes: PassInfo[];
   /** Common code shared across all passes / 所有通道共享的通用代碼 */
   commonCode: string;
+  /** Metadata directives / 元數據指令 */
+  metadata: ShaderMetadata;
 }

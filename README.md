@@ -6,10 +6,9 @@
 
 ## Development Status
 
-> [!WARNING]
-> There are still unrepaired problems
->
->     The adjustable parameter function is not completed
+> [!NOTE]
+> The adjustable parameter pipeline (declaration → default upload → runtime update) is
+> now functional end-to-end. See `examples/test.wgsl` for the canonical core example.
 
 **WGFX** is a high-performance graphics effect framework built for WebGPU. Inspired by the design philosophy of **Magpie**, it aims to provide a powerful and user-friendly platform for developing and executing effects in the Web environment. WGFX supports parsing custom `.wgsl` effect files and automatically manages GPU resources, pipeline construction, and multi-pass rendering.
 
@@ -124,6 +123,11 @@ const outputView = wgfx.getOutputView();
 wgfx.updateUniforms({ Strength: 1.5 });
 ```
 
+> Using the low-level `WGFXRuntime` directly? Call
+> `runtime.resourceManager.updateSceneBuffer(inW, inH, outW, outH)` after `compile()`
+> (and on resolution changes) — passes that read `scene.inputSize` otherwise
+> early-return silently. `WGFX.create()` does this automatically.
+
 ---
 
 ## 📄 .wgsl Effect Format Specification
@@ -133,9 +137,15 @@ WGFX effect files contain special directives and standard WGSL code:
 | Directive              | Description                                        | Example                   |
 | :--------------------- | :------------------------------------------------- | :------------------------ |
 | `//! PASS <index>`     | Defines a render pass                              | `//! PASS 1`              |
-| `//! TEXTURE <name>`   | Declares an intermediate texture resource          | `//! TEXTURE TempTex`     |
-| `//! PARAMETER <name>` | Defines a dynamically adjustable uniform parameter | `//! PARAMETER Sharpness` |
+| `//! TEXTURE <name>`   | Declares a texture (`Texture2D X;` or `var X: texture_2d<f32>`) | `//! TEXTURE TempTex` |
+| `//! PARAMETER <name>` | Defines a dynamically adjustable uniform parameter (`//! TYPE`, `//! DEFAULT`, `//! MIN/MAX/STEP` supported) | `//! PARAMETER Sharpness` |
+| `//! SAMPLER <name>`   | Declares a sampler with `//! FILTER` / `//! ADDRESS` | `//! SAMPLER sam`        |
 | `//! COMMON`           | A shared code block for all passes                 | `//! COMMON`              |
+
+**Resource binding layout** (generator-owned): binding 1 = `uniforms` (parameters),
+binding 4 = `scene` (resolution info), bindings 5+ = samplers, bindings 10+ = textures.
+Parameters are accessed in pass code as `uniforms.<Name>`; scene info as `scene.inputSize`,
+`scene.inputPt`, `scene.outputSize`, `scene.outputPt`, `scene.scale`.
 
 _(For detailed specifications, refer to [API Documentation](docs/modules.md))_
 

@@ -1,6 +1,6 @@
 /// <reference types="@webgpu/types" />
 import { ResourceManager } from './ResourceManager';
-import { Logger } from '@/utils/Logger';
+import { Logger } from '../utils/Logger';
 
 /**
  * Metadata for a stored WebGPU pipeline and its associated layouts.
@@ -25,6 +25,12 @@ export interface StoredPipeline {
  * Manages the creation and execution of compute pipelines.
  * ---
  * 管理 WebGPU 計算管線的建立、編譯監控與執行分發。
+ *
+ * 綁定配置完全由 WGSLCodeGenerator 輸出的 resources 決定：
+ * - binding 1: Uniform 參數緩衝區（有參數時）
+ * - binding 4: SceneInfo 場景資訊緩衝區
+ * - binding 5+: 自訂取樣器
+ * - binding 10+: 紋理（sampled/storaged 成對別名綁定至同一邏輯紋理）
  *
  * @group Core
  */
@@ -76,14 +82,6 @@ export class PipelineManager {
 
             const bindingMap = new Map<number, GPUBindGroupLayoutEntry>();
 
-            // Setup Default Bindings / 設定預設綁定項目
-            // Binding 0: Default sampler for texture sampling / 綁定 0：用於紋理取樣的預設取樣器
-            bindingMap.set(0, {
-                binding: 0,
-                visibility: GPUShaderStage.COMPUTE,
-                sampler: { type: 'filtering' }
-            });
-
             // Binding 1: Uniform buffer for parameters / 綁定 1：存放參數的 Uniform 緩衝區
             if (module.resources.parameters.length > 0) {
                 bindingMap.set(1, {
@@ -93,21 +91,22 @@ export class PipelineManager {
                 });
             }
 
-            // Binding 4: Scene info (Global constants) / 綁定 4：場景資訊（全域常量）
-            bindingMap.set(4, {
-                binding: 4,
+            // Binding 4 (or COMMON-declared slot): Scene info / 場景資訊（全域常量）
+            // COMMON 自行宣告 scene 時使用 COMMON 選擇的槽位。
+            const sceneBinding: number = module.resources.sceneBinding ?? 4;
+            bindingMap.set(sceneBinding, {
+                binding: sceneBinding,
                 visibility: GPUShaderStage.COMPUTE,
                 buffer: { type: 'uniform' }
             });
 
             // Process textures (Sampled or Storage) / 處理紋理資源（取樣或儲存型）
             module.resources.textures.forEach((tex: any) => {
-                const format = 'rgba16float'; // Internal high-precision format / 內部高精度格式
                 if (tex.isStorage) {
                     bindingMap.set(tex.binding, {
                         binding: tex.binding,
                         visibility: GPUShaderStage.COMPUTE,
-                        storageTexture: { format: format as GPUTextureFormat, access: 'write-only' }
+                        storageTexture: { format: tex.format as GPUTextureFormat, access: 'write-only' }
                     });
                 } else {
                     bindingMap.set(tex.binding, {
@@ -120,13 +119,11 @@ export class PipelineManager {
 
             // Process custom samplers / 處理自定義取樣器
             module.resources.samplers.forEach((samp: any) => {
-                if (samp.binding !== 0) {
-                    bindingMap.set(samp.binding, {
-                        binding: samp.binding,
-                        visibility: GPUShaderStage.COMPUTE,
-                        sampler: { type: 'filtering' }
-                    });
-                }
+                bindingMap.set(samp.binding, {
+                    binding: samp.binding,
+                    visibility: GPUShaderStage.COMPUTE,
+                    sampler: { type: 'filtering' }
+                });
             });
 
             // Create layouts and pipeline / 建立佈局與管線
@@ -165,39 +162,36 @@ export class PipelineManager {
         const { computePipeline, bindGroupLayout, resources, passInfo: originalPassInfo } = pipeline;
         const groupEntries: GPUBindGroupEntry[] = [];
 
-        // 1. Get or create default sampler / 獲取或建立預設取樣器
-        let defaultSampler = this.resourceManager.getSampler('sam');
-        if (!defaultSampler) {
-            defaultSampler = this.device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
-        }
-        groupEntries.push({ binding: 0, resource: defaultSampler });
-
-        // 2. Bind uniform buffer if needed / 若有需要則綁定 Uniform 緩衝區
+        // 1. Bind uniform buffer if needed / 若有需要則綁定 Uniform 緩衝區
         if (resources.parameters.length > 0) {
             const ub = this.resourceManager.getUniformBuffer();
             if (!ub) throw new Error("Uniform buffer missing");
             groupEntries.push({ binding: 1, resource: { buffer: ub } });
         }
 
-        // 3. Bind all required textures / 綁定所有需要的紋理
+        // 2. Bind all required textures / 綁定所有需要的紋理
+        //    sampled/storaged 成對別名會被 ResourceManager 解析到同一邏輯紋理的對應 view。
         resources.textures.forEach((tex: any) => {
             const mode = tex.isStorage ? 'storage' : 'sampled';
             const view = this.resourceManager.getTextureView(tex.name, mode);
             groupEntries.push({ binding: tex.binding, resource: view });
         });
 
-        // 4. Bind additional samplers / 綁定額外的取樣器
+        // 3. Bind custom samplers / 綁定自訂取樣器
         resources.samplers.forEach((samp: any) => {
-            if (samp.binding !== 0) {
-                const s = this.resourceManager.getSampler(samp.name);
-                if (s) groupEntries.push({ binding: samp.binding, resource: s });
+            const s = this.resourceManager.getSampler(samp.name);
+            if (s) {
+                groupEntries.push({ binding: samp.binding, resource: s });
+            } else {
+                throw new Error(`Sampler "${samp.name}" not found for pass ${passInfo.index}`);
             }
         });
 
-        // 5. Bind global scene constants / 綁定全域場景常量
+        // 4. Bind global scene constants / 綁定全域場景常量
         const sceneBuffer = this.resourceManager.getSceneBuffer();
         if (sceneBuffer) {
-            groupEntries.push({ binding: 4, resource: { buffer: sceneBuffer } });
+            const sceneBinding: number = resources.sceneBinding ?? 4;
+            groupEntries.push({ binding: sceneBinding, resource: { buffer: sceneBuffer } });
         }
 
         // Initialize compute pass / 初始化計算通道
@@ -216,9 +210,12 @@ export class PipelineManager {
         if (!outTex) throw new Error(`Output texture "${outName}" not found`);
 
         // Calculate grid size (Workgroups) / 計算網格大小
-        const workgroupSize = originalPassInfo.blockSize || originalPassInfo.numThreads;
-        const dx = Math.ceil(outTex.width / workgroupSize[0]);
-        const dy = Math.ceil(outTex.height / workgroupSize[1]);
+        // BLOCK_SIZE 優先於 NUM_THREADS：BLOCK_SIZE 描述每個工作群組涵蓋的像素範圍。
+        const workgroupSize = originalPassInfo.blockSize || originalPassInfo.numThreads || [1, 1];
+        const bx = Math.max(1, workgroupSize[0] | 0);
+        const by = Math.max(1, (workgroupSize[1] || 1) | 0);
+        const dx = Math.ceil(outTex.width / bx);
+        const dy = Math.ceil(outTex.height / by);
 
         Logger.debug(`Dispatch Pass ${passInfo.index}: ${dx}x${dy} groups`);
 

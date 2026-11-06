@@ -328,9 +328,11 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
     for (var i: u32 = 0u; i <= 2u; i += 2u) {
         for (var j: u32 = 0u; j <= 2u; j += 2u) {
             let tpos: MF2 = MF2(gxy + uint2(i, j)) * inputPt;
-            let sr: MF4 = textureGather(0, tex1_sampled, sam, tpos);
-            let sg: MF4 = textureGather(1, tex1_sampled, sam, tpos);
-            let sb: MF4 = textureGather(2, tex1_sampled, sam, tpos);
+            // pass 3 讀取 pass 2 的輸出 tex2（原 GLSL conv2d_1_tf），
+            // 不可讀取同 pass 亦寫入的 tex1（同步範圍衝突）
+            let sr: MF4 = textureGather(0, tex2_sampled, sam, tpos);
+            let sg: MF4 = textureGather(1, tex2_sampled, sam, tpos);
+            let sb: MF4 = textureGather(2, tex2_sampled, sam, tpos);
 
             // w z -> x z
 		    // x y -> y w
@@ -341,13 +343,14 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
         }
     }
 
-    textureStore(tex1_storaged, int2(gxy), A4KS2(src, 1i, 1i));
+    // pass 3 對應原 GLSL conv2d_2_tf 捲積，權重為 A4KS3（先前誤用 pass 2 的 A4KS2）
+    textureStore(tex1_storaged, int2(gxy), A4KS3(src, 1i, 1i));
     gxy.x = gxy.x + 1u;
-    textureStore(tex1_storaged, int2(gxy), A4KS2(src, 2i, 1i));
+    textureStore(tex1_storaged, int2(gxy), A4KS3(src, 2i, 1i));
     gxy.y = gxy.y + 1u;
-    textureStore(tex1_storaged, int2(gxy), A4KS2(src, 2i, 2i));
+    textureStore(tex1_storaged, int2(gxy), A4KS3(src, 2i, 2i));
     gxy.x = gxy.x - 1u;
-    textureStore(tex1_storaged, int2(gxy), A4KS2(src, 1i, 2i));
+    textureStore(tex1_storaged, int2(gxy), A4KS3(src, 1i, 2i));
 }
 //!PASS 4
 //!DESC Conv-4x3x3x8, Depth-to-Space

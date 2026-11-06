@@ -1,5 +1,5 @@
 import { ResourceManager } from './ResourceManager';
-import { Logger } from '@/utils/Logger';
+import { Logger } from '../utils/Logger';
 
 /**
  * Handles the binding and updating of WebGPU uniform buffers.
@@ -54,22 +54,24 @@ export class UniformBinder {
             return;
         }
 
-        const { buffer, offset, size } = metadata;
-        let data: Float32Array | Int32Array;
+        const { buffer, offset, size, type } = metadata;
+        const values = Array.isArray(value) ? value : [value];
+        const isIntegerType = /^(int|i32|uint|u32|int2|uint2|int4|uint4)$/i.test(type || 'float');
 
-        // Convert value to TypedArray (Currently assuming Float32)
-        // 將數值轉換為類型化陣列（目前預設採 Float32）
-        // Note: Ideally this should be strictly typed based on metadata
-        // 註：理想情況下應根據元數據進行嚴格類型檢查
-        if (Array.isArray(value)) {
-            data = new Float32Array(value);
+        // Length validation / 長度驗證（vec 型別需要完整分量，純量只需 1 個）
+        if (values.length > size / 4) {
+            Logger.warn(`Uniform "${name}": ${values.length} components given but slot size is ${size} bytes; extra components ignored.`);
+        }
+
+        // Convert value to TypedArray based on declared type / 依宣告型別轉換為類型化陣列
+        let data: Float32Array | Int32Array;
+        if (isIntegerType) {
+            data = new Int32Array(values.map(v => Math.round(Number(v))));
         } else {
-            data = new Float32Array([value]);
+            data = new Float32Array(values.map(v => Number(v)));
         }
 
         // Optimized GPU buffer write / 優化的 GPU 緩衝區寫入操作
-        // We use the queue to schedule the data transfer
-        // 我們使用隊列（Queue）來排程數據傳輸
         this.device.queue.writeBuffer(
             buffer,            // Target GPU buffer / 目標 GPU 緩衝區
             offset,            // Byte offset in buffer / 緩衝區中的位元組偏移量
@@ -77,8 +79,5 @@ export class UniformBinder {
             data.byteOffset,   // Offset in source data / 來源數據的起始偏移
             data.byteLength    // Total bytes to copy / 要拷貝的總位元組長度
         );
-
-        // Debugging log for sensitive updates / 針對敏感更新的偵錯記錄
-        // Logger.debug(`Uniform updated: ${name} at offset ${offset}`);
     }
 }

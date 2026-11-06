@@ -30,17 +30,9 @@ struct SceneInfo {
     inputPt: MF2,
 }
 
-// 參數結構必須與 uniform buffer 對齊
-struct ParamInfo {
-    intensitySigma: f32,
-    padding1: f32, // Padding 確保 16-byte 對齊 (雖非強制但推薦)
-    padding2: f32,
-    padding3: f32,
-}
-
 // --- Uniform 綁定 (必須在 COMMON 內) ---
+// 參數由產生器注入的 uniforms 結構（@binding(1)）提供，COMMON 不自訂參數 uniform。
 @group(0) @binding(4) var<uniform> scene: SceneInfo;
-@group(0) @binding(5) var<uniform> params: ParamInfo; // 這裡定義 params 變數
 
 // --- 輔助函數 (Helper Functions) ---
 fn GetInputPt() -> MF2 {
@@ -174,9 +166,8 @@ fn Pass1(@builtin(workgroup_id) workgroup_id: vec3<u32>, @builtin(local_invocati
             // Center pixel luma
             let vc = src[u32(KERNELHALFSIZE) + i][u32(KERNELHALFSIZE) + j].a;
 
-            // HERE IS THE FIX: using params.intensitySigma
-            // let is_val = pow(vc + 0.0001, INTENSITY_POWER_CURVE) * params.intensitySigma;
-            let is_val = pow(vc + 0.0001, INTENSITY_POWER_CURVE) * 0.5;
+            // 參數 intensitySigma 由產生器注入的 uniforms 結構提供（binding 1）
+            let is_val = pow(vc + 0.0001, INTENSITY_POWER_CURVE) * uniforms.intensitySigma;
             let ss = 1.0; // SPATIAL_SIGMA
 
             // Calculate weights based on spatial and intensity distance

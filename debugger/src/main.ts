@@ -17,56 +17,10 @@ import wasmUrl from "./wesl-web/wesl_web_bg.wasm?url";
 // CONSTANTS & DEFAULT VALUES
 // =====================================================================================
 
-// Default shader code for debugging
-const DEFAULT_SHADER = `//! MAGPIE EFFECT WGFX
-//! VERSION 4
-
-//! PARAMETER InvertAmount
-//! LABEL "Invert Amount"
-//! MIN 0.0
-//! MAX 1.0
-//! DEFAULT 1.0
-//! STEP 0.01
-float InvertAmount;
-
-//! TEXTURE INPUT
-Texture2D INPUT;
-
-//! TEXTURE OUTPUT
-Texture2D OUTPUT;
-
-//! SAMPLER LinearSampler
-//! FILTER LINEAR
-//! ADDRESS CLAMP
-SamplerState LinearSampler;
-
-//! COMMON
-struct Constants {
-    input_size: vec2<f32>,
-    output_size: vec2<f32>,
-};
-@group(0) @binding(0) var<uniform> constants: Constants;
-
-//! PASS 1
-//! IN INPUT
-//! OUT OUTPUT
-//! STYLE CS
-//! NUM_THREADS 8,8,1
-//! DESC "A simple color inversion effect."
-
-@compute @workgroup_size(8, 8, 1)
-fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    let tex_coords = vec2<f32>(global_id.xy) / constants.output_size;
-    let original_color = textureSample(INPUT, LinearSampler, tex_coords);
-    let inverted_color = vec4<f32>(
-        mix(original_color.r, 1.0 - original_color.r, InvertAmount),
-        mix(original_color.g, 1.0 - original_color.g, InvertAmount),
-        mix(original_color.b, 1.0 - original_color.b, InvertAmount),
-        original_color.a
-    );
-    textureStore(OUTPUT, global_id.xy, inverted_color);
-}
-`;
+// 編輯器初始佔位內容（實際著色器由 loadFileList() + checkExternalShader() 流程自動載入，
+// 預設會自動選取 examples/test.wgsl）
+const INITIAL_SHADER_PLACEHOLDER =
+    "// 請從左上角選單載入 examples 下的 .wgsl 特效檔，或直接貼上 WGFX DSL 著色器";
 
 // =====================================================================================
 // DOM ELEMENTS
@@ -123,7 +77,14 @@ const debugInfoResizer = document.getElementById(
 // Debug output elements
 const logContent = document.getElementById("log-content") as HTMLDivElement;
 const irContent = document.getElementById("ir-content") as HTMLDivElement;
-const wgslContent = document.getElementById("wgsl-content") as HTMLDivElement;
+const wgslTextContent = document.getElementById(
+    "wgsl-text"
+) as HTMLDivElement;
+
+// Uniform 參數面板（由 compileShader() 依 initialize() 回傳的 uniforms 動態重建）
+const uniformPanel = document.getElementById(
+    "uniform-panel"
+) as HTMLDivElement;
 
 // =====================================================================================
 // APPLICATION STATE
@@ -139,6 +100,10 @@ let currentVideoElement: HTMLVideoElement | null = null; // Track active video e
 let editor: monaco.editor.IStandaloneCodeEditor;
 let hasUserEdits = false; // Track if user has made edits since last external load
 let lastExternalContent = ""; // Track last external content for smart undo detection
+
+// WESL validation state（用於驗證「產生的 WGSL」，不驗證原始 DSL 編輯器內容）
+let weslReady = false; // WESL WASM 引擎是否已初始化
+let wgslEditor: monaco.editor.IStandaloneCodeEditor | null = null; // 「Generated WGSL」分頁內的唯讀編輯器
 
 // Rendering and animation state
 let isAnimating = false;
@@ -485,148 +450,167 @@ function endDebugInfoDrag() {
 }
 
 // =====================================================================================
-// WESL SYNTAX VALIDATION SYSTEM
+// WESL VALIDATION SYSTEM（驗證「產生的 WGSL」）
 // =====================================================================================
 
 /**
- * Set up WESL (WebGPU Shader Language) syntax validation for Monaco editor
- * Uses WebAssembly WESL compiler to provide real-time syntax checking
+ * 將字元偏移量（offset）轉換為 Monaco 的行列位置
  */
-async function setupWeslValidator(
-    editorInstance: monaco.editor.IStandaloneCodeEditor
-) {
+function offsetToPosition(
+    lines: string[],
+    offset: number
+): { lineNumber: number; column: number } {
+    let charCount = 0;
+    for (let i = 0; i < lines.length; i++) {
+        const lineLength = lines[i].length + 1; // +1 for newline
+        if (charCount + lineLength > offset) {
+            return {
+                lineNumber: i + 1,
+                column: Math.max(1, offset - charCount + 1),
+            };
+        }
+        charCount += lineLength;
+    }
+    return {
+        lineNumber: lines.length,
+        column: Math.max(1, lines[lines.length - 1]?.length || 1),
+    };
+}
+
+/**
+ * 初始化 WESL 引擎，並在「Generated WGSL」分頁內建立唯讀的 WGSL 檢視編輯器
+ * 注意：不再對 DSL 原始編輯器內容做即時驗證（//! 指示詞會造成誤報），
+ * 驗證對象改為編譯後產生的 WGSL，見 validateGeneratedWGSL()
+ */
+async function setupWeslValidator() {
     try {
         // 1. Initialize WASM module (using module_or_path parameter to avoid warnings)
         await initWesl({ module_or_path: wasmUrl });
+        weslReady = true;
         console.log("WESL 語法檢查引擎已啟動");
 
-        const model = editorInstance.getModel();
-        if (!model) return;
+        // 2. 在「Generated WGSL」分頁內建立唯讀迷你編輯器（約分頁高度 40%）
+        const container = document.getElementById("wgsl-editor");
+        if (!container) return;
 
-        // 2. Define validation logic that runs WESL compilation
-        const performValidation = () => {
-            const code = model.getValue();
-
-            // 使用 run 參數 Compile 命令進行語法檢查
-            let diagnostics: any[] = [];
-            try {
-                // 嘗試編譯，如果成功則沒有診斷信息
-                void run({
-                    command: "Compile",
-                    files: { "main.wgsl": code },
-                    root: "main.wgsl",
-                    validate: true,
-                    sourcemap: false,
-                    imports: false,
-                    condcomp: false,
-                    generics: false,
-                    strip: false,
-                    lower: false,
-                    naga: false,
-                    lazy: false,
-                    keep_root: false,
-                    mangle_root: false,
-                    features: {},
-                });
-
-                // 如果編譯成功，沒有診斷信息
-                diagnostics = [];
-            } catch (err: any) {
-                // 如果編譯失敗，錯誤對象包含 diagnostics
-                console.log("WESL 編譯錯誤:", err);
-                if (err && err.diagnostics && Array.isArray(err.diagnostics)) {
-                    diagnostics = err.diagnostics;
-                    console.log("找到診斷信息:", diagnostics.length, "個錯誤");
-                } else if (err && err.message) {
-                    // 如果沒有 diagnostics，嘗試從錯誤消息中提取
-                    console.warn("WESL 錯誤沒有 diagnostics，錯誤消息:", err.message);
-                    // Create a generic diagnostic message
-                    diagnostics = [
-                        {
-                            title: err.message || "Compilation error",
-                            span: { start: 0, end: 0 },
-                        },
-                    ];
-                } else {
-                    console.error("WESL Analysis failed:", err);
-                    return;
-                }
-            }
-
-            // 3. Convert WESL diagnostics to Monaco Markers
-            const lines = code.split("\n");
-            const markers = diagnostics.map((d: any) => {
-                // Calculate line and column positions from character offsets
-                let lineNumber = 1;
-                let column = 1;
-                let endLineNumber = 1;
-                let endColumn = 1;
-
-                if (d.span && typeof d.span.start === "number") {
-                    // Calculate start position from span.start
-                    let charCount = 0;
-                    for (let i = 0; i < lines.length; i++) {
-                        const lineLength = lines[i].length + 1; // +1 for newline
-                        if (charCount + lineLength > d.span.start) {
-                            lineNumber = i + 1;
-                            column = Math.max(1, d.span.start - charCount + 1);
-                            break;
-                        }
-                        charCount += lineLength;
-                    }
-
-                    // Calculate end position
-                    endLineNumber = lineNumber;
-                    endColumn = column;
-                    if (
-                        d.span.end &&
-                        typeof d.span.end === "number" &&
-                        d.span.end > d.span.start
-                    ) {
-                        let endCharCount = 0;
-                        for (let i = 0; i < lines.length; i++) {
-                            const lineLength = lines[i].length + 1;
-                            if (endCharCount + lineLength > d.span.end) {
-                                endLineNumber = i + 1;
-                                endColumn = Math.max(1, d.span.end - endCharCount + 1);
-                                break;
-                            }
-                            endCharCount += lineLength;
-                        }
-                    } else {
-                        // If no end position, use entire line
-                        endColumn = lines[lineNumber - 1]?.length || column;
-                    }
-                }
-
-                return {
-                    message: d.title || d.message || "Syntax error",
-                    severity: monaco.MarkerSeverity.Error,
-                    startLineNumber: lineNumber,
-                    startColumn: column,
-                    endLineNumber: endLineNumber,
-                    endColumn: endColumn,
-                };
-            });
-
-            console.log(`設定 ${markers.length} 個語法錯誤標記`);
-            // 4. Set red error markers (Owner set to 'wesl' to avoid conflicts with other owners)
-            monaco.editor.setModelMarkers(model, "wesl", markers);
-        };
-
-        // 5. Set up debounced validation on content change
-        let debounceHandle: any;
-        editorInstance.onDidChangeModelContent(() => {
-            clearTimeout(debounceHandle);
-            debounceHandle = setTimeout(performValidation, 500); // 500ms delay
+        wgslEditor = monaco.editor.create(container, {
+            value: "// 尚未編譯：成功編譯後此處會顯示 WGFX 產生的 WGSL 並標記 WESL 驗證錯誤",
+            language: "wgsl", // 使用註冊的WGSL語法
+            theme: "wgsl-dark", // 使用自定義的WGSL主題
+            readOnly: true,
+            minimap: { enabled: false },
+            lineNumbers: "on",
+            lineNumbersMinChars: 3,
+            glyphMargin: true, // 啟用以顯示錯誤標記
+            folding: true,
+            renderLineHighlight: "line",
+            scrollBeyondLastLine: false,
+            automaticLayout: true, // 分頁切換顯示/隱藏時自動重新計算版面
         });
-
-        // Run initial validation
-        performValidation();
     } catch (e) {
         console.error("無法啟動 WESL 檢查器:", e);
         log("WESL Validator failed to load. Check console.", "error");
     }
+}
+
+/**
+ * 使用 WESL 引擎編譯驗證 WGFX 產生的 WGSL，並將錯誤標記在唯讀編輯器上
+ * @param wgslText 產生的 WGSL 程式碼（可含多個 PASS）
+ * @returns 錯誤數量（引擎未就緒或無法驗證時回傳 0）
+ */
+export function validateGeneratedWGSL(wgslText: string): number {
+    // 更新唯讀編輯器內容
+    const model = wgslEditor?.getModel() ?? null;
+    if (model) {
+        model.setValue(wgslText);
+    }
+
+    if (!weslReady) {
+        console.warn("WESL 引擎尚未就緒，略過產生 WGSL 的驗證");
+        return 0;
+    }
+
+    // 使用 run 參數 Compile 命令對產生的 WGSL 進行驗證
+    let diagnostics: any[] = [];
+    try {
+        // 嘗試編譯，如果成功則沒有診斷信息
+        void run({
+            command: "Compile",
+            files: { "main.wgsl": wgslText },
+            root: "main.wgsl",
+            validate: true,
+            sourcemap: false,
+            imports: false,
+            condcomp: false,
+            generics: false,
+            strip: false,
+            lower: false,
+            naga: false,
+            lazy: false,
+            keep_root: false,
+            mangle_root: false,
+            features: {},
+        });
+
+        // 如果編譯成功，沒有診斷信息
+        diagnostics = [];
+    } catch (err: any) {
+        // 如果編譯失敗，錯誤對象包含 diagnostics
+        if (err && err.diagnostics && Array.isArray(err.diagnostics)) {
+            diagnostics = err.diagnostics;
+        } else if (err && err.message) {
+            // 如果沒有 diagnostics，以錯誤訊息建立通用診斷（標記在檔案開頭）
+            diagnostics = [
+                {
+                    title: err.message || "Compilation error",
+                    span: { start: 0, end: 0 },
+                },
+            ];
+        } else {
+            console.error("WESL Analysis failed:", err);
+            return 0;
+        }
+    }
+
+    // 將 WESL 診斷資訊轉換為 Monaco 標記
+    const lines = wgslText.split("\n");
+    const markers = diagnostics.map((d: any) => {
+        const startOffset =
+            typeof d.span?.start === "number" ? d.span.start : 0;
+        const start = offsetToPosition(lines, startOffset);
+
+        // 預設結束位置：同一行行尾（涵蓋整行）
+        let end = {
+            lineNumber: start.lineNumber,
+            column: Math.max(
+                start.column + 1,
+                (lines[start.lineNumber - 1]?.length || start.column) + 1
+            ),
+        };
+        if (
+            d.span &&
+            typeof d.span.end === "number" &&
+            d.span.end > startOffset
+        ) {
+            end = offsetToPosition(lines, d.span.end);
+        }
+
+        return {
+            message: d.title || d.message || "語法錯誤",
+            severity: monaco.MarkerSeverity.Error,
+            startLineNumber: start.lineNumber,
+            startColumn: start.column,
+            endLineNumber: end.lineNumber,
+            endColumn: end.column,
+        };
+    });
+
+    console.log(`生成 WGSL 驗證：${markers.length} 個錯誤`);
+    // 在唯讀編輯器上設置紅色錯誤標記（Owner 為 'wesl-generated' 以免與其他 owner 衝突）
+    if (model) {
+        monaco.editor.setModelMarkers(model, "wesl-generated", markers);
+    }
+    return markers.length;
 }
 
 // =====================================================================================
@@ -797,7 +781,7 @@ monaco.editor.defineTheme("wgsl-dark", {
  */
 function initEditor() {
     editor = monaco.editor.create(document.getElementById("editor")!, {
-        value: DEFAULT_SHADER,
+        value: INITIAL_SHADER_PLACEHOLDER,
         language: "wgsl", // 使用註冊的WGSL語法
         theme: "wgsl-dark", // 使用自定義的WGSL主題
         minimap: { enabled: false },
@@ -819,10 +803,8 @@ function initEditor() {
         compileShader();
     });
 
-    // Set up WESL syntax validation
-    setupWeslValidator(editor);
-
-    // Set up editor event handlers
+    // 初始化 WESL 引擎與「Generated WGSL」唯讀檢視編輯器（不驗證 DSL 原始內容）
+    setupWeslValidator();
 
     // Track user edits to preserve undo stack with smart detection
     editor.onDidChangeModelContent(() => {
@@ -832,16 +814,6 @@ function initEditor() {
             hasUserEdits = false;
         } else {
             hasUserEdits = true;
-        }
-    });
-
-    // Track focus and keyboard events for debugging
-    editor.onDidFocusEditorText(() => { });
-
-    editor.onDidBlurEditorText(() => { });
-
-    editor.onKeyDown((e) => {
-        if (e.keyCode === monaco.KeyCode.KeyZ && (e.ctrlKey || e.metaKey)) {
         }
     });
 }
@@ -891,6 +863,20 @@ async function initWebGPU(): Promise<boolean> {
         log(`Failed to request max limits: ${err}. Fallback to default.`, "error");
         device = await adapter.requestDevice();
     }
+
+    // 註冊未捕捉的 GPU 錯誤事件，將錯誤顯示在 log 面板（addEventListener 與 on- 屬性兩種途徑）
+    device.addEventListener?.("uncapturederror", (event: Event) => {
+        const err = (event as GPUUncapturedErrorEvent).error;
+        log(`GPU 錯誤: ${err?.message || err}`, "error");
+    });
+    device.onuncapturederror = (e) => {
+        log(`GPU 錯誤: ${e.error?.message || e.error}`, "error");
+    };
+
+    // 裝置遺失（如驅動重置、裝置關閉）時於 log 面板提示（一次性 Promise）
+    device.lost.then((info) => {
+        log(`裝置遺失: ${info.message}`, "error");
+    });
 
     log("WebGPU initialized successfully.", "success");
     return true;
@@ -980,8 +966,14 @@ async function loadVideoFile(file: File, url: string) {
 async function loadImageFile(file: File, url: string) {
     const img = new Image();
     img.src = url;
-    await new Promise<void>((resolve) => (img.onload = resolve));
+    // 修正：以包裝的 Promise 等待 onload（直接指定 resolve 會有型別不相容問題）
+    await new Promise<void>((res) => {
+        img.onload = () => res();
+    });
     const bitmap = await createImageBitmap(img);
+
+    // 釋放先前的輸入來源（ImageBitmap / VideoFrame 需手動 close，避免資源洩漏）
+    (inputSource as any)?.close?.();
     inputSource = bitmap;
 
     // Hide video controls for images
@@ -1096,6 +1088,86 @@ volumeBar.addEventListener("input", () => {
     updateVolumeDisplay();
 });
 
+// =====================================================================================
+// UNIFORM PARAMETER PANEL（動態參數面板）
+// =====================================================================================
+
+/** initialize() 回傳的單一參數中繼資料 */
+interface UniformMeta {
+    name: string;
+    type: string;
+    default: number;
+    min: number;
+    max: number;
+    step: number;
+    label?: string;
+}
+
+/**
+ * 依 initialize() 回傳的參數清單重建動態參數面板
+ * float 參數使用中繼資料的 min/max/step；int 參數固定使用 step 1
+ * 若沒有任何參數則隱藏面板
+ */
+function buildUniformPanel(uniforms: UniformMeta[]) {
+    // 每次成功編譯都重建面板，避免殘留舊參數的滑桿
+    uniformPanel.innerHTML = "";
+
+    if (!uniforms || uniforms.length === 0) {
+        uniformPanel.style.display = "none";
+        return;
+    }
+
+    for (const u of uniforms) {
+        const isInt = u.type === "int";
+
+        // 範圍與步進：float 使用中繼資料，int 固定 step 1；min/max 異常時給予安全後備值
+        const min = Number.isFinite(u.min) ? u.min : 0;
+        const max = Number.isFinite(u.max) && u.max > min ? u.max : min + 1;
+        const step = isInt
+            ? 1
+            : Number.isFinite(u.step) && u.step > 0
+            ? u.step
+            : 0.01;
+        const defaultValue = Number.isFinite(u.default) ? u.default : min;
+
+        const row = document.createElement("div");
+        row.className = "uniform-row";
+
+        const label = document.createElement("label");
+        label.textContent = u.label || u.name;
+        label.title = `${u.name} (${u.type})`;
+
+        const slider = document.createElement("input");
+        slider.type = "range";
+        slider.min = String(min);
+        slider.max = String(max);
+        slider.step = String(step);
+        slider.value = String(defaultValue);
+
+        const valueDisplay = document.createElement("span");
+        valueDisplay.className = "uniform-value";
+        valueDisplay.textContent = String(defaultValue);
+
+        slider.addEventListener("input", () => {
+            let value = parseFloat(slider.value);
+            if (!Number.isFinite(value)) return;
+            if (isInt) value = Math.round(value); // int 參數僅送出整數
+            valueDisplay.textContent = String(value);
+            if (wgfx) {
+                // 僅送出數值型 uniform
+                wgfx.updateUniforms({ [u.name]: value });
+            }
+        });
+
+        row.appendChild(label);
+        row.appendChild(slider);
+        row.appendChild(valueDisplay);
+        uniformPanel.appendChild(row);
+    }
+
+    uniformPanel.style.display = "flex";
+}
+
 // Main Compile & Run Logic
 async function compileShader() {
     if (!device || !inputSource) {
@@ -1136,17 +1208,12 @@ async function compileShader() {
             height,
         });
 
+        // 取得特效資訊（uniforms 參數清單；參數預設值已於編譯時自動上傳，無需手動設定）
         const info = wgfx.initialize();
 
-        // Set uniforms matching the test shader structure
-        const uniforms = {
-            input_size: [width, height],
-            output_size: [width, height],
-        };
-        wgfx.updateUniforms(uniforms);
-
-        // Set shader parameters
-        wgfx.updateUniforms({ InvertAmount: 1.0 });
+        // 依 initialize() 回傳的 uniforms 重建動態參數面板
+        // （場景資訊 inputSize/outputSize 等已由核心自動注入為 scene，不再手動傳遞）
+        buildUniformPanel(info.uniforms);
 
         log("Compilation successful!", "success");
 
@@ -1156,18 +1223,31 @@ async function compileShader() {
 
         // Show generated WGSL code
         if (runtime.generatedModules && runtime.generatedModules.length > 0) {
-            let wgslText = "";
+            let joinedWgsl = "";
             runtime.generatedModules.forEach(
                 (module: { passIndex: any; wgslCode: string }) => {
-                    wgslText += `// === PASS ${module.passIndex} ===\n`;
-                    wgslText += module.wgslCode;
-                    wgslText += "\n\n";
+                    joinedWgsl += `// === PASS ${module.passIndex} ===\n`;
+                    joinedWgsl += module.wgslCode;
+                    joinedWgsl += "\n\n";
                 }
             );
-            wgslContent.textContent = wgslText;
+            wgslTextContent.textContent = joinedWgsl;
+
+            // 以 WESL 編譯驗證產生的 WGSL，並在唯讀編輯器上標記錯誤
+            const wgslErrorCount = validateGeneratedWGSL(joinedWgsl);
+            log(
+                `生成 WGSL 驗證：${wgslErrorCount} 個錯誤`,
+                wgslErrorCount > 0 ? "error" : "info"
+            );
         } else {
-            wgslContent.textContent =
+            wgslTextContent.textContent =
                 "// No generated WGSL modules found.\n// Check that shader compilation was successful.";
+            // 清除唯讀編輯器內容與先前殘留的驗證標記
+            const wgslModel = wgslEditor?.getModel();
+            if (wgslModel) {
+                wgslModel.setValue("// 找不到產生的 WGSL 模組");
+                monaco.editor.setModelMarkers(wgslModel, "wesl-generated", []);
+            }
         }
 
         startRenderLoop();
@@ -1223,20 +1303,9 @@ function initBlitPipeline() {
             fn fs_main(@location(0) uv : vec2<f32>) -> @location(0) vec4<f32> {
                 if (uniforms.displayMode == 1.0) {
                     // Single view mode: show processed output only
+                    // （單一模式不使用棋盤格 fallback，直接呈現真實輸出狀態，避免掩蓋渲染失敗）
                     let color = textureSampleLevel(texOutput, s, uv, 0.0);
-
-                    // Check if output texture appears to be empty/uninitialized
-                    let isBlackOrTransparent = (color.r + color.g + color.b) < 0.01;
-
-                    if (isBlackOrTransparent) {
-                        // If output is black/empty, show a pattern to confirm rendering works
-                        let patternUV = uv * 10.0;
-                        let checker = (floor(patternUV.x) + floor(patternUV.y)) % 2.0;
-                        return vec4<f32>(1.0, checker * 0.5, 0.0, 1.0); // Orange checkerboard if output is empty
-                    } else {
-                        // Output has content, apply color filters if enabled
-                        return select(color, mix(color, vec4<f32>(0.0, 0.2, 0.0, 1.0), 0.05), uniforms.useFilters == 1.0);
-                    }
+                    return select(color, mix(color, vec4<f32>(0.0, 0.2, 0.0, 1.0), 0.05), uniforms.useFilters == 1.0);
                 } else {
                     // Split screen mode
                     if (uv.x < uniforms.splitRatio) {
@@ -1247,10 +1316,11 @@ function initBlitPipeline() {
                         let isBlackOrTransparent = (color.r + color.g + color.b) < 0.01;
 
                         if (isBlackOrTransparent) {
-                            // If output is black/empty, show a pattern to confirm rendering works
+                            // 橘色棋盤格 fallback：表示 OUTPUT 尚未被渲染（輸出為空），
+                            // 僅在分割模式的已處理側顯示，用於輔助除錯
                             let patternUV = uv * 10.0;
                             let checker = (floor(patternUV.x) + floor(patternUV.y)) % 2.0;
-                            return vec4<f32>(1.0, checker * 0.5, 0.0, 1.0); // Orange checkerboard if output is empty
+                            return vec4<f32>(1.0, checker * 0.5, 0.0, 1.0);
                         } else {
                             // Output has content, add subtle green tint for distinction (if filters enabled)
                             return select(color, mix(color, vec4<f32>(0.0, 0.2, 0.0, 1.0), 0.05), uniforms.useFilters == 1.0);
@@ -1266,9 +1336,10 @@ function initBlitPipeline() {
         `,
     });
 
-    // Create uniform buffer for filter, split and display settings (useFilters: u32, splitRatio: f32, displayMode: u32)
+    // Create uniform buffer for filter, split and display settings (useFilters: f32, splitRatio: f32, displayMode: f32)
     const uniformBuffer = device.createBuffer({
-        size: 12, // 4 bytes for u32 + 4 bytes for f32 + 4 bytes for u32
+        // 16 bytes：uniform buffer 建議 16-byte 對齊（3 個 f32 共 12 bytes + 4 bytes padding），跨驅動較安全
+        size: 16,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -1563,6 +1634,11 @@ document.querySelectorAll(".tab").forEach((t) => {
             .querySelectorAll(".tab-content")
             .forEach((c) => ((c as HTMLElement).style.display = "none"));
         document.getElementById(`${targetId}-content`)!.style.display = "block";
+
+        // 切換到 WGSL 分頁時，重新計算唯讀編輯器的大小
+        if (targetId === "wgsl") {
+            wgslEditor?.layout();
+        }
     });
 });
 

@@ -12,6 +12,12 @@ dist/
 debugger/dist/
 docs/api/
 
+# Generated parser (built from ShaderParser.pegjs via `npm run generate:parser`)
+src/runtime/ShaderParser.js
+
+# Tooling caches
+.codegraph/
+
 # Temporary files and logs
 *.zip
 wgsl_temp/

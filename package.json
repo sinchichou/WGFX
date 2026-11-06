@@ -1,17 +1,29 @@
 {
   "name": "wgfx",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "bin": {
-    "wgfx": "index.js"
+  "description": "WebGPU Effect Framework — parse and run Magpie-style .wgsl effect files",
+  "main": "dist/wgfx.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "browser": "./dist/wgfx.browser.esm.js",
+      "import": "./dist/wgfx.esm.js",
+      "require": "./dist/wgfx.js"
+    }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "generate:parser": "peggy --format es -o src/runtime/ShaderParser.js src/runtime/ShaderParser.pegjs",
+    "prebuild": "npm run generate:parser",
     "build": "rollup -c",
     "pretest": "npm run build",
     "test": "node test/test_runtime.js",
     "debug": "npm run dev --prefix debugger",
-    "build:docs": "typedoc"
+    "build:docs": "typedoc",
+    "typecheck": "tsc --noEmit"
   },
   "private": true,
   "dependencies": {
@@ -28,10 +40,10 @@
     "@webgpu/types": "^0.1.68",
     "peggy": "^5.0.6",
     "rollup": "^4.53.3",
-    "rollup-plugin-peggy": "^6.1.0",
     "rollup-plugin-polyfill-node": "^0.13.0",
     "rollup-plugin-typescript2": "^0.36.0",
     "tslib": "^2.8.1",
+    "typedoc": "^0.28.15",
     "typedoc-plugin-markdown": "^4.9.0",
     "typescript": "^5.9.3"
   }

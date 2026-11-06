@@ -10,6 +10,13 @@
 
 ---
 
+## 🛠️ 開發狀態
+
+> [!NOTE]
+> 可調整參數管線（宣告 → 預設值上傳 → 執行期更新）現已端對端可用。請參考 `examples/test.wgsl` 標準核心範例。
+
+---
+
 ## 🌟 核心特性
 
 - 🚀 **高效能實作**：直接操作 WebGPU API，充分發揮現代 GPU 的平行運算能力。
@@ -126,9 +133,15 @@ WGFX 的特效檔包含特殊的指示符 (Directives) 與標準 WGSL 代碼：
 | 指示符                 | 描述                              | 範例                      |
 | :--------------------- | :-------------------------------- | :------------------------ |
 | `//! PASS <index>`     | 定義一個渲染通道                  | `//! PASS 1`              |
-| `//! TEXTURE <name>`   | 聲明一個中間紋理資源              | `//! TEXTURE TempTex`     |
-| `//! PARAMETER <name>` | 定義一個可動態調整的 Uniform 參數 | `//! PARAMETER Sharpness` |
-| `//! COMMON`           | 所有通道共享的通用代碼塊          | `//! COMMON`              |
+| `//! TEXTURE <name>`   | 宣告紋理（支援 HLSL 風格 `Texture2D X;` 與 WGSL 風格 `var X: texture_2d<f32>`） | `//! TEXTURE TempTex` |
+| `//! PARAMETER <name>` | 定義可動態調整的 Uniform 參數（支援 `//! TYPE`、`//! DEFAULT`、`//! MIN/MAX/STEP`） | `//! PARAMETER Sharpness` |
+| `//! SAMPLER <name>`   | 宣告取樣器，支援 `//! FILTER` / `//! ADDRESS` | `//! SAMPLER sam`        |
+| `//! COMMON`           | 所有通道共享的代碼塊              | `//! COMMON`              |
+
+**資源綁定配置**（由產生器統一管理）：binding 1 = `uniforms`（參數）、
+binding 4 = `scene`（解析度資訊）、binding 5+ = 取樣器、binding 10+ = 紋理。
+Pass 代碼中以 `uniforms.<名稱>` 存取參數，以 `scene.inputSize` / `scene.inputPt` /
+`scene.outputSize` / `scene.outputPt` / `scene.scale` 存取場景資訊。
 
 _(詳細規格請參考 [API 文件](docs/modules.md))_
 

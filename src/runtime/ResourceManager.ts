@@ -1,5 +1,6 @@
 /// <reference types="@webgpu/types" />
 import { WGFXShaderInfo, TextureInfo } from '../types/shader';
+import { logicalTextureName, paramType } from './WGSLCodeGenerator';
 import { Logger } from '../utils/Logger';
 
 /**
@@ -20,7 +21,7 @@ export class ResourceManager {
     /** @zh 取樣器映射表：名稱 -> GPUSampler */
     public samplers: Map<string, GPUSampler>;
     /** @zh Uniform 映射表：名稱 -> 緩衝區區段資訊 */
-    public uniforms: Map<string, { buffer: GPUBuffer; offset: number; size: number }>;
+    public uniforms: Map<string, { buffer: GPUBuffer; offset: number; size: number; type: string }>;
     /** @zh 主要參數 Uniform 緩衝區 */
     public uniformBuffer: GPUBuffer | null;
     /** @zh 場景資訊（寬高、解析度）Uniform 緩衝區 */
@@ -78,7 +79,9 @@ export class ResourceManager {
          */
         const evaluate = (expr: string | number, ctx: Record<string, number>): number => {
             if (typeof expr === 'number') return expr;
-
+            if (typeof expr !== 'string') {
+                throw new Error('expression missing');
+            }
             expr = expr.replace(/\s+/g, ''); // Remove spaces / 移除空白
             let pos = 0;
 
@@ -131,21 +134,36 @@ export class ResourceManager {
         };
 
         // 3. Create intermediate textures / 建立中間渲染紋理
+        //    Magpie 風格的 `tex1_sampled` / `tex1_storaged` 成對宣告代表**同一個**邏輯紋理，
+        //    主機端只配置一塊 GPUTexture，並提供 sampled/storage 兩種 view。
+        const createdLogical = new Set<string>();
         shaderInfo.textures.forEach((tex: TextureInfo) => {
-            if (this.textures.has(tex.name)) {
-                Logger.debug(`Skipping existing texture: ${tex.name}`);
+            const logicalName = logicalTextureName(tex.name);
+            if (this.textures.has(logicalName) || createdLogical.has(logicalName)) {
+                Logger.debug(`Skipping duplicate texture declaration: ${tex.name} -> ${logicalName}`);
                 return;
             }
+            createdLogical.add(logicalName);
 
-            const width = evaluate(tex.width, context);
-            const height = evaluate(tex.height, context);
+            let width: number;
+            let height: number;
+            try {
+                width = evaluate(tex.width as string | number, context);
+                height = evaluate(tex.height as string | number, context);
+            } catch (e: any) {
+                throw new Error(
+                    `Texture "${tex.name}": WIDTH/HEIGHT missing or unresolvable (declare //!WIDTH///!HEIGHT or provide the texture via externalResources)`
+                );
+            }
 
             if (!width || !height) {
                 throw new Error(`Failed to determine size for texture ${tex.name}`);
             }
 
-            // Define format: INPUT uses rgba8, others use rgba16float / 定義格式：輸入用 rgba8，其餘用高精度浮點
-            const format: GPUTextureFormat = (tex.name === 'INPUT' ? 'rgba8unorm' : 'rgba16float');
+            // Format: declared FORMAT wins; INPUT defaults to rgba8unorm, others to rgba16float.
+            // 格式：優先使用宣告的 FORMAT；INPUT 預設 rgba8unorm，其餘預設高精度浮點。
+            const format: GPUTextureFormat = (tex.format as GPUTextureFormat)
+                || (logicalName === 'INPUT' ? 'rgba8unorm' : 'rgba16float');
 
             const descriptor: GPUTextureDescriptor = {
                 size: [width, height],
@@ -156,8 +174,8 @@ export class ResourceManager {
                     GPUTextureUsage.COPY_SRC
             };
 
-            this.createTexture(tex.name, descriptor);
-            Logger.debug(`Created texture: ${tex.name} (${width}x${height}, ${format})`);
+            this.createTexture(logicalName, descriptor);
+            Logger.debug(`Created texture: ${tex.name} -> ${logicalName} (${width}x${height}, ${format})`);
         });
 
         // 4. Create samplers / 建立取樣器
@@ -221,7 +239,8 @@ export class ResourceManager {
      * @returns The requested {@link GPUTextureView}
      */
     public getTextureView(name: string, type: 'sampled' | 'storage' = 'sampled'): GPUTextureView {
-        const v = this.views.get(name);
+        // Resolve sampled/storaged alias to the logical texture / 解析成對別名至邏輯紋理
+        const v = this.views.get(name) || this.views.get(logicalTextureName(name));
         if (!v) {
             throw new Error(`View "${name}" not found`);
         }
@@ -231,13 +250,13 @@ export class ResourceManager {
     /**
      * Get a GPUTexture object by name.
      * ---
-     * 根據名稱獲取 GPUTexture 物件。
+     * 根據名稱獲取 GPUTexture 物件。`X_sampled`/`X_storaged` 別名會解析至邏輯紋理 `X`。
      *
      * @group Query
      * @param name - Texture name / 紋理名稱
      */
     public getTexture(name: string): GPUTexture | undefined {
-        return this.textures.get(name);
+        return this.textures.get(name) ?? this.textures.get(logicalTextureName(name));
     }
 
     /**
@@ -272,7 +291,7 @@ export class ResourceManager {
      *
      * @group Query
      */
-    public getUniform(name: string): { buffer: GPUBuffer; offset: number; size: number } | undefined {
+    public getUniform(name: string): { buffer: GPUBuffer; offset: number; size: number; type: string } | undefined {
         return this.uniforms.get(name);
     }
 
@@ -413,16 +432,18 @@ export class ResourceManager {
     /**
      * Create the main uniform buffer and map parameter offsets.
      * ---
-     * 建立主要的 Uniform 緩衝區，並計算各參數在緩衝區中的偏移量（採 16 字節對齊）。
+     * 建立主要的 Uniform 緩衝區，並計算各參數在緩衝區中的偏移量。
+     * 每個參數佔用一個 16-byte slot，與 WGSLCodeGenerator._generateUniformStruct
+     * 產生的 struct 佈局（參數欄位 + pad 補滿 16 bytes）完全一致。
      *
      * @internal
      */
     private createUniformBuffer(parameters: any[]): void {
         let offset = 0;
         parameters.forEach(p => {
-            const size = 4; // Assume f32 / 假設為單精度浮點
-            this.uniforms.set(p.name, { buffer: null as any, offset, size });
-            offset += 16; // Maintain standard 16-byte alignment / 維持標準 16 位元組對齊
+            const { size } = paramType(p.type); // Actual byte size from declared type / 依宣告型別計算位元組數
+            this.uniforms.set(p.name, { buffer: null as any, offset, size, type: p.type || 'float' });
+            offset += 16; // Each parameter occupies a 16-byte slot / 每個參數佔用 16-byte slot
         });
 
         const bufferSize = Math.max(offset, 16);
@@ -434,5 +455,23 @@ export class ResourceManager {
 
         // Link all parameters to this single buffer / 將所有參數關聯至此單一緩衝區
         this.uniforms.forEach(u => u.buffer = this.uniformBuffer!);
+
+        // Upload declared default values so the first dispatch uses them.
+        // 上傳宣告的預設值，確保首次 dispatch 即使用預設參數。
+        const initial = new ArrayBuffer(bufferSize);
+        const f32 = new Float32Array(initial);
+        const i32 = new Int32Array(initial);
+        parameters.forEach(p => {
+            const meta = this.uniforms.get(p.name);
+            if (!meta) return;
+            const defaults: number[] = Array.isArray(p.default) ? p.default : [p.default];
+            const isIntegerType = /^(int|i32|uint|u32|int2|uint2|int4|uint4)$/i.test(meta.type);
+            defaults.forEach((v: number, i: number) => {
+                if (i * 4 >= meta.size) return;
+                if (isIntegerType) i32[(meta.offset >> 2) + i] = Math.round(Number(v) || 0);
+                else f32[(meta.offset >> 2) + i] = Number(v) || 0;
+            });
+        });
+        this.device.queue.writeBuffer(this.uniformBuffer, 0, initial);
     }
 }

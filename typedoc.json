@@ -1,15 +1,17 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": [
+    "src/index.ts",
     "src/WGFX.ts",
     "src/runtime/WGFXRuntime.ts",
     "src/runtime/PipelineManager.ts",
     "src/runtime/ResourceManager.ts",
     "src/runtime/UniformBinder.ts",
+    "src/runtime/WGSLCodeGenerator.ts",
     "src/types/shader.ts",
     "src/utils/Logger.ts"
   ],
-  "out": "docs",
+  "out": "docs/api",
   "plugin": [
     "typedoc-plugin-markdown"
   ],
