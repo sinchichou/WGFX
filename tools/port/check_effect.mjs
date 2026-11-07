@@ -66,7 +66,8 @@ for (const file of files) {
             re.lastIndex = 0;
             if (!re.test(bare)) continue;
             const ctx = lines.slice(i, i + 4).join(' ');
-            const guarded = /\bsaturate\b|\bselect\b|\bclamp\b|==\s*0\.0|<=\s*0\.0|===\s*0|max\(.*,\s*(1e|1\.0e|0\.0001|\/ ?32768)/.test(ctx);
+            const guarded = /\bsaturate\b|\bselect\b|\bclamp\b|==\s*0\.0|<=\s*0\.0|===\s*0|max\(.*,\s*(1e|1\.0e|0\.0001|\/ ?32768)/.test(ctx)
+                || /\bmax\([^()]{0,80}?\bvec[234]<f32>\(\s*1e-/.test(bare); // max(分母, vecN(eps)) 防護形式
             const noted = lines.slice(Math.max(0, i - 3), i).join(' ').includes('保護') || lines.slice(Math.max(0, i - 3), i).join(' ').toLowerCase().includes('protect');
             if (!guarded && !noted) findings.push(['E1', i + 1, `${name} — 3 行內無 saturate/select/clamp 後盾`]);
         }
