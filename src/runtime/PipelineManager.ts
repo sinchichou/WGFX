@@ -1,6 +1,6 @@
 /// <reference types="@webgpu/types" />
 import { ResourceManager } from './ResourceManager';
-import { Logger } from '../utils/Logger';
+import { Logger, LogLevel } from '../utils/Logger';
 
 /**
  * Metadata for a stored WebGPU pipeline and its associated layouts.
@@ -19,6 +19,14 @@ export interface StoredPipeline {
     resources: any;
     /** Pass metadata / 通道元數據 */
     passInfo: any;
+    /**
+     * Cached bind group（快取的綁定組）。
+     * 僅在 ResourceManager.revision 變動（紋理/緩衝區重建立）時重建，
+     * 讓每幀 dispatch 不再重複配置 bind group。
+     */
+    bindGroup: GPUBindGroup | null;
+    /** Resource revision the cached bind group was built at / 建立快取時的資源版本 */
+    bindGroupRevision: number;
 }
 
 /**
@@ -139,7 +147,8 @@ export class PipelineManager {
             });
 
             this.pipelines.set(module.passIndex, {
-                computePipeline, bindGroupLayout, resources: module.resources, passInfo: pass
+                computePipeline, bindGroupLayout, resources: module.resources, passInfo: pass,
+                bindGroup: null, bindGroupRevision: -1
             });
         }
     }
@@ -159,7 +168,49 @@ export class PipelineManager {
             throw new Error(`Pipeline for pass ${passInfo.index} not found`);
         }
 
-        const { computePipeline, bindGroupLayout, resources, passInfo: originalPassInfo } = pipeline;
+        // Hot path: reuse the cached bind group unless the resource revision changed.
+        // 熱路徑：資源版本未變時重用快取的 bind group，避免每幀重新配置。
+        const revision = this.resourceManager.revision;
+        if (pipeline.bindGroup === null || pipeline.bindGroupRevision !== revision) {
+            pipeline.bindGroup = this._buildBindGroup(pipeline);
+            pipeline.bindGroupRevision = revision;
+        }
+        const bindGroup = pipeline.bindGroup;
+
+        const passEncoder = commandEncoder.beginComputePass();
+        passEncoder.setPipeline(pipeline.computePipeline);
+        passEncoder.setBindGroup(0, bindGroup);
+
+        // Determine dispatch dimensions based on output size / 根據輸出大小決定分發維度
+        const outName = pipeline.passInfo.out[0];
+        const outTex = this.resourceManager.getTexture(outName);
+        if (!outTex) throw new Error(`Output texture "${outName}" not found`);
+
+        // Calculate grid size (Workgroups) / 計算網格大小
+        // BLOCK_SIZE 優先於 NUM_THREADS：BLOCK_SIZE 描述每個工作群組涵蓋的像素範圍。
+        const workgroupSize = pipeline.passInfo.blockSize || pipeline.passInfo.numThreads || [1, 1];
+        const bx = Math.max(1, workgroupSize[0] | 0);
+        const by = Math.max(1, (workgroupSize[1] || 1) | 0);
+        const dx = Math.ceil(outTex.width / bx);
+        const dy = Math.ceil(outTex.height / by);
+
+        // Hot-path log is gated to avoid per-frame string building
+        // 熱路徑日誌加閘，避免每幀組字串
+        if (Logger.wouldLog(LogLevel.DEBUG)) {
+            Logger.debug(`Dispatch Pass ${passInfo.index}: ${dx}x${dy} groups`);
+        }
+
+        passEncoder.dispatchWorkgroups(dx, dy, 1);
+        passEncoder.end();
+    }
+
+    /**
+     * Build the bind group for a pipeline from current resources.
+     * ---
+     * 依目前資源為管線建立綁定組（僅在資源版本變動時呼叫）。
+     */
+    private _buildBindGroup(pipeline: StoredPipeline): GPUBindGroup {
+        const { bindGroupLayout, resources, passInfo } = pipeline;
         const groupEntries: GPUBindGroupEntry[] = [];
 
         // 1. Bind uniform buffer if needed / 若有需要則綁定 Uniform 緩衝區
@@ -194,33 +245,10 @@ export class PipelineManager {
             groupEntries.push({ binding: sceneBinding, resource: { buffer: sceneBuffer } });
         }
 
-        // Initialize compute pass / 初始化計算通道
-        const bindGroup = this.device.createBindGroup({
+        return this.device.createBindGroup({
             layout: bindGroupLayout,
             entries: groupEntries
         });
-
-        const passEncoder = commandEncoder.beginComputePass();
-        passEncoder.setPipeline(computePipeline);
-        passEncoder.setBindGroup(0, bindGroup);
-
-        // Determine dispatch dimensions based on output size / 根據輸出大小決定分發維度
-        const outName = originalPassInfo.out[0];
-        const outTex = this.resourceManager.getTexture(outName);
-        if (!outTex) throw new Error(`Output texture "${outName}" not found`);
-
-        // Calculate grid size (Workgroups) / 計算網格大小
-        // BLOCK_SIZE 優先於 NUM_THREADS：BLOCK_SIZE 描述每個工作群組涵蓋的像素範圍。
-        const workgroupSize = originalPassInfo.blockSize || originalPassInfo.numThreads || [1, 1];
-        const bx = Math.max(1, workgroupSize[0] | 0);
-        const by = Math.max(1, (workgroupSize[1] || 1) | 0);
-        const dx = Math.ceil(outTex.width / bx);
-        const dy = Math.ceil(outTex.height / by);
-
-        Logger.debug(`Dispatch Pass ${passInfo.index}: ${dx}x${dy} groups`);
-
-        passEncoder.dispatchWorkgroups(dx, dy, 1);
-        passEncoder.end();
     }
 
     /**

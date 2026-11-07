@@ -4,7 +4,7 @@ import { ResourceManager } from './ResourceManager';
 import { PipelineManager } from './PipelineManager';
 import { WGSLCodeGenerator } from './WGSLCodeGenerator';
 import { UniformBinder } from './UniformBinder';
-import { WGFXShaderInfo } from '../types';
+import { WGFXShaderInfo, PassInfo } from '../types';
 import { Logger } from '../utils/Logger';
 
 /**
@@ -31,6 +31,9 @@ export class WGFXRuntime {
     public shaderInfo: WGFXShaderInfo | null;
     /** @zh 生成的WGSL模組，用於除錯顯示 */
     public generatedModules: { wgslCode: string; passIndex: number; resources: any }[] | null;
+
+    /** @zh pass 索引 → 元數據查找表（compile 時建立，dispatch 熱路徑免字串解析與線性搜尋） */
+    private passInfoByIndex: Map<number, PassInfo> = new Map();
 
     /**
      * Initialize the WGFX runtime environment.
@@ -73,6 +76,8 @@ export class WGFXRuntime {
             // 1. Parse source code into metadata / 步驟 1：將原始碼解析為元數據
             const shaderInfo = parse(effectCode);
             this.shaderInfo = shaderInfo;
+            // Pre-index passes for the dispatch hot path / 為 dispatch 熱路徑預建 pass 索引
+            this.passInfoByIndex = new Map(shaderInfo.passes.map(p => [p.index, p]));
             Logger.debug("WGFXRuntime: ShaderInfo parsed");
 
             // 2. Generate optimized WGSL modules / 步驟 2：產生優化後的 WGSL 模組
@@ -109,9 +114,12 @@ export class WGFXRuntime {
             throw new Error("Effect not compiled. Call compile() first.");
         }
 
-        // Extract index from name (e.g., "PASS_0" -> 0) / 從名稱提取索引
-        const passIndex = parseInt(passName.split('_')[1], 10);
-        const passInfo = this.shaderInfo.passes.find(p => p.index === passIndex);
+        // Validate format once, then O(1) lookup（格式驗證一次 + O(1) 查表）
+        const m = /^PASS_(\d+)$/.exec(passName);
+        if (!m) {
+            throw new Error(`Invalid pass name "${passName}" (expected "PASS_<index>", e.g. "PASS_0").`);
+        }
+        const passInfo = this.passInfoByIndex.get(Number(m[1]));
 
         if (!passInfo) {
             throw new Error(`Pass "${passName}" not found.`);
