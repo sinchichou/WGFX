@@ -91,6 +91,20 @@ export class Logger {
     }
 
     /**
+     * Fast level gate for hot paths / 熱路徑快速層級檢查。
+     * ---
+     * 讓呼叫端在組字串「之前」先判斷該層級是否會被輸出，
+     * 避免每幀產生用不到的字串。典型用法：
+     * `if (Logger.wouldLog(LogLevel.DEBUG)) Logger.debug(...)`
+     *
+     * @group Configuration
+     * @param level - The log level to test / 欲測試的層級
+     */
+    public static wouldLog(level: LogLevel): boolean {
+        return this.level <= level;
+    }
+
+    /**
      * Log an info message.
      * ---
      * 記錄一般資訊。適用於系統狀態更新。

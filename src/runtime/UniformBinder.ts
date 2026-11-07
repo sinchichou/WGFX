@@ -16,6 +16,11 @@ export class UniformBinder {
     /** @zh 資源管理員，用於檢索 Uniform 元數據 */
     public resourceManager: ResourceManager;
 
+    /** @zh 16-byte 暫存槽（重用，避免每次更新配置新緩衝） */
+    private scratch = new ArrayBuffer(16);
+    private scratchF32 = new Float32Array(this.scratch);
+    private scratchI32 = new Int32Array(this.scratch);
+
     /**
      * Initialize the uniform binder.
      * ---
@@ -63,21 +68,24 @@ export class UniformBinder {
             Logger.warn(`Uniform "${name}": ${values.length} components given but slot size is ${size} bytes; extra components ignored.`);
         }
 
-        // Convert value to TypedArray based on declared type / 依宣告型別轉換為類型化陣列
-        let data: Float32Array | Int32Array;
-        if (isIntegerType) {
-            data = new Int32Array(values.map(v => Math.round(Number(v))));
-        } else {
-            data = new Float32Array(values.map(v => Number(v)));
+        // Clamp to the parameter's own 16-byte slot — writing through it would
+        // corrupt the NEXT parameter in the shared uniform buffer.
+        // 收斂到參數自身槽位內——超寫會污染共享 uniform 緩衝區中的下一個參數。
+        const count = Math.min(values.length, size >> 2, 4);
+        const isInt = isIntegerType;
+        for (let i = 0; i < count; i++) {
+            const v = Number(values[i]) || 0;
+            if (isInt) this.scratchI32[i] = Math.round(v);
+            else this.scratchF32[i] = v;
         }
 
-        // Optimized GPU buffer write / 優化的 GPU 緩衝區寫入操作
+        // Reused scratch write / 重用暫存槽寫入（零配置）
         this.device.queue.writeBuffer(
-            buffer,            // Target GPU buffer / 目標 GPU 緩衝區
-            offset,            // Byte offset in buffer / 緩衝區中的位元組偏移量
-            data.buffer,       // Source array buffer / 來源陣列緩衝區
-            data.byteOffset,   // Offset in source data / 來源數據的起始偏移
-            data.byteLength    // Total bytes to copy / 要拷貝的總位元組長度
+            buffer,              // Target GPU buffer / 目標 GPU 緩衝區
+            offset,              // Byte offset in buffer / 緩衝區中的位元組偏移量
+            this.scratch,        // Source scratch (reused) / 來源暫存槽
+            0,                   // Offset in source data / 來源數據的起始偏移
+            count * 4            // Bytes to copy / 要拷貝的位元組數
         );
     }
 }

@@ -27,6 +27,22 @@ export class ResourceManager {
     /** @zh 場景資訊（寬高、解析度）Uniform 緩衝區 */
     public sceneBuffer: GPUBuffer | null = null;
 
+    /** @zh 資源版本號：任何紋理/緩衝區（重）建立時遞增，供管線層偵測綁定失效 */
+    private resourceVersion = 0;
+    /** @zh updateSceneBuffer 暫存寫入區（重用，避免每幀配置新 ArrayBuffer） */
+    private sceneScratch = new ArrayBuffer(40);
+    private sceneScratchU32 = new Uint32Array(this.sceneScratch);
+    private sceneScratchF32 = new Float32Array(this.sceneScratch);
+
+    /** @zh 目前資源版本號 / Current resource revision for bind-group cache invalidation */
+    public get revision(): number {
+        return this.resourceVersion;
+    }
+
+    private bumpRevision(): void {
+        this.resourceVersion++;
+    }
+
     /**
      * Initialize the resource manager.
      * ---
@@ -225,6 +241,10 @@ export class ResourceManager {
             storage: texture.createView({ label: `${name}_storage` })
         });
 
+        // Old views/texture replaced → cached bind groups must be rebuilt
+        // 舊視圖/紋理已被替換 → 管線層快取的 bind group 必須重建
+        this.bumpRevision();
+
         return texture;
     }
 
@@ -356,6 +376,7 @@ export class ResourceManager {
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             label: 'SceneInfo'
         });
+        this.bumpRevision();
     }
 
     /**
@@ -371,9 +392,9 @@ export class ResourceManager {
         if (outWidth === 0) outWidth = width;
         if (outHeight === 0) outHeight = height;
 
-        const data = new ArrayBuffer(40);
-        const u32 = new Uint32Array(data);
-        const f32 = new Float32Array(data);
+        // Reuse the persistent scratch views（重用暫存視圖，熱路徑零配置）
+        const u32 = this.sceneScratchU32;
+        const f32 = this.sceneScratchF32;
 
         // inputSize: uint2 (8 bytes)
         u32[0] = width;
@@ -395,7 +416,7 @@ export class ResourceManager {
         f32[8] = outWidth / width;
         f32[9] = outHeight / height;
 
-        this.device.queue.writeBuffer(this.sceneBuffer, 0, data);
+        this.device.queue.writeBuffer(this.sceneBuffer, 0, this.sceneScratch);
         Logger.debug(`Updated scene buffer: IN(${width}x${height}), OUT(${outWidth}x${outHeight}), SCALE(${f32[8].toFixed(2)}, ${f32[9].toFixed(2)})`);
     }
 
@@ -426,6 +447,9 @@ export class ResourceManager {
             this.sceneBuffer = null;
         }
         this.uniforms.clear();
+        // All GPU resources are gone → any cached bind group is stale
+        // 所有 GPU 資源已釋放 → 任何快取的 bind group 皆已失效
+        this.bumpRevision();
         Logger.info('ResourceManager: All resources disposed');
     }
 
@@ -473,5 +497,6 @@ export class ResourceManager {
             });
         });
         this.device.queue.writeBuffer(this.uniformBuffer, 0, initial);
+        this.bumpRevision();
     }
 }
