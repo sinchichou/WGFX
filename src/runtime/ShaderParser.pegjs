@@ -125,9 +125,23 @@
       case 'max':
       case 'step':
         data[key] = parseFloat(value); break;
-      case 'format':
-        data[key] = value.toLowerCase()==='r16g16b16a16_float' ? 'rgba16float' : value;
+      case 'format': {
+        // D3D/Magpie 格式名 → WebGPU 格式名（其餘原樣傳遞，交由裝置驗證）
+        const FORMAT_MAP = {
+          r8g8b8a8_unorm: 'rgba8unorm',
+          r8g8b8a8_uint: 'rgba8uint',
+          r8g8b8a8_snorm: 'rgba8snorm',
+          b8g8r8a8_unorm: 'bgra8unorm',
+          r16g16b16a16_float: 'rgba16float',
+          r16g16b16a16_unorm: 'rgba16uint',
+          r16g16b16a16_snorm: 'rgba16snorm',
+          r32g32b32a32_float: 'rgba32float',
+          r10g10b10a2_unorm: 'rgb10a2unorm',
+        };
+        const lower = value.toLowerCase();
+        data[key] = FORMAT_MAP[lower] !== undefined ? FORMAT_MAP[lower] : value;
         break;
+      }
       case 'label':
       case 'desc':
         data[key] = dequote(value); break;

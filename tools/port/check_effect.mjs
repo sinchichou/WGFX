@@ -58,6 +58,7 @@ for (const file of files) {
     });
 
     // E1 零分母位點（往後看 3 行內有無 saturate/select/clamp 後盾；行內 `checker:ok` 標註可豁免）
+    const constNames = new Set([...code.matchAll(/^\s*const\s+([A-Za-z_]\w*)\s*=/gm)].map(m => m[1]));
     lines.forEach((ln, i) => {
         const bare = ln.replace(/\/\/.*$/, '');
         if (ln.includes('checker:ok')) return;
@@ -69,8 +70,10 @@ for (const file of files) {
             const ctx = lines.slice(i, i + 4).join(' ');
             const guarded = /\bsaturate\b|\bselect\b|\bclamp\b|==\s*0\.0|<=\s*0\.0|===\s*0|max\(.*,\s*(1e|1\.0e|0\.0001|\/ ?32768)/.test(ctx)
                 || /\bmax\([^()]{0,80}?\bvec[234]<f32>\(\s*1e-/.test(bare); // max(分母, vecN(eps)) 防護形式
+            // 分母為模組 const 標識符（如 1.0 / LOCALITY）→ 編譯期常數，可證
+            const denomConst = [...bare.matchAll(/\/\s*([A-Za-z_]\w*)/g)].some(m => constNames.has(m[1]));
             const noted = lines.slice(Math.max(0, i - 3), i).join(' ').includes('保護') || lines.slice(Math.max(0, i - 3), i).join(' ').toLowerCase().includes('protect');
-            if (!guarded && !noted) findings.push(['E1', i + 1, `${name} — 3 行內無 saturate/select/clamp 後盾`]);
+            if (!guarded && !noted && !denomConst) findings.push(['E1', i + 1, `${name} — 3 行內無 saturate/select/clamp 後盾`]);
         }
     });
 
