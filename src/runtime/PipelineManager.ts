@@ -66,10 +66,18 @@ export class PipelineManager {
     public async createPipelines(shaderInfo: any, generatedModules: any[]): Promise<void> {
         this.pipelines.clear();
 
-        for (const module of generatedModules) {
+        // O(1) pass lookup / 以索引建查找表，免線性搜尋
+        const passByIndex = new Map(shaderInfo.passes.map((p: any) => [p.index, p]));
+
+        // Create all pipelines concurrently: WGSL→ISA compilation overlaps on the
+        // driver side, so compile latency approaches the SLOWEST pass instead of
+        // the SUM of all passes (matters most for multi-pass CNN effects).
+        // 並行建立所有管線：WGSL 編譯在驅動端可重疊，總延遲趨近最慢的 pass
+        // 而非各 pass 總和（對多 pass CNN 特效最有感）。
+        await Promise.all(generatedModules.map(async (module) => {
             // Find corresponding pass info / 尋找對應的通道資訊
-            const pass = shaderInfo.passes.find((p: any) => p.index === module.passIndex);
-            if (!pass) continue;
+            const pass = passByIndex.get(module.passIndex);
+            if (!pass) return;
 
             // Create shader module from WGSL / 從 WGSL 代碼建立著色器模組
             const shaderModule = this.device.createShaderModule({
@@ -150,7 +158,7 @@ export class PipelineManager {
                 computePipeline, bindGroupLayout, resources: module.resources, passInfo: pass,
                 bindGroup: null, bindGroupRevision: -1
             });
-        }
+        }));
     }
 
     /**
