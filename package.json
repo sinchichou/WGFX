@@ -21,6 +21,7 @@
     "build": "rollup -c",
     "pretest": "npm run build",
     "test": "node test/test_runtime.js",
+    "test:ref": "node test/ref_probe_upscale_denoise_s.mjs",
     "debug": "npm run dev --prefix debugger",
     "build:docs": "typedoc",
     "typecheck": "tsc --noEmit"
