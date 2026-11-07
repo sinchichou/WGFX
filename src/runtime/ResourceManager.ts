@@ -161,8 +161,12 @@ export class ResourceManager {
         // 3. Create intermediate textures / 建立中間渲染紋理
         //    Magpie 風格的 `tex1_sampled` / `tex1_storaged` 成對宣告代表**同一個**邏輯紋理，
         //    主機端只配置一塊 GPUTexture，並提供 sampled/storage 兩種 view。
+        //    兩階段解析：先建立可解尺寸者；尺寸運算式引用 OUTPUT_WIDTH/OUTPUT_HEIGHT
+        //    （Magpie 慣例）的紋理延後到 OUTPUT 實際尺寸確定後重試。
         const createdLogical = new Set<string>();
-        shaderInfo.textures.forEach((tex: TextureInfo) => {
+        const deferredTextures: TextureInfo[] = [];
+
+        const createTextureFromDecl = (tex: TextureInfo): void => {
             const logicalName = logicalTextureName(tex.name);
             if (this.textures.has(logicalName) || createdLogical.has(logicalName)) {
                 // Effect-declared explicit size wins for non-INPUT external textures
@@ -198,7 +202,6 @@ export class ResourceManager {
                 }
                 return;
             }
-            createdLogical.add(logicalName);
 
             let width: number;
             let height: number;
@@ -230,8 +233,32 @@ export class ResourceManager {
             };
 
             this.createTexture(logicalName, descriptor);
+            createdLogical.add(logicalName); // 建立成功才登記（尺寸失敗者可於第二階段重試）
             Logger.debug(`Created texture: ${tex.name} -> ${logicalName} (${width}x${height}, ${format})`);
+        };
+
+        const sizeFailures: TextureInfo[] = [];
+        shaderInfo.textures.forEach((tex: TextureInfo) => {
+            try {
+                createTextureFromDecl(tex);
+            } catch (e: any) {
+                if (/WIDTH\/HEIGHT|determine size/.test(e?.message || '')) {
+                    deferredTextures.push(tex);
+                } else {
+                    throw e;
+                }
+            }
         });
+
+        if (deferredTextures.length > 0) {
+            // 以 OUTPUT 實際尺寸（外部提供或已建立）補入 context 後重試
+            const outTex = this.textures.get('OUTPUT');
+            if (outTex) {
+                context.OUTPUT_WIDTH = outTex.width;
+                context.OUTPUT_HEIGHT = outTex.height;
+            }
+            deferredTextures.forEach(tex => createTextureFromDecl(tex));
+        }
 
         // 4. Create samplers / 建立取樣器
         shaderInfo.samplers.forEach(samp => {
