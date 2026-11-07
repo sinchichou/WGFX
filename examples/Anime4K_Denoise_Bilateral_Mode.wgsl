@@ -117,30 +117,23 @@ fn Pass1(@builtin(workgroup_id) workgroup_id: vec3<u32>, @builtin(local_invocati
     // Load data using Gather (fetching 2x2 blocks)
     for (var i: u32 = 0u; i <= KERNELSIZE - 1u; i += 2u) {
         for (var j: u32 = 0u; j <= KERNELSIZE - 1u; j += 2u) {
-            // Calculate texture coordinate for Gather
-            // In WGSL Gather uses 0..1 coordinates.
-            // Offset calculation matches HLSL logic
-            let pixelPos = MF2(gxy + uint2(i, j));
-            
-            // Texture coordinates must be centered on the pixel for Gather to work predictably
-            // or slightly offset depending on the specific gather implementation requirements.
-            // Using (pos + 0.5) * pt is standard center sampling.
-            let tpos = (pixelPos + 0.5) * inputPt; 
+            // 與 Magpie 原版一致：以象限「角點座標」取樣 Gather。
+            // Gather 的 base = floor(u * size - 0.5)，以角點座標（整數紋素座標）取樣時
+            // base = 該角點左上鄰素，返回的四象限正好涵蓋 [gxy+i-1, gxy+i] 的 2x2 鄰域，
+            // 使 src[HALF+dx][HALF+dy] = texel(gxy+dx, gxy+j+dy)（核心中心對齊目標像素）。
+            // 原先的 (pos + 0.5) * pt 中心取樣會把整個 gather 視窗平移 (+1,+1)，
+            // 且在非 2 的冪次尺寸下有浮點脆弱性（u * size - 0.5 落在整數附近）。
+            let tpos = MF2(gxy + uint2(i, j)) * inputPt;
 
             // Gather returns 4 values from a 2x2 quad.
             // Component 0=R, 1=G, 2=B.
+            // 實測（Dawn）與 D3D GatherRed 相同的分量佈局：x=左下、y=右下、z=右上、w=左上，
+            // 對應原版 HLSL 註解的「w z / x y」排列。
             let sr = textureGather(0, INPUT, sam, tpos);
             let sg = textureGather(1, INPUT, sam, tpos);
             let sb = textureGather(2, INPUT, sam, tpos);
 
-            // HLSL Gather returns: w=(0,1), z=(1,1), y=(1,0), x=(0,0) relative to sample pos?
-            // Or w=BottomLeft?
-            // We map them to the 'src' array matching the HLSL logic:
-            // src[i][j]     = w components
-            // src[i][j+1]   = x components
-            // src[i+1][j]   = z components
-            // src[i+1][j+1] = y components
-
+            // w=TL -> src[i][j]、x=BL -> src[i][j+1]、z=TR -> src[i+1][j]、y=BR -> src[i+1][j+1]
             src[i][j] = MF4(sr.w, sg.w, sb.w, get_luma(MF3(sr.w, sg.w, sb.w)));
             src[i][j + 1u] = MF4(sr.x, sg.x, sb.x, get_luma(MF3(sr.x, sg.x, sb.x)));
             src[i + 1u][j] = MF4(sr.z, sg.z, sb.z, get_luma(MF3(sr.z, sg.z, sb.z)));
