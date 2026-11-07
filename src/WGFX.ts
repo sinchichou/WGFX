@@ -24,6 +24,16 @@ export interface WGFXOptions {
     width: number;
     /** @zh 初始處理高度 */
     height: number;
+    /**
+     * Optional output width for upscaling effects (defaults to width).
+     * @zh 選用的輸出寬度，供升頻特效使用（預設等同 width）
+     */
+    outWidth?: number;
+    /**
+     * Optional output height for upscaling effects (defaults to height).
+     * @zh 選用的輸出高度，供升頻特效使用（預設等同 height）
+     */
+    outHeight?: number;
     /** @zh 選用的外部資源 (textures, samplers, etc.) */
     externalResources?: any;
 }
@@ -131,7 +141,7 @@ export class WGFX {
      * @returns A promise that resolves to a WGFX instance
      * @throws {Error} 如果 WebGPU 裝置、代碼無效或編譯失敗時拋出錯誤
      */
-    public static async create({ device, effectCode, width, height }: WGFXOptions): Promise<WGFX> {
+    public static async create({ device, effectCode, width, height, outWidth, outHeight }: WGFXOptions): Promise<WGFX> {
         if (!device) {
             const error = 'Must provide a valid GPUDevice';
             Logger.error(error);
@@ -147,6 +157,10 @@ export class WGFX {
             Logger.error(error);
             throw new Error(error);
         }
+        // Output dimensions default to input dimensions; upscaling effects pass 2x.
+        // 輸出尺寸預設等同輸入；升頻特效傳入 2 倍尺寸。
+        const outW = (outWidth && outWidth > 0) ? Math.floor(outWidth) : width;
+        const outH = (outHeight && outHeight > 0) ? Math.floor(outHeight) : height;
 
         const runtime = new WGFXRuntime(device);
 
@@ -164,7 +178,7 @@ export class WGFX {
                         GPUTextureUsage.RENDER_ATTACHMENT
                 },
                 OUTPUT: {
-                    size: [width, height],
+                    size: [outW, outH],
                     format: 'rgba16float' as GPUTextureFormat,
                     usage: GPUTextureUsage.STORAGE_BINDING |
                         GPUTextureUsage.COPY_SRC |
@@ -182,14 +196,14 @@ export class WGFX {
 
         // Write the scene buffer once so the first dispatch has valid resolution info.
         // 初始化時先寫入場景資訊，確保首次 dispatch 即有正確的解析度資料。
-        runtime.resourceManager.updateSceneBuffer(width, height, width, height);
+        runtime.resourceManager.updateSceneBuffer(width, height, outW, outH);
 
         const instance = new WGFX(runtime);
         instance.width = width;
         instance.height = height;
         instance.initialized = true;
 
-        Logger.info(`WGFX initialized: ${width}x${height}`);
+        Logger.info(`WGFX initialized: ${width}x${height} -> ${outW}x${outH}`);
         return instance;
     }
 

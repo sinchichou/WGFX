@@ -196,8 +196,8 @@ fn A4KS4(pos: MF2) -> MF4 {
 @group(0) @binding(0) var INPUT: texture_2d<f32>;
 
 //!TEXTURE
-//!WIDTH INPUT_WIDTH
-//!HEIGHT INPUT_HEIGHT
+//!WIDTH INPUT_WIDTH * 2
+//!HEIGHT INPUT_HEIGHT * 2
 @group(0) @binding(1) var OUTPUT: texture_storage_2d<rgba16float, write>;
 
 //!TEXTURE
@@ -361,18 +361,20 @@ fn Pass3(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_i
 @compute @workgroup_size(64, 1, 1)
 fn Pass4(@builtin(workgroup_id) workgroup_id: uint3, @builtin(local_invocation_id) local_id: uint3) {
     var gxy: uint2 = (Rmp8x8(local_id.x) << uint2(1u)) + (workgroup_id.xy * 16u);
-    let inputSize = GetInputSize();
-    if gxy.x >= inputSize.x || gxy.y >= inputSize.y {
+    // 原版 Depth-to-Space 輸出為輸入的 2 倍，邊界檢查必須使用 outputSize
+    let outputSize = GetOutputSize();
+    if gxy.x >= outputSize.x || gxy.y >= outputSize.y {
         return;
     }
 
     let inputPt = GetInputPt();
     let outputPt = GetOutputPt();
 
-    var pos: MF2 = (MF2(gxy) + MF2(0.5, 0.5)) * inputPt;
+    // conv2d_last_tf（tex1）與 INPUT 皆以 normalized 座標取樣（輸入/輸出共享 0..1 區間）
+    var pos: MF2 = (MF2(gxy) + MF2(0.5, 0.5)) * outputPt;
     let c: MF4 = A4KS4(pos);
 
-    pos -= MF2(0.5) * outputPt;
+    // residual: 對 INPUT 以輸出座標取樣（原版 + MAIN_tex(MAIN_pos)）
     textureStore(OUTPUT, int2(gxy), MF4(c.x + textureSampleLevel(INPUT, sam1, pos, 0.0).rgb, 1.0));
 
     gxy.x += 1u;
