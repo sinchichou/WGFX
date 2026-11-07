@@ -1,0 +1,207 @@
+WebGPU Report  
+
+#1 high-performance  
+=====================  
+
+adapter info:  
+---------------  
+* architecture:               lovelace  
+* description 
+* device 
+* isFallbackAdapter: false  
+* subgroupMaxSize:            32  
+* subgroupMinSize:           32  
+* vendor:                nvidia  
+
+limits: 
+-------------------------------  
+* maxBindGroups:                           4
+* maxBindGroupsPlusVertexBuffers:                     24  
+* maxBindingsPerBindGroup:                     1000  
+* maxBufferSize:                         2147483648 (2gb)  
+* maxColorAttachmentBytesPerSample:                   128b  
+* maxColorAttachments:                          8
+* maxComputeInvocationsPerWorkgroup:                  1k  
+* maxComputeWorkgroupSizeX:                      1k  
+* maxComputeWorkgroupSizeY:        1k  
+* maxComputeWorkgroupSizeZ:        64  
+* maxComputeWorkgroupStorageSize:                     32768 (32k)  
+* maxComputeWorkgroupsPerDimension:                   65535 (64k)  
+* maxDynamicStorageBuffersPerPipelineLayout:                8
+* maxDynamicUniformBuffersPerPipelineLayout:                10  
+* maxImmediateSize:                          64  
+* maxInterStageShaderVariables:                      28  
+* maxSampledTexturesPerShaderStage:                  48  
+* maxSamplersPerShaderStage:                  16  
+* maxStorageBufferBindingSize:                     2147483644 (2gb)  
+* maxStorageBuffersInFragmentStage:                     16  
+* maxStorageBuffersInVertexStage:                     16  
+* maxStorageBuffersPerShaderStage:                 16  
+* maxStorageTexturesInFragmentStage:                    8
+* maxStorageTexturesInVertexStage:       8
+* maxStorageTexturesPerShaderStage:                  8
+* maxTextureArrayLayers:                         2048 (2k)  
+* maxTextureDimension1D:                        16384 (16k)  
+* maxTextureDimension2D:                        16384 (16k)  
+* maxTextureDimension3D:           2048 (2k)  
+* maxUniformBufferBindingSize:                     65536 (64k)  
+* maxUniformBuffersPerShaderStage:                12  
+* maxVertexAttributes:                          30  
+* maxVertexBufferArrayStride:                     2048 (2k)  
+* maxVertexBuffers:                         8
+* minStorageBufferOffsetAlignment: 256b  
+* minUniformBufferOffsetAlignment:                     256b  
+
+features: 
+---------------------------------  
+* bgra8unorm-storage  
+* clip-distances  
+* core-features-and-limits  
+* depth-clip-control  
+* depth32float-stencil8  
+* dual-source-blending  
+* float32-blendable  
+* float32-filterable  
+* indirect-first-instance  
+* primitive-index  
+* rg11b10ufloat-renderable  
+* shader-f16  
+* subgroup-size-control  
+* subgroups  
+* texture-component-swizzle  
+* texture-compression-bc  
+* texture-compression-bc-sliced-3d  
+* texture-compression-unaligned  
+* texture-formats-tier1  
+* texture-formats-tier2  
+* timestamp-query  
+
+#2 compatibilityMode  
+======================  
+
+adapter info:  
+---------------  
+* architecture:               lovelace  
+* description 
+* device 
+* isFallbackAdapter: false  
+* subgroupMaxSize:            32  
+* subgroupMinSize:           32  
+* vendor:                nvidia  
+
+limits: 
+-------------------------------  
+* maxBindGroups:                           4
+* maxBindGroupsPlusVertexBuffers:                     24  
+* maxBindingsPerBindGroup:                     1000  
+* maxBufferSize:                         2147483648 (2gb)  
+* maxColorAttachmentBytesPerSample:                   128b  
+* maxColorAttachments:                          8
+* maxComputeInvocationsPerWorkgroup:                  1k  
+* maxComputeWorkgroupSizeX:                      1k  
+* maxComputeWorkgroupSizeY:        1k  
+* maxComputeWorkgroupSizeZ:        64  
+* maxComputeWorkgroupStorageSize:                     32768 (32k)  
+* maxComputeWorkgroupsPerDimension:                   65535 (64k)  
+* maxDynamicStorageBuffersPerPipelineLayout:                8
+* maxDynamicUniformBuffersPerPipelineLayout:                10  
+* maxImmediateSize:                          64  
+* maxInterStageShaderVariables:                      28  
+* maxSampledTexturesPerShaderStage:                  48  
+* maxSamplersPerShaderStage:                  16  
+* maxStorageBufferBindingSize:                     2147483644 (2gb)  
+* maxStorageBuffersInFragmentStage:                     16  
+* maxStorageBuffersInVertexStage:                     16  
+* maxStorageBuffersPerShaderStage:                 16  
+* maxStorageTexturesInFragmentStage:                    8
+* maxStorageTexturesInVertexStage:       8
+* maxStorageTexturesPerShaderStage:                  8
+* maxTextureArrayLayers:                         2048 (2k)  
+* maxTextureDimension1D:                        16384 (16k)  
+* maxTextureDimension2D:                        16384 (16k)  
+* maxTextureDimension3D:           2048 (2k)  
+* maxUniformBufferBindingSize:                     65536 (64k)  
+* maxUniformBuffersPerShaderStage:                12  
+* maxVertexAttributes:                          30  
+* maxVertexBufferArrayStride:                     2048 (2k)  
+* maxVertexBuffers:                         8
+* minStorageBufferOffsetAlignment: 256b  
+* minUniformBufferOffsetAlignment:                     256b  
+
+features: 
+---------------------------------  
+* bgra8unorm-storage  
+* clip-distances  
+* core-features-and-limits  
+* depth-clip-control  
+* depth32float-stencil8  
+* dual-source-blending  
+* float32-blendable  
+* float32-filterable  
+* indirect-first-instance  
+* primitive-index  
+* rg11b10ufloat-renderable  
+* shader-f16  
+* subgroup-size-control  
+* subgroups  
+* texture-component-swizzle  
+* texture-compression-bc  
+* texture-compression-bc-sliced-3d  
+* texture-compression-unaligned  
+* texture-formats-tier1  
+* texture-formats-tier2  
+* timestamp-query  
+
+WGSL language features:  
+-------------------------  
+* buffer_view  
+* immediate_address_space  
+* linear_indexing  
+* packed_4x8_integer_dot_product  
+* pointer_composite_access  
+* readonly_and_readwrite_storage_textures  
+* subgroup_id  
+* subgroup_uniformity  
+* swizzle_assignment  
+* texture_and_sampler_let  
+* texture_formats_tier1  
+* uniform_buffer_standard_layout  
+* unrestricted_pointer_parameters  
+
+misc:  
+-------  
+* HDR canvas support:  supported  
+* WebXR support: not supported  
+* fallback adapter:    not supported  
+* getPreferredCanvasFormat: bgra8unorm  
+
+dedicated workers:  
+====================  
+* webgpu API:               exists  
+* requestAdapter:                    successful  
+* requestDevice:                     successful  
+* getContext("webgpu"):     successful  
+* requestAnimationFrame:                    successful  
+* transferControlToOffscreen:               successful  
+* OffscreenCanvas:                    successful  
+* CanvasRenderingContext2D: successful  
+
+shared workers:  
+=================  
+* webgpu API:               exists  
+* requestAdapter:                    successful  
+* requestDevice:                     successful  
+* getContext("webgpu"):     successful  
+* transferControlToOffscreen:               successful  
+* OffscreenCanvas:                    successful  
+* CanvasRenderingContext2D: successful  
+
+service workers:  
+==================  
+* webgpu API:                 exists  
+* requestAdapter:             successful  
+* requestDevice:              successful  
+* getContext("webgpu"):       successful  
+* transferControlToOffscreen: successful  
+* OffscreenCanvas:            successful  
+* CanvasRenderingContext2D:   successful
