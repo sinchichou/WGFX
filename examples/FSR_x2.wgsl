@@ -25,16 +25,31 @@
 //     CLAMP sampler address mode. RCAS keeps the original unclamped Load
 //     semantics (out-of-bounds texels read as zero in D3D and WebGPU alike).
 //   * The scalar (non-FP16) AMD code path is ported; WGSL f32 replaces MF.
+//   * AMD's APrx* approximate reciprocal/rsqrt (ffx_a.h) are restored verbatim as
+//     WGSL `bitcast<u32>` bit-tricks (constants 0x7ef07ebb / 0x7ef19fff / 0x5f347d74).
+//     They are mathematically TOTAL — for any finite input they return a finite value
+//     (rcp(0) ≈ 1.6e38, never +Inf) — which is the structural protection the official
+//     code relies on. Replacing them with exact `1.0/x` creates Inf→NaN sites (0*Inf)
+//     that HLSL's ternary min/max heals but WGSL spec min/max propagate; on Dawn the
+//     NaN happens to self-heal (saturate(NaN)=0, NMax semantics), on stricter
+//     implementations it would not. hitMin/hitMax keep exact rcp (as the original's
+//     ARcpF1) with an explicit all-black/all-white guard matching the official's
+//     healed result.
 //   * Porting deviation (documented): RCAS output is clamped to the min/max of its
 //     four neighbors (b,d,f,h) — the same deringing philosophy as EASU's terminal
 //     min4/max4 clamp. The original extrapolates with a negative lobe, which
 //     amplifies single-pixel chroma outliers (4:2:0 video noise) into saturated
 //     red/green/blue fireflies in dark areas (~2x chroma overshoot at
 //     Sharpness=0.87), and even passes the input's own spikes through verbatim at
-//     1:1 scale. The clamp bounds output by the neighborhood: fireflies collapse to
-//     the local level (measured by test/red_dot_probe.mjs: 130 output fireflies on
-//     a dark noisy frame -> 0). Documented trade-off: genuine isolated single-pixel
-//     highlights are smoothed as well.
+//     1:1 scale. The clamp bounds output by the neighborhood: saturated fireflies
+//     collapse to the local level. Residual: bounded 2x2 chroma blobs remain where
+//     the input spike itself sits inside the nearest-4 set (per-channel min4/max4
+//     can combine channels from different texels, so output chroma is bounded by
+//     the neighborhood's per-channel range, not by any single input texel's
+//     chroma). Verified faithful to the official math by test/impulse_response.mjs
+//     (9/9 cases, GPU ≡ CPU reference within 1-3 f16 ulp; NaN-prefill coverage
+//     100%). Documented trade-off: genuine isolated single-pixel highlights are
+//     smoothed as well.
 //! VERSION 4
 
 //! PARAMETER Sharpness
@@ -82,6 +97,18 @@ fn Pass1(@builtin(global_invocation_id) global_id: vec3<u32>) {
 fn EasuLoad(pos: vec2<i32>) -> vec3<f32> {
     let size = vec2<i32>(scene.inputSize);
     return textureLoad(INPUT, clamp(pos, vec2<i32>(0), size - vec2<i32>(1)), 0).rgb;
+}
+
+// Approximate reciprocal (AMD ffx_a.h, verbatim: single IADD bit trick).
+// Total function: never returns Inf/NaN for any finite input (rcp(0) ≈ 1.6e38),
+// removing the Inf→NaN paths that exact `1.0/x` would create (0*Inf).
+fn APrxLoRcpF1(a: f32) -> f32 {
+    return bitcast<f32>(0x7ef07ebbu - bitcast<u32>(a));
+}
+
+// Approximate reciprocal square root (AMD ffx_a.h, verbatim: IADD + shift).
+fn APrxLoRsqF1(a: f32) -> f32 {
+    return bitcast<f32>(0x5f347d74u - (bitcast<u32>(a) >> 1u));
 }
 
 // Filtering for a given tap for the scalar. (AMD FidelityFX EASU)
@@ -150,7 +177,7 @@ fn FsrEasuSetF(
     let dc = lD - lC;
     let cb = lC - lB;
     var lenX = max(abs(dc), abs(cb));
-    lenX = 1.0 / lenX;
+    lenX = APrxLoRcpF1(lenX);
     let dirX = lD - lB;
     lenX = saturate(abs(dirX) * lenX);
     lenX *= lenX;
@@ -158,7 +185,7 @@ fn FsrEasuSetF(
     let ec = lE - lC;
     let ca = lC - lA;
     var lenY = max(abs(ec), abs(ca));
-    lenY = 1.0 / lenY;
+    lenY = APrxLoRcpF1(lenY);
     let dirY = lE - lA;
     lenY = saturate(abs(dirY) * lenY);
     lenY *= lenY;
@@ -249,14 +276,14 @@ fn FsrEasu(ip: vec2<u32>) -> vec3<f32> {
     let dir2 = dir * dir;
     var dirR = dir2.x + dir2.y;
     let zro = dirR < 1.0 / 32768.0;
-    dirR = select(inverseSqrt(dirR), 1.0, zro);
+    dirR = select(APrxLoRsqF1(dirR), 1.0, zro);
     dir.x = select(dir.x, 1.0, zro);
     dir *= dirR;
     // Transform from {0 to 2} to {0 to 1} range, and shape with square.
     len = len * 0.5;
     len *= len;
     // Stretch kernel {1.0 vert|horz, to sqrt(2.0) on diagonal}.
-    let stretch = (dir.x * dir.x + dir.y * dir.y) / max(abs(dir.x), abs(dir.y));
+    let stretch = (dir.x * dir.x + dir.y * dir.y) * APrxLoRcpF1(max(abs(dir.x), abs(dir.y)));
     // Anisotropic length after rotation,
     //  x := 1.0 lerp to 'stretch' on edges
     //  y := 1.0 lerp to 2x on edges
@@ -265,7 +292,7 @@ fn FsrEasu(ip: vec2<u32>) -> vec3<f32> {
     // the window shifts from +/-{sqrt(2.0) to slightly beyond 2.0}.
     let lob = 0.5 + ((1.0 / 4.0 - 0.04) - 0.5) * len;
     // Set distance^2 clipping point to the end of the adjustable window.
-    let clp = 1.0 / lob;
+    let clp = APrxLoRcpF1(lob);
     // Accumulation mixed with min/max of 4 nearest.
     //    b c
     //  e f g h
@@ -323,6 +350,13 @@ fn Pass2(@builtin(global_invocation_id) global_id: vec3<u32>) {
 // This is set at the limit of providing unnatural results for sharpening.
 const FSR_RCAS_LIMIT: f32 = 0.25 - (1.0 / 16.0);
 
+// Medium-precision approximate reciprocal (AMD ffx_a.h, verbatim: IADD + FMA + MUL).
+// The 1.87… Newton step keeps APrxMedRcpF1(0) ≈ 3.2e38 — finite, unlike exact 1/0.
+fn APrxMedRcpF1(a: f32) -> f32 {
+    let b = bitcast<f32>(0x7ef19fffu - bitcast<u32>(a));
+    return b * (-b * a + 2.0);
+}
+
 // FidelityFX RCAS core. (AMD FidelityFX, scalar path)
 // Algorithm uses minimal 3x3 pixel neighborhood.
 //    b
@@ -338,7 +372,7 @@ fn FsrRcasF(b: vec3<f32>, d: vec3<f32>, e: vec3<f32>, f: vec3<f32>, h: vec3<f32>
 
     // Noise detection.
     var nz = 0.25 * bL + 0.25 * dL + 0.25 * fL + 0.25 * hL - eL;
-    nz = saturate(abs(nz) * (1.0 / (max(max(max(bL, dL), eL), max(fL, hL)) - min(min(min(bL, dL), eL), min(fL, hL)))));
+    nz = saturate(abs(nz) * APrxMedRcpF1(max(max(max(bL, dL), eL), max(fL, hL)) - min(min(min(bL, dL), eL), min(fL, hL))));
     nz = -0.5 * nz + 1.0;
 
     // Min and max of ring.
@@ -351,12 +385,17 @@ fn FsrRcasF(b: vec3<f32>, d: vec3<f32>, e: vec3<f32>, f: vec3<f32>, h: vec3<f32>
     // Immediate constants for peak range.
     // peakC = { 1.0, -1.0 * 4.0 }
     // Limiters, these need to be high precision RCPs.
-    let hitMinR = min(mn4R, e.r) * (1.0 / (4.0 * mx4R));
-    let hitMinG = min(mn4G, e.g) * (1.0 / (4.0 * mx4G));
-    let hitMinB = min(mn4B, e.b) * (1.0 / (4.0 * mx4B));
-    let hitMaxR = (1.0 - max(mx4R, e.r)) * (1.0 / (4.0 * mn4R + (-4.0)));
-    let hitMaxG = (1.0 - max(mx4G, e.g)) * (1.0 / (4.0 * mn4G + (-4.0)));
-    let hitMaxB = (1.0 - max(mx4B, e.b)) * (1.0 / (4.0 * mn4B + (-4.0)));
+    // Degenerate-neighborhood guard: when 4*mx4 == 0 (all-black) or 4*mn4 - 4 == 0
+    // (all-white) the original also forms 0*Inf = NaN, but HLSL's ternary max/min
+    // comparison semantics heal it. WGSL min/max propagate NaN per spec, so the
+    // guard is explicit; the resulting output matches the official healed result
+    // (all-black → e, all-white → e, sharpening off).
+    let hitMinR = select(min(mn4R, e.r) * (1.0 / (4.0 * mx4R)), 0.0, mx4R == 0.0);
+    let hitMinG = select(min(mn4G, e.g) * (1.0 / (4.0 * mx4G)), 0.0, mx4G == 0.0);
+    let hitMinB = select(min(mn4B, e.b) * (1.0 / (4.0 * mx4B)), 0.0, mx4B == 0.0);
+    let hitMaxR = select((1.0 - max(mx4R, e.r)) * (1.0 / (4.0 * mn4R + (-4.0))), 0.0, mn4R == 1.0);
+    let hitMaxG = select((1.0 - max(mx4G, e.g)) * (1.0 / (4.0 * mn4G + (-4.0))), 0.0, mn4G == 1.0);
+    let hitMaxB = select((1.0 - max(mx4B, e.b)) * (1.0 / (4.0 * mn4B + (-4.0))), 0.0, mn4B == 1.0);
     let lobeR = max(-hitMinR, hitMaxR);
     let lobeG = max(-hitMinG, hitMaxG);
     let lobeB = max(-hitMinB, hitMaxB);
@@ -366,7 +405,7 @@ fn FsrRcasF(b: vec3<f32>, d: vec3<f32>, e: vec3<f32>, f: vec3<f32>, h: vec3<f32>
     lobe *= nz;
 
     // Resolve, which needs the medium precision rcp approximation to avoid visible tonality changes.
-    let rcpL = 1.0 / (4.0 * lobe + 1.0);
+    let rcpL = APrxMedRcpF1(4.0 * lobe + 1.0);
     let res = vec3<f32>(
         (lobe * b.r + lobe * d.r + lobe * h.r + lobe * f.r + e.r) * rcpL,
         (lobe * b.g + lobe * d.g + lobe * h.g + lobe * f.g + e.g) * rcpL,
