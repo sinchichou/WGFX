@@ -93,8 +93,10 @@ export class WGSLCodeGenerator {
         // COMMON 函式主體會依每個 pass 的實際呼叫進行**函式級裁剪**：
         // 未被呼叫的輔助函式不進入模組，避免其引用的資源在不需要的 pass
         // 中被迫宣告（導致 storage/sampled 同步範圍衝突或超出裝置上限）。
+        // 單次行走同時產出：表頭（struct/alias/const/var）+ 函式主體映射。
+        const commonSplit = this._splitCommonCode(shaderInfo.commonCode);
         const commonHeader = shaderInfo.commonCode
-            ? `// --- COMMON CODE ---\n${this._stripCommonFunctions(shaderInfo.commonCode)}\n\n`
+            ? `// --- COMMON CODE ---\n${commonSplit.header}\n\n`
             : '';
 
         // Bindings already claimed by hand-written COMMON code (e.g. `@binding(4)`).
@@ -107,7 +109,7 @@ export class WGSLCodeGenerator {
         // Textures/samplers referenced by COMMON code (helper functions may sample them
         // in every pass). Per-pass declarations add these on top of pass.in/out.
         // COMMON 代碼引用到的資源（輔助函式可能在每個 pass 取樣），需在每個 pass 宣告。
-        const fnBodies = this._extractCommonFunctions(shaderInfo.commonCode);
+        const fnBodies = commonSplit.fnBodies;
         const texNameSet = new Set<string>(shaderInfo.textures.map((t: TextureInfo) => t.name));
         const samplerNameSet = new Set<string>(shaderInfo.samplers.map((s: SamplerInfo) => s.name));
 
@@ -141,13 +143,16 @@ export class WGSLCodeGenerator {
             // transitively, the COMMON helper functions it calls (a pass calling a
             // COMMON helper that samples a texture needs that texture declared).
             // 以 pass 代碼為起點，沿 COMMON 輔助函式呼叫圖遞迴解析資源引用。
-            const referenced = this._collectReferencedResources(pass.code, fnBodies, texNameSet, samplerNameSet);
+            const closure = this._resolveCommonClosure(pass.code, fnBodies);
+            const referenced = new Set<string>();
+            for (const w of closure.identifiers) {
+                if (texNameSet.has(w) || samplerNameSet.has(w)) referenced.add(w);
+            }
 
             // Emit COMMON header + only the helper functions this pass calls.
             // 輸出 COMMON 表頭 + 此 pass 實際呼叫的輔助函式（函式級裁剪）。
             wgsl += commonHeader;
-            const calledFns = this._collectCalledFunctions(pass.code, fnBodies);
-            for (const fnName of calledFns) {
+            for (const fnName of closure.fns) {
                 wgsl += fnBodies.get(fnName) + '\n';
             }
             wgsl += '\n';
@@ -244,13 +249,17 @@ export class WGSLCodeGenerator {
     }
 
     /**
-     * Extract function bodies from COMMON code (line-based, brace-counting).
+     * Split COMMON code into the shared header and function bodies (single walk).
      * ---
-     * 以行為單位（括號計數）從 COMMON 代碼中擷取函式主體，供引用解析使用。
-     * 回傳函式主體映射與去除函式後的表頭代碼（struct/alias/const/var 等）。
+     * 單次行走（括號計數）將 COMMON 代碼拆分為：
+     * - header：函式以外的共用宣告（struct/alias/const/var 等）
+     * - fnBodies：函式名稱 → 完整函式主體（含簽名行）
      */
-    private _extractCommonFunctions(commonCode: string): Map<string, string> {
+    private _splitCommonCode(commonCode: string): { header: string; fnBodies: Map<string, string> } {
+        const header: string[] = [];
         const fnBodies = new Map<string, string>();
+        if (!commonCode) return { header: '', fnBodies };
+
         let curFn: string | null = null;
         let depth = 0;
         let started = false;
@@ -264,6 +273,7 @@ export class WGSLCodeGenerator {
                     started = false;
                     buf = []; // Start a fresh body buffer / 開始新的函式主體緩衝
                 } else {
+                    header.push(line);
                     continue;
                 }
             }
@@ -280,93 +290,36 @@ export class WGSLCodeGenerator {
                 curFn = null;
             }
         }
-        return fnBodies;
+        return { header: header.join("\n"), fnBodies };
     }
 
     /**
-     * Strip COMMON function bodies, keeping only the shared header
-     * (structs, aliases, constants, uniform declarations).
+     * Walk the transitive COMMON-helper closure reachable from a pass's code.
      * ---
-     * 移除 COMMON 中的函式主體，僅保留共用表頭（struct/alias/const/var 宣告）。
+     * 以 pass 代碼中的識別字為起點，沿 COMMON 函式呼叫圖遞迴展開，
+     * 回傳可達函式（BFS 發現順序，供函式級裁剪）與全部出現過的識別字
+     * （供資源引用判定），單一走訪同時服務兩種需求。
      */
-    private _stripCommonFunctions(commonCode: string): string {
-        if (!commonCode) return '';
-        const kept: string[] = [];
-        let curFn: string | null = null;
-        let depth = 0;
-        let started = false;
-        for (const line of commonCode.split("\n")) {
-            if (curFn === null) {
-                const m = line.match(/\bfn\s+(\w+)\s*\(/);
-                if (m) { curFn = m[1]; depth = 0; started = false; }
-                else { kept.push(line); continue; }
-            }
-            // Count braces on the signature line too / 簽名行同樣計算括號
-            for (const ch of line) {
-                if (ch === "{") { depth++; started = true; }
-                else if (ch === "}") { depth--; }
-            }
-            if (started && depth <= 0) {
-                curFn = null; // end of function body / 函式主體結束
-            }
-        }
-        return kept.join("\n");
-    }
-
-    /**
-     * Collect COMMON helper functions reachable from a pass's code (transitive call closure).
-     * ---
-     * 收集 pass 代碼可達的 COMMON 輔助函式（遞迴呼叫閉包）。
-     */
-    private _collectCalledFunctions(passCode: string, fnBodies: Map<string, string>): string[] {
-        const seen = new Set<string>();
-        const called: string[] = [];
+    private _resolveCommonClosure(
+        passCode: string,
+        fnBodies: Map<string, string>
+    ): { fns: string[]; identifiers: Set<string> } {
+        const identifiers = new Set<string>();
+        const fns: string[] = [];
         const queue: string[] = passCode.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
         while (queue.length > 0) {
             const w = queue.shift()!;
-            if (seen.has(w)) continue;
-            seen.add(w);
+            if (identifiers.has(w)) continue;
+            identifiers.add(w);
             const body = fnBodies.get(w);
             if (body !== undefined) {
-                called.push(w);
+                fns.push(w);
                 for (const w2 of body.match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
-                    if (!seen.has(w2)) queue.push(w2);
+                    if (!identifiers.has(w2)) queue.push(w2);
                 }
             }
         }
-        return called;
-    }
-
-    /**
-     * Collect resource names referenced by a pass, transitively through COMMON helpers.
-     * ---
-     * 收集 pass 實際引用的資源名稱：以 pass 代碼中的識別字為起點，
-     * 沿 COMMON 函式呼叫圖遞迴展開，比對紋理與取樣器名稱。
-     */
-    private _collectReferencedResources(
-        passCode: string,
-        fnBodies: Map<string, string>,
-        texNames: Set<string>,
-        samplerNames: Set<string>
-    ): Set<string> {
-        const referenced = new Set<string>();
-        const seen = new Set<string>();
-        const queue: string[] = passCode.match(/[A-Za-z_][A-Za-z0-9_]*/g) || [];
-        while (queue.length > 0) {
-            const w = queue.shift()!;
-            if (seen.has(w)) continue;
-            seen.add(w);
-            if (texNames.has(w) || samplerNames.has(w)) {
-                referenced.add(w);
-            }
-            const body = fnBodies.get(w);
-            if (body) {
-                for (const w2 of body.match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
-                    if (!seen.has(w2)) queue.push(w2);
-                }
-            }
-        }
-        return referenced;
+        return { fns, identifiers };
     }
 
     /**
