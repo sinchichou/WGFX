@@ -27,6 +27,16 @@ yarn-debug.log*
 yarn-error.log*
 .DS_Store
 
+# Debug-session captures / analysis scratch (not part of the test suite)
+test/videoframe_*.png
+test/test(*).png
+test/test(1).png
+test/red_dots_marked.png
+test/analyze_red_dots.py
+test/ffx_a_ref.h
+test/out_wgsl/
+WGFX.code-workspace
+
 # Environment variables
 .env
 .env.*

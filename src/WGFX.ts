@@ -159,8 +159,14 @@ export class WGFX {
         }
         // Output dimensions default to input dimensions; upscaling effects pass 2x.
         // 輸出尺寸預設等同輸入；升頻特效傳入 2 倍尺寸。
+        // Host-provided outWidth/outHeight is an explicit override with top priority;
+        // when omitted, the effect's own declared OUTPUT size (e.g. `INPUT_WIDTH * 2`)
+        // is honored instead of silently collapsing to 1x.
+        // 宿主明確傳入的 outWidth/outHeight 具最高優先權；未傳入時採用效果檔宣告的
+        // OUTPUT 尺寸（如 `INPUT_WIDTH * 2`），而非默默退化為 1x。
         const outW = (outWidth && outWidth > 0) ? Math.floor(outWidth) : width;
         const outH = (outHeight && outHeight > 0) ? Math.floor(outHeight) : height;
+        const hostOverridesOutput = (outWidth !== undefined && outWidth > 0) || (outHeight !== undefined && outHeight > 0);
 
         const runtime = new WGFXRuntime(device);
 
@@ -188,22 +194,28 @@ export class WGFX {
         };
 
         try {
-            await runtime.compile(effectCode, externalResources);
+            await runtime.compile(effectCode, externalResources, { honorDeclaredOutput: !hostOverridesOutput });
         } catch (error: any) {
             Logger.error('WGFX compilation failed:', error);
             throw new Error(`Shader compilation error: ${error.message}`);
         }
 
         // Write the scene buffer once so the first dispatch has valid resolution info.
+        // The size comes from the ACTUAL output texture — it may have been created at
+        // the effect's declared size (e.g. 2x) when the host did not override it.
         // 初始化時先寫入場景資訊，確保首次 dispatch 即有正確的解析度資料。
-        runtime.resourceManager.updateSceneBuffer(width, height, outW, outH);
+        // 尺寸取自「實際」OUTPUT 紋理——宿主未覆寫時可能來自效果檔宣告（如 2x）。
+        const outputTexture = runtime.resourceManager.getTexture('OUTPUT');
+        const finalOutW = outputTexture ? outputTexture.width : outW;
+        const finalOutH = outputTexture ? outputTexture.height : outH;
+        runtime.resourceManager.updateSceneBuffer(width, height, finalOutW, finalOutH);
 
         const instance = new WGFX(runtime);
         instance.width = width;
         instance.height = height;
         instance.initialized = true;
 
-        Logger.info(`WGFX initialized: ${width}x${height} -> ${outW}x${outH}`);
+        Logger.info(`WGFX initialized: ${width}x${height} -> ${finalOutW}x${finalOutH}`);
         return instance;
     }
 
@@ -328,11 +340,11 @@ export class WGFX {
                 label: 'WGFX Frame Processing'
             });
 
-            if (this.runtime.shaderInfo) {
-                for (const pass of this.runtime.shaderInfo.passes) {
-                    this.runtime.dispatchPass(`PASS_${pass.index}`, commandEncoder);
-                }
-            }
+            // Hot path: dispatch every pass directly from metadata — no per-pass
+            // "PASS_i" string building / regex validation per frame.
+            // 熱路徑：直接以 pass 元數據依序 dispatch，免除每幀每 pass 的
+            // "PASS_i" 字串組建與正規式驗證。
+            this.runtime.dispatchAllPasses(commandEncoder);
 
             this.runtime.device.queue.submit([commandEncoder.finish()]);
 

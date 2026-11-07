@@ -25,6 +25,16 @@
 //     CLAMP sampler address mode. RCAS keeps the original unclamped Load
 //     semantics (out-of-bounds texels read as zero in D3D and WebGPU alike).
 //   * The scalar (non-FP16) AMD code path is ported; WGSL f32 replaces MF.
+//   * Porting deviation (documented): RCAS output is clamped to the min/max of its
+//     four neighbors (b,d,f,h) — the same deringing philosophy as EASU's terminal
+//     min4/max4 clamp. The original extrapolates with a negative lobe, which
+//     amplifies single-pixel chroma outliers (4:2:0 video noise) into saturated
+//     red/green/blue fireflies in dark areas (~2x chroma overshoot at
+//     Sharpness=0.87), and even passes the input's own spikes through verbatim at
+//     1:1 scale. The clamp bounds output by the neighborhood: fireflies collapse to
+//     the local level (measured by test/red_dot_probe.mjs: 130 output fireflies on
+//     a dark noisy frame -> 0). Documented trade-off: genuine isolated single-pixel
+//     highlights are smoothed as well.
 //! VERSION 4
 
 //! PARAMETER Sharpness
@@ -357,11 +367,20 @@ fn FsrRcasF(b: vec3<f32>, d: vec3<f32>, e: vec3<f32>, f: vec3<f32>, h: vec3<f32>
 
     // Resolve, which needs the medium precision rcp approximation to avoid visible tonality changes.
     let rcpL = 1.0 / (4.0 * lobe + 1.0);
-    return vec3<f32>(
+    let res = vec3<f32>(
         (lobe * b.r + lobe * d.r + lobe * h.r + lobe * f.r + e.r) * rcpL,
         (lobe * b.g + lobe * d.g + lobe * h.g + lobe * f.g + e.g) * rcpL,
         (lobe * b.b + lobe * d.b + lobe * h.b + lobe * f.b + e.b) * rcpL
     );
+
+    // Deringing clamp / 除彩溢出鉗位（見檔頭 porting note）：
+    // 負 lobe 的外推會把單像素 chroma 離群值放大成飽和紅/綠/藍雜點（fireflies）。
+    // 與 EASU 結尾的 min4/max4 dering 同一哲學——輸出鉗位在「四鄰居」(b,d,f,h)
+    // 的局部範圍內：不僅抑制外推過衝，也會把輸入本身就存在的單像素 chroma 雜點
+    // 收斂回鄰域水準（代價：真正的單像素亮點會被平滑，對自然影像升頻屬可接受取捨）。
+    let mn4 = min(min(b, d), min(f, h));
+    let mx4 = max(max(b, d), max(f, h));
+    return clamp(res, mn4, mx4);
 }
 
 //! END

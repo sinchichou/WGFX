@@ -27,6 +27,15 @@ export interface StoredPipeline {
     bindGroup: GPUBindGroup | null;
     /** Resource revision the cached bind group was built at / 建立快取時的資源版本 */
     bindGroupRevision: number;
+    /**
+     * Precomputed dispatch grid divisors / 建立時預算的網格除數。
+     * BLOCK_SIZE 優先於 NUM_THREADS（BLOCK_SIZE 描述每個工作群組涵蓋的像素範圍），
+     * 於管線建立時解析一次，dispatch 熱路徑免每幀重新判斷。
+     */
+    gridBx: number;
+    gridBy: number;
+    /** Name of the output texture this pass writes / 此 pass 寫入的輸出紋理名稱 */
+    outTexName: string;
 }
 
 /**
@@ -67,7 +76,9 @@ export class PipelineManager {
         this.pipelines.clear();
 
         // O(1) pass lookup / 以索引建查找表，免線性搜尋
-        const passByIndex = new Map(shaderInfo.passes.map((p: any) => [p.index, p]));
+        const passByIndex = new Map<number, any>(
+            shaderInfo.passes.map((p: any) => [p.index, p] as [number, any])
+        );
 
         // Create all pipelines concurrently: WGSL→ISA compilation overlaps on the
         // driver side, so compile latency approaches the SLOWEST pass instead of
@@ -78,6 +89,10 @@ export class PipelineManager {
             // Find corresponding pass info / 尋找對應的通道資訊
             const pass = passByIndex.get(module.passIndex);
             if (!pass) return;
+
+            // Resolve dispatch grid divisor once per pipeline / 每管線僅解析一次網格除數
+            // （BLOCK_SIZE 優先；存入 StoredPipeline 供 dispatch 熱路徑直接使用）
+            const workgroupSize = pass.blockSize || pass.numThreads || [1, 1];
 
             // Create shader module from WGSL / 從 WGSL 代碼建立著色器模組
             const shaderModule = this.device.createShaderModule({
@@ -156,7 +171,12 @@ export class PipelineManager {
 
             this.pipelines.set(module.passIndex, {
                 computePipeline, bindGroupLayout, resources: module.resources, passInfo: pass,
-                bindGroup: null, bindGroupRevision: -1
+                bindGroup: null, bindGroupRevision: -1,
+                // Precompute dispatch hot-path constants / 預先計算 dispatch 熱路徑常數
+                // BLOCK_SIZE 優先於 NUM_THREADS：BLOCK_SIZE 描述每個工作群組涵蓋的像素範圍。
+                gridBx: Math.max(1, (workgroupSize[0] || 1) | 0),
+                gridBy: Math.max(1, (workgroupSize[1] || 1) | 0),
+                outTexName: pass.out[0]
             });
         }));
     }
@@ -183,24 +203,19 @@ export class PipelineManager {
             pipeline.bindGroup = this._buildBindGroup(pipeline);
             pipeline.bindGroupRevision = revision;
         }
-        const bindGroup = pipeline.bindGroup;
 
         const passEncoder = commandEncoder.beginComputePass();
         passEncoder.setPipeline(pipeline.computePipeline);
-        passEncoder.setBindGroup(0, bindGroup);
+        passEncoder.setBindGroup(0, pipeline.bindGroup);
 
-        // Determine dispatch dimensions based on output size / 根據輸出大小決定分發維度
-        const outName = pipeline.passInfo.out[0];
-        const outTex = this.resourceManager.getTexture(outName);
-        if (!outTex) throw new Error(`Output texture "${outName}" not found`);
+        // Grid divisors are precomputed at pipeline creation; only the texture lookup
+        // stays per-frame（texture 物件可能因 resize 而重建，故保留查詢）。
+        // 網格除數已於管線建立時計算完成。
+        const outTex = this.resourceManager.getTexture(pipeline.outTexName);
+        if (!outTex) throw new Error(`Output texture "${pipeline.outTexName}" not found`);
 
-        // Calculate grid size (Workgroups) / 計算網格大小
-        // BLOCK_SIZE 優先於 NUM_THREADS：BLOCK_SIZE 描述每個工作群組涵蓋的像素範圍。
-        const workgroupSize = pipeline.passInfo.blockSize || pipeline.passInfo.numThreads || [1, 1];
-        const bx = Math.max(1, workgroupSize[0] | 0);
-        const by = Math.max(1, (workgroupSize[1] || 1) | 0);
-        const dx = Math.ceil(outTex.width / bx);
-        const dy = Math.ceil(outTex.height / by);
+        const dx = Math.ceil(outTex.width / pipeline.gridBx);
+        const dy = Math.ceil(outTex.height / pipeline.gridBy);
 
         // Hot-path log is gated to avoid per-frame string building
         // 熱路徑日誌加閘，避免每幀組字串

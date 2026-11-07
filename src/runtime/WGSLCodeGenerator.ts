@@ -1,4 +1,10 @@
-import { WGFXShaderInfo, PassInfo, TextureInfo, ParameterInfo, SamplerInfo } from '../types';
+import {
+    WGFXShaderInfo,
+    PassInfo,
+    TextureInfo,
+    ParameterInfo,
+    SamplerInfo,
+} from "../types";
 
 /**
  * Resource binding index configuration strategy.
@@ -17,10 +23,10 @@ import { WGFXShaderInfo, PassInfo, TextureInfo, ParameterInfo, SamplerInfo } fro
  * PipelineManager 依本模組輸出的 resources 建立對應的 BindGroupLayout。
  */
 const BINDING_LAYOUT = {
-    UNIFORMS: 1,        // Uniform buffer (adjustable parameters) / 可調整參數緩衝區
-    SCENE_INFO: 4,      // Scene information (Resolution, etc.) / 場景資訊 (解析度等)
-    SAMPLERS_START: 5,  // Sampler start index / 採樣器起始索引
-    SAMPLERS_END: 9,    // Sampler end index (inclusive) / 採樣器結束索引
+    UNIFORMS: 1, // Uniform buffer (adjustable parameters) / 可調整參數緩衝區
+    SCENE_INFO: 4, // Scene information (Resolution, etc.) / 場景資訊 (解析度等)
+    SAMPLERS_START: 5, // Sampler start index / 採樣器起始索引
+    SAMPLERS_END: 9, // Sampler end index (inclusive) / 採樣器結束索引
     TEXTURES_START: 10, // Texture start index / 紋理起始索引
 } as const;
 
@@ -32,32 +38,37 @@ const BINDING_LAYOUT = {
  * 主機端只配置一塊 GPUTexture，並以 sampled/storage 兩種 view 分別綁定。
  */
 export function logicalTextureName(name: string): string {
-    return name.replace(/_(sampled|storaged)$/, '');
+    return name.replace(/_(sampled|storaged)$/, "");
 }
 
 /** Scalar size (bytes) and WGSL type for a parameter type. */
 const PARAM_TYPE_MAP: Record<string, { wgsl: string; size: number }> = {
-    'float': { wgsl: 'f32', size: 4 },
-    'f32':   { wgsl: 'f32', size: 4 },
-    'int':   { wgsl: 'i32', size: 4 },
-    'i32':   { wgsl: 'i32', size: 4 },
-    'uint':  { wgsl: 'u32', size: 4 },
-    'u32':   { wgsl: 'u32', size: 4 },
-    'vec2':  { wgsl: 'vec2<f32>', size: 8 },
-    'float2':{ wgsl: 'vec2<f32>', size: 8 },
-    'int2':  { wgsl: 'vec2<i32>', size: 8 },
-    'uint2': { wgsl: 'vec2<u32>', size: 8 },
-    'vec3':  { wgsl: 'vec3<f32>', size: 12 },
-    'float3':{ wgsl: 'vec3<f32>', size: 12 },
-    'vec4':  { wgsl: 'vec4<f32>', size: 16 },
-    'float4':{ wgsl: 'vec4<f32>', size: 16 },
-    'int4':  { wgsl: 'vec4<i32>', size: 16 },
-    'uint4': { wgsl: 'vec4<u32>', size: 16 },
+    float: { wgsl: "f32", size: 4 },
+    f32: { wgsl: "f32", size: 4 },
+    int: { wgsl: "i32", size: 4 },
+    i32: { wgsl: "i32", size: 4 },
+    uint: { wgsl: "u32", size: 4 },
+    u32: { wgsl: "u32", size: 4 },
+    vec2: { wgsl: "vec2<f32>", size: 8 },
+    float2: { wgsl: "vec2<f32>", size: 8 },
+    int2: { wgsl: "vec2<i32>", size: 8 },
+    uint2: { wgsl: "vec2<u32>", size: 8 },
+    vec3: { wgsl: "vec3<f32>", size: 12 },
+    float3: { wgsl: "vec3<f32>", size: 12 },
+    vec4: { wgsl: "vec4<f32>", size: 16 },
+    float4: { wgsl: "vec4<f32>", size: 16 },
+    int4: { wgsl: "vec4<i32>", size: 16 },
+    uint4: { wgsl: "vec4<u32>", size: 16 },
 };
 
 /** Get the normalized {wgsl,size} for a parameter type (default: scalar f32). */
-export function paramType(type: string | undefined): { wgsl: string; size: number } {
-    return PARAM_TYPE_MAP[(type || 'float').toLowerCase()] || PARAM_TYPE_MAP['float'];
+export function paramType(type: string | undefined): {
+    wgsl: string;
+    size: number;
+} {
+    return (
+        PARAM_TYPE_MAP[(type || "float").toLowerCase()] || PARAM_TYPE_MAP["float"]
+    );
 }
 
 /**
@@ -70,8 +81,7 @@ export function paramType(type: string | undefined): { wgsl: string; size: numbe
  * @category Generators
  */
 export class WGSLCodeGenerator {
-    constructor() {
-    }
+    constructor() { }
 
     /**
      * Generate complete WGSL modules for each pass in the shader info.
@@ -86,8 +96,14 @@ export class WGSLCodeGenerator {
      * @param shaderInfo - The parsed shader metadata / 解析後的著色器元數據
      * @returns Array of generated modules / 產生的模組列表
      */
-    public generate(shaderInfo: WGFXShaderInfo): { wgslCode: string; passIndex: number; resources: any }[] {
-        const generatedModules: { wgslCode: string; passIndex: number; resources: any }[] = [];
+    public generate(
+        shaderInfo: WGFXShaderInfo,
+    ): { wgslCode: string; passIndex: number; resources: any }[] {
+        const generatedModules: {
+            wgslCode: string;
+            passIndex: number;
+            resources: any;
+        }[] = [];
 
         // Prepare common code sections / 準備共通代碼區段
         // COMMON 函式主體會依每個 pass 的實際呼叫進行**函式級裁剪**：
@@ -97,7 +113,7 @@ export class WGSLCodeGenerator {
         const commonSplit = this._splitCommonCode(shaderInfo.commonCode);
         const commonHeader = shaderInfo.commonCode
             ? `// --- COMMON CODE ---\n${commonSplit.header}\n\n`
-            : '';
+            : "";
 
         // Bindings already claimed by hand-written COMMON code (e.g. `@binding(4)`).
         // COMMON 手寫宣告已佔用的綁定槽位，產生器必須避開。
@@ -110,17 +126,23 @@ export class WGSLCodeGenerator {
         // in every pass). Per-pass declarations add these on top of pass.in/out.
         // COMMON 代碼引用到的資源（輔助函式可能在每個 pass 取樣），需在每個 pass 宣告。
         const fnBodies = commonSplit.fnBodies;
-        const texNameSet = new Set<string>(shaderInfo.textures.map((t: TextureInfo) => t.name));
-        const samplerNameSet = new Set<string>(shaderInfo.samplers.map((s: SamplerInfo) => s.name));
+        const texNameSet = new Set<string>(
+            shaderInfo.textures.map((t: TextureInfo) => t.name),
+        );
+        const samplerNameSet = new Set<string>(
+            shaderInfo.samplers.map((s: SamplerInfo) => s.name),
+        );
 
         // Generate SceneInfo struct + uniform var / 產生場景資訊結構體與 uniform 變數
         const sceneInfoCode = this._generateSceneInfoStruct();
 
         // Generate Uniform buffer struct / 產生 Uniform 緩衝區結構體
-        const uniformBufferCode = this._generateUniformStruct(shaderInfo.parameters);
+        const uniformBufferCode = this._generateUniformStruct(
+            shaderInfo.parameters,
+        );
 
         // Process each render pass / 處理每個渲染通道
-        shaderInfo.passes.forEach(pass => {
+        shaderInfo.passes.forEach((pass) => {
             let wgsl = `// ========================================\n`;
             wgsl += `// Pass ${pass.index}\n`;
             wgsl += `// ========================================\n\n`;
@@ -128,15 +150,19 @@ export class WGSLCodeGenerator {
             // Prepare resource tracking object / 準備資源追蹤物件
             // COMMON 自行宣告 scene 時（如舊版 Magpie 移植），主機端必須把 sceneBuffer
             // 綁定到 COMMON 選擇的槽位，而非預設的 SCENE_INFO。
-            const commonSceneMatch = shaderInfo.commonCode.match(/@binding\((\d+)\)\s*var<uniform>\s+scene/);
-            const sceneBinding = commonSceneMatch ? parseInt(commonSceneMatch[1], 10) : BINDING_LAYOUT.SCENE_INFO;
+            const commonSceneMatch = shaderInfo.commonCode.match(
+                /@binding\((\d+)\)\s*var<uniform>\s+scene/,
+            );
+            const sceneBinding = commonSceneMatch
+                ? parseInt(commonSceneMatch[1], 10)
+                : BINDING_LAYOUT.SCENE_INFO;
 
             const passResources = {
                 textures: [] as any[],
                 samplers: [] as any[],
                 parameters: shaderInfo.parameters,
                 hasScene: true,
-                sceneBinding: sceneBinding
+                sceneBinding: sceneBinding,
             };
 
             // Resolve which resources this pass needs by scanning the pass code and,
@@ -153,18 +179,21 @@ export class WGSLCodeGenerator {
             // 輸出 COMMON 表頭 + 此 pass 實際呼叫的輔助函式（函式級裁剪）。
             wgsl += commonHeader;
             for (const fnName of closure.fns) {
-                wgsl += fnBodies.get(fnName) + '\n';
+                wgsl += fnBodies.get(fnName) + "\n";
             }
-            wgsl += '\n';
+            wgsl += "\n";
 
             // Inject SceneInfo (Resolution, scaling etc.) unless COMMON declares its own.
             // 若 COMMON 已自行宣告 scene，則跳過注入（保持與舊版 Magpie 移植相容）。
-            if (!shaderInfo.commonCode.includes('var<uniform> scene')) {
+            if (!shaderInfo.commonCode.includes("var<uniform> scene")) {
                 wgsl += sceneInfoCode;
             }
 
             // Inject Uniforms (Parameters)
-            if (uniformBufferCode && !shaderInfo.commonCode.includes('var<uniform> uniforms')) {
+            if (
+                uniformBufferCode &&
+                !shaderInfo.commonCode.includes("var<uniform> uniforms")
+            ) {
                 wgsl += uniformBufferCode;
             }
 
@@ -173,9 +202,15 @@ export class WGSLCodeGenerator {
             let samplerBinding = BINDING_LAYOUT.SAMPLERS_START;
             shaderInfo.samplers.forEach((sampler: SamplerInfo) => {
                 // Skip if already hand-declared in COMMON / COMMON 已宣告者跳過
-                if (new RegExp(`var\\s+${sampler.name}\\s*:`).test(shaderInfo.commonCode)) return;
+                if (
+                    new RegExp(`var\\s+${sampler.name}\\s*:`).test(shaderInfo.commonCode)
+                )
+                    return;
                 if (!referenced.has(sampler.name)) return;
-                while (reservedBindings.has(samplerBinding) && samplerBinding <= BINDING_LAYOUT.SAMPLERS_END) {
+                while (
+                    reservedBindings.has(samplerBinding) &&
+                    samplerBinding <= BINDING_LAYOUT.SAMPLERS_END
+                ) {
                     samplerBinding++;
                 }
                 const currentBinding = samplerBinding++;
@@ -184,10 +219,10 @@ export class WGSLCodeGenerator {
                 passResources.samplers.push({
                     ...sampler,
                     binding: currentBinding,
-                    group: 0
+                    group: 0,
                 });
             });
-            wgsl += '\n';
+            wgsl += "\n";
 
             // Setup texture bindings / 設定紋理綁定
             // 每個宣告（含 sampled/storaged 成對別名）都取得獨立綁定槽，
@@ -205,14 +240,19 @@ export class WGSLCodeGenerator {
                 // 角色由宣告名稱決定：僅有出現在 pass.out（寫入目標）的 _storaged 紋理
                 // 取得 storage 存取；IN 列表僅供依賴排序，其餘一律宣告為 sampled。
                 let isStorage: boolean;
-                if (tex.name.endsWith('_storaged')) {
+                if (tex.name.endsWith("_storaged")) {
                     isStorage = pass.out.includes(tex.name);
-                } else if (tex.name.endsWith('_sampled')) {
+                } else if (tex.name.endsWith("_sampled")) {
                     isStorage = false;
                 } else {
-                    isStorage = pass.out.includes(tex.name) || pass.out.includes(logical) || tex.name === 'OUTPUT';
+                    isStorage =
+                        pass.out.includes(tex.name) ||
+                        pass.out.includes(logical) ||
+                        tex.name === "OUTPUT";
                 }
-                const format = (tex.format as string) || (logical === 'INPUT' ? 'rgba8unorm' : 'rgba16float');
+                const format =
+                    (tex.format as string) ||
+                    (logical === "INPUT" ? "rgba8unorm" : "rgba16float");
                 const textureType = isStorage
                     ? `texture_storage_2d<${format}, write>`
                     : `texture_2d<f32>`;
@@ -229,10 +269,10 @@ export class WGSLCodeGenerator {
                     format: format,
                     binding: currentBinding,
                     group: 0,
-                    isStorage: isStorage
+                    isStorage: isStorage,
                 });
             });
-            wgsl += '\n';
+            wgsl += "\n";
 
             // Transform pass logic to compute shader entry point / 轉換通道邏輯為計算著色器進入點
             let passCode = this._transformPassToComputeShader(pass);
@@ -241,7 +281,7 @@ export class WGSLCodeGenerator {
             generatedModules.push({
                 wgslCode: wgsl,
                 passIndex: pass.index,
-                resources: passResources
+                resources: passResources,
             });
         });
 
@@ -255,10 +295,13 @@ export class WGSLCodeGenerator {
      * - header：函式以外的共用宣告（struct/alias/const/var 等）
      * - fnBodies：函式名稱 → 完整函式主體（含簽名行）
      */
-    private _splitCommonCode(commonCode: string): { header: string; fnBodies: Map<string, string> } {
+    private _splitCommonCode(commonCode: string): {
+        header: string;
+        fnBodies: Map<string, string>;
+    } {
         const header: string[] = [];
         const fnBodies = new Map<string, string>();
-        if (!commonCode) return { header: '', fnBodies };
+        if (!commonCode) return { header: "", fnBodies };
 
         let curFn: string | null = null;
         let depth = 0;
@@ -281,8 +324,12 @@ export class WGSLCodeGenerator {
             // (the opening `{` usually sits at the end of `fn X() ... {`).
             // 函式簽名行本身也要計算括號（`{` 通常在行尾）。
             for (const ch of line) {
-                if (ch === "{") { depth++; started = true; }
-                else if (ch === "}") { depth--; }
+                if (ch === "{") {
+                    depth++;
+                    started = true;
+                } else if (ch === "}") {
+                    depth--;
+                }
             }
             buf.push(line);
             if (started && depth <= 0) {
@@ -302,7 +349,7 @@ export class WGSLCodeGenerator {
      */
     private _resolveCommonClosure(
         passCode: string,
-        fnBodies: Map<string, string>
+        fnBodies: Map<string, string>,
     ): { fns: string[]; identifiers: Set<string> } {
         const identifiers = new Set<string>();
         const fns: string[] = [];
@@ -350,11 +397,11 @@ struct SceneInfo {
      * offset += 16 逐參數配置完全一致），不足部分以 pad 欄位填補。
      */
     private _generateUniformStruct(parameters: ParameterInfo[]): string {
-        if (parameters.length === 0) return '';
+        if (parameters.length === 0) return "";
 
         let code = `// Uniform Parameters (16-byte slot per parameter) / Uniform 參數（每參數 16-byte）\nstruct Uniforms {\n`;
 
-        parameters.forEach(param => {
+        parameters.forEach((param) => {
             const t = paramType(param.type);
             code += `    ${param.name}: ${t.wgsl},\n`;
 
@@ -382,24 +429,26 @@ struct SceneInfo {
      */
     private _transformPassToComputeShader(pass: PassInfo): string {
         // Remove meta-command comments / 移除元指令註解
-        let code = pass.code.replace(/\/\/!.*\n/g, '');
+        let code = pass.code.replace(/\/\/!.*\n/g, "");
 
         // Apply @compute attribute and workgroup size, anchored to the ENTRY POINT
         // function itself (not blindly prepended to the block) so that helper
         // functions may be defined before fn Pass<N> within the same pass block.
         // @compute 屬性直接掛在進入點函式上，允許 helper 定義在 fn Pass<N> 之前。
         const numThreads = pass.numThreads || [1, 1, 1];
-        code = code.replace(/@compute\s*@workgroup_size\([^)]+\)\s*/g, '');
+        code = code.replace(/@compute\s*@workgroup_size\([^)]+\)\s*/g, "");
 
         const entryRegex = new RegExp(`fn\\s+(?:Pass${pass.index}|main)\\s*\\(`);
         if (entryRegex.test(code)) {
             code = code.replace(
                 entryRegex,
-                `@compute @workgroup_size(${numThreads[0]}, ${numThreads[1]}, ${numThreads[2]})\nfn main_cs(`
+                `@compute @workgroup_size(${numThreads[0]}, ${numThreads[1]}, ${numThreads[2]})\nfn main_cs(`,
             );
         } else {
             // eslint-disable-next-line no-console
-            console.warn(`[WGFX] Pass ${pass.index}: no "fn Pass${pass.index}(" or "fn main(" found; prepending @compute to block start.`);
+            console.warn(
+                `[WGFX] Pass ${pass.index}: no "fn Pass${pass.index}(" or "fn main(" found; prepending @compute to block start.`,
+            );
             code = `@compute @workgroup_size(${numThreads[0]}, ${numThreads[1]}, ${numThreads[2]})\n${code}`;
         }
 

@@ -66,10 +66,17 @@ export class WGFXRuntime {
      * @group Lifecycle
      * @param effectCode - The source code of the effect / 特效原始碼
      * @param externalResources - Optional external resource definitions / 選用的外部資源定義
+     * @param options - Compilation options / 編譯選項
+     * @param options.honorDeclaredOutput - Let the effect's declared texture sizes
+     *   override same-named external resources (see
+     *   {@link ResourceManager.initialize}). Used by {@link WGFX.create} when the
+     *   host does not pass explicit outWidth/outHeight.
+     *   讓效果檔宣告的紋理尺寸覆寫同名外部資源（見 {@link ResourceManager.initialize}）。
+     *   {@link WGFX.create} 在宿主未明確傳入 outWidth/outHeight 時啟用。
      * @returns A promise that resolves when compilation is successful
      * @throws {Error} 當語法解析、代碼產生或管線編譯失敗時拋出異常
      */
-    public async compile(effectCode: string, externalResources: any = {}): Promise<void> {
+    public async compile(effectCode: string, externalResources: any = {}, options: { honorDeclaredOutput?: boolean } = {}): Promise<void> {
         Logger.debug("WGFXRuntime: Starting effect compilation.");
 
         try {
@@ -85,7 +92,7 @@ export class WGFXRuntime {
             this.generatedModules = generatedModules;
 
             // 3. Prepare GPU textures and buffers / 步驟 3：準備 GPU 紋理與緩衝區
-            this.resourceManager.initialize(shaderInfo, externalResources);
+            this.resourceManager.initialize(shaderInfo, externalResources, options);
             Logger.debug("WGFXRuntime: Resources initialized.");
 
             // 4. Create and compile GPU pipelines / 步驟 4：建立並編譯 GPU 管線
@@ -127,6 +134,26 @@ export class WGFXRuntime {
 
         // Delegate to pipeline manager / 委託給管線管理員執行
         this.pipelineManager.dispatchPass(passInfo, commandEncoder);
+    }
+
+    /**
+     * Dispatch every pass in declaration order with zero per-frame overhead.
+     * ---
+     * 依宣告順序執行全部渲染通道。跳過 "PASS_i" 字串解析與正規式驗證，
+     * 直接以 pass 元數據驅動管線，是 {@link WGFX.process} 的每幀熱路徑。
+     *
+     * @group Execution
+     * @param commandEncoder - The active GPU command encoder / 目前的 GPU 指令編碼器
+     * @throws {Error} 如果特效尚未編譯則拋出錯誤
+     */
+    public dispatchAllPasses(commandEncoder: GPUCommandEncoder): void {
+        if (!this.shaderInfo) {
+            throw new Error("Effect not compiled. Call compile() first.");
+        }
+        const pipelineManager = this.pipelineManager;
+        for (const pass of this.shaderInfo.passes) {
+            pipelineManager.dispatchPass(pass, commandEncoder);
+        }
     }
 
     /**

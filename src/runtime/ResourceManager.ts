@@ -70,8 +70,17 @@ export class ResourceManager {
      * @group Lifecycle
      * @param shaderInfo - Parsed shader metadata / 解析後的著色器資訊
      * @param externalResources - External resource definitions / 外部資源定義
+     * @param options - Initialization options / 初始化選項
+     * @param options.honorDeclaredOutput - When true, an effect-declared explicit
+     *   WIDTH/HEIGHT for an already-provided external texture (e.g. OUTPUT declared
+     *   as `INPUT_WIDTH * 2`) overrides the external size. INPUT is always
+     *   host-owned (media size) and never overridden. Low-level compile() keeps the
+     *   default (external wins) contract.
+     *   為 true 時，效果檔對已存在外部紋理的顯式 WIDTH/HEIGHT 宣告（如 `INPUT_WIDTH * 2`）
+     *   優先於外部尺寸；INPUT 恆由宿主（媒體尺寸）決定。低階 compile() 預設維持
+     *   「外部資源優先」契約。
      */
-    public initialize(shaderInfo: WGFXShaderInfo, externalResources: any = {}): void {
+    public initialize(shaderInfo: WGFXShaderInfo, externalResources: any = {}, options: { honorDeclaredOutput?: boolean } = {}): void {
         const context: Record<string, number> = {};
 
         // 1. Load external defines / 載入外部巨集定義
@@ -156,7 +165,37 @@ export class ResourceManager {
         shaderInfo.textures.forEach((tex: TextureInfo) => {
             const logicalName = logicalTextureName(tex.name);
             if (this.textures.has(logicalName) || createdLogical.has(logicalName)) {
-                Logger.debug(`Skipping duplicate texture declaration: ${tex.name} -> ${logicalName}`);
+                // Effect-declared explicit size wins for non-INPUT external textures
+                // when honorDeclaredOutput is set（見上方 options 說明）。
+                if (
+                    options.honorDeclaredOutput === true &&
+                    this.textures.has(logicalName) &&
+                    logicalName !== 'INPUT'
+                ) {
+                    const existing = this.textures.get(logicalName)!;
+                    try {
+                        const declaredW = evaluate(tex.width as string | number, context);
+                        const declaredH = evaluate(tex.height as string | number, context);
+                        if (declaredW > 0 && declaredH > 0 && (declaredW !== existing.width || declaredH !== existing.height)) {
+                            Logger.info(
+                                `Texture "${logicalName}": external size ${existing.width}x${existing.height} ` +
+                                `overridden by effect declaration ${declaredW}x${declaredH}`
+                            );
+                            // Recreate with the host's usage/format (host owns those); only the
+                            // declared geometry wins. 以宿主的 usage/format 重建，僅尺寸依宣告。
+                            this.createTexture(logicalName, {
+                                size: [declaredW, declaredH],
+                                format: existing.format,
+                                usage: existing.usage
+                            });
+                        }
+                    } catch {
+                        // Declaration has no/explicit-unresolvable WIDTH/HEIGHT (e.g. plain
+                        // `Texture2D OUTPUT`) → keep the external size. 宣告缺漏時保留外部尺寸。
+                    }
+                } else {
+                    Logger.debug(`Skipping duplicate texture declaration: ${tex.name} -> ${logicalName}`);
+                }
                 return;
             }
             createdLogical.add(logicalName);

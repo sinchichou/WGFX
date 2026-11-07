@@ -3,7 +3,7 @@
 // =====================================================================================
 import * as monaco from "monaco-editor";
 // @ts-ignore
-import { WGFX } from "wgfx";
+import { WGFX, LogLevel } from "wgfx";
 
 // WESL WebAssembly imports
 // 1. 修改 Import路徑：現在從src目錄下載入了相對路徑(移除錯誤的named export)
@@ -131,6 +131,16 @@ const currentRatioDisplay = document.getElementById(
 // Blit Pipeline for displaying results (used for split-screen and single view rendering)
 let blitPipeline: GPURenderPipeline | null = null;
 let blitSampler: GPUSampler | null = null;
+
+// Cached blit resources（重用資源：bind group 與 uniform 僅在變動時重建/上傳，避免每幀配置）
+let blitUniformBuffer: GPUBuffer | null = null;
+let blitBindGroupLayout: GPUBindGroupLayout | null = null;
+let blitBindGroup: GPUBindGroup | null = null;
+let blitBindGroupKeyIn: GPUTexture | null = null; // bind group 建立時的 INPUT 紋理
+let blitBindGroupKeyOut: GPUTexture | null = null; // bind group 建立時的 OUTPUT 紋理
+const blitUniformData = new Float32Array(4); // 16-byte uniform: useFilters, splitRatio, displayMode
+let blitUniformsDirty = true; // UI 狀態變動旗標
+let canvasCtx: GPUCanvasContext | null = null; // 重用的 canvas context（不必每幀 getContext）
 
 // =====================================================================================
 // UTILITY FUNCTIONS
@@ -269,7 +279,10 @@ function updateSplitFromMouse(e: MouseEvent) {
     const clampedX = Math.max(0, Math.min(rect.width, x));
     // 計算比例
     const ratio = clampedX / rect.width;
-    splitRatio = ratio;
+    if (ratio !== splitRatio) {
+        splitRatio = ratio;
+        blitUniformsDirty = true; // split 比例變動 → 下一幀重新上傳 blit uniform
+    }
     updateSplitHandle();
 }
 
@@ -297,7 +310,10 @@ function updateModeButtons() {
  * Handle preset button clicks for split ratio
  */
 function handlePresetClick(ratio: number) {
-    splitRatio = ratio;
+    if (ratio !== splitRatio) {
+        splitRatio = ratio;
+        blitUniformsDirty = true; // split 比例變動 → 下一幀重新上傳 blit uniform
+    }
     updateSplitHandle();
 
     // Update active button
@@ -992,12 +1008,23 @@ async function loadImageFile(file: File, url: string) {
 
 let isCanvasConfigured = false; // Track if canvas WebGPU context is configured
 
+let lastMediaW = 0; // 最近一次媒體（輸入）寬高——供 window resize 時維持正確長寬比
+let lastMediaH = 0;
+
 /**
  * Resize canvas to fit container while maintaining aspect ratio of input media
- * Sets both CSS display size and internal WebGPU resolution
+ * Sets both CSS display size and internal WebGPU resolution.
+ * 內部解析度可與媒體尺寸不同（升頻特效的 OUTPUT 為 2x），CSS 顯示尺寸依媒體長寬比。
+ * @param w media width / 媒體寬（決定長寬比）
+ * @param h media height / 媒體高（決定長寬比）
+ * @param internalW internal WebGPU resolution width / 內部解析度寬（預設同 w）
+ * @param internalH internal WebGPU resolution height / 內部解析度高（預設同 h）
  */
-function resizeCanvas(w: number, h: number) {
+function resizeCanvas(w: number, h: number, internalW: number = w, internalH: number = h) {
     const aspect = w / h;
+    lastMediaW = w;
+    lastMediaH = h;
+
     const container = canvas.parentElement!;
 
     // Fit to container while maintaining aspect ratio
@@ -1013,10 +1040,10 @@ function resizeCanvas(w: number, h: number) {
     canvas.style.width = `${dispW}px`;
     canvas.style.height = `${dispH}px`;
 
-    // Set internal resolution to match the media dimensions
-    // The shader will handle splitting the display
-    canvas.width = w;
-    canvas.height = h;
+    // Set internal resolution (may be the effect's OUTPUT size, e.g. 2x for SR)
+    // 內部解析度 = 效果實際輸出解析度（升頻特效由此如實呈現超解析度結果）
+    canvas.width = internalW;
+    canvas.height = internalH;
 
     // Reconfigure canvas context with new dimensions
     initCanvasContext();
@@ -1044,6 +1071,7 @@ function initCanvasContext() {
             usage: GPUTextureUsage.RENDER_ATTACHMENT,
         });
 
+        canvasCtx = ctx;
         isCanvasConfigured = true;
     } else {
     }
@@ -1214,6 +1242,15 @@ async function compileShader() {
         // 依 initialize() 回傳的 uniforms 重建動態參數面板
         // （場景資訊 inputSize/outputSize 等已由核心自動注入為 scene，不再手動傳遞）
         buildUniformPanel(info.uniforms);
+
+        // 畫布內部解析度改用效果「實際」的 OUTPUT 尺寸（升頻特效如 FSR/Anime4K
+        // 宣告 2x，核心現會採納宣告尺寸），讓預覽呈現真正的超解析度輸出。
+        // 之後回到 INFO 層級，避免每幀 dispatch 除錯日誌灌爆 console。
+        const outTex = wgfx.runtime.resourceManager.getTexture("OUTPUT");
+        if (outTex) {
+            resizeCanvas(width, height, outTex.width, outTex.height);
+        }
+        WGFX.setLevel(LogLevel.INFO);
 
         log("Compilation successful!", "success");
 
@@ -1391,8 +1428,13 @@ function initBlitPipeline() {
     });
 
     // Store uniform buffer and layout for later updates
-    (blitPipeline as any).uniformBuffer = uniformBuffer;
-    (blitPipeline as any).bindGroupLayout = bindGroupLayout;
+    blitUniformBuffer = uniformBuffer;
+    blitBindGroupLayout = bindGroupLayout;
+    // 新管線 → 舊 bind group 一律作廢，uniform 需重新上傳
+    blitBindGroup = null;
+    blitBindGroupKeyIn = null;
+    blitBindGroupKeyOut = null;
+    blitUniformsDirty = true;
 }
 
 function startRenderLoop() {
@@ -1429,58 +1471,25 @@ function startRenderLoop() {
                 }
             }
 
-            // Try different input formats like content.js does
-            let processedInput = inputSource;
-            if (inputSource instanceof HTMLVideoElement) {
-                // Convert video element to VideoFrame like content.js
-                if (typeof VideoFrame !== "undefined") {
-                    try {
-                        processedInput = new VideoFrame(inputSource);
-                    } catch (e) {
-                        // If VideoFrame fails, use original video element
-                        processedInput = inputSource;
-                    }
-                }
-            }
-
-            let outputTexture;
+            // copyExternalImageToTexture 直接支援 HTMLVideoElement（會取用目前播放影格），
+            // 不必每幀配置/關閉 VideoFrame（減少 GC 壓力）。
+            let outputTexture: GPUTexture | null = null;
             try {
-                outputTexture = await wgfx.process(processedInput);
+                outputTexture = await wgfx.process(inputSource);
             } catch (e: any) {
                 log(`WGFX process error: ${e?.message || String(e)}`, "error");
                 outputTexture = null;
             }
 
-            // Clean up VideoFrame or ImageBitmap if we created one
-            if (processedInput !== inputSource) {
-                // VideoFrame (WebCodecs)
-                if (
-                    typeof VideoFrame !== "undefined" &&
-                    processedInput instanceof VideoFrame &&
-                    typeof processedInput.close === "function"
-                ) {
-                    processedInput.close();
-                }
-                // ImageBitmap
-                else if (
-                    typeof ImageBitmap !== "undefined" &&
-                    processedInput instanceof ImageBitmap &&
-                    typeof processedInput.close === "function"
-                ) {
-                    processedInput.close();
-                }
-            }
-
             const inputTexture = wgfx.runtime.resourceManager.getTexture("INPUT");
 
             // Draw result to canvas
-            const ctx = canvas.getContext("webgpu") as unknown as GPUCanvasContext;
-            if (ctx && isCanvasConfigured && inputTexture) {
+            if (canvasCtx && isCanvasConfigured && inputTexture && outputTexture) {
                 if (!blitPipeline) {
                     initBlitPipeline();
                 }
 
-                const currentTexture = ctx.getCurrentTexture();
+                const currentTexture = canvasCtx.getCurrentTexture();
 
                 const commandEncoder = device.createCommandEncoder();
 
@@ -1495,37 +1504,43 @@ function startRenderLoop() {
                     ],
                 });
 
-                if (blitPipeline && blitSampler) {
-                    // Update uniform buffer with current filter, split and display settings
-                    const displayModeValue = displayMode === "single" ? 1 : 0;
-                    const uniformData = new Float32Array([
-                        useColorFilters ? 1 : 0,
-                        splitRatio,
-                        displayModeValue,
-                    ]);
-                    device.queue.writeBuffer(
-                        (blitPipeline as any).uniformBuffer,
-                        0,
-                        uniformData
-                    );
+                if (blitPipeline && blitSampler && blitUniformBuffer) {
+                    // Uniform 僅在 UI 狀態（split/filters/displayMode）變動時上傳
+                    if (blitUniformsDirty) {
+                        blitUniformData[0] = useColorFilters ? 1 : 0;
+                        blitUniformData[1] = splitRatio;
+                        blitUniformData[2] = displayMode === "single" ? 1 : 0;
+                        device.queue.writeBuffer(blitUniformBuffer, 0, blitUniformData);
+                        blitUniformsDirty = false;
+                    }
 
-                    const bindGroup = device.createBindGroup({
-                        layout:
-                            (blitPipeline as any).bindGroupLayout ||
-                            blitPipeline.getBindGroupLayout(0),
-                        entries: [
-                            { binding: 0, resource: inputTexture.createView() },
-                            { binding: 1, resource: outputTexture.createView() },
-                            { binding: 2, resource: blitSampler },
-                            {
-                                binding: 3,
-                                resource: { buffer: (blitPipeline as any).uniformBuffer },
-                            },
-                        ],
-                    });
+                    // Bind group 僅在輸入/輸出紋理物件改變（重新編譯）時重建；
+                    // 紋理物件在每幀之間是穩定的，因此每幀不再 createView/配置。
+                    if (
+                        !blitBindGroup ||
+                        blitBindGroupKeyIn !== inputTexture ||
+                        blitBindGroupKeyOut !== outputTexture
+                    ) {
+                        blitBindGroup = device.createBindGroup({
+                            layout:
+                                blitBindGroupLayout ||
+                                blitPipeline.getBindGroupLayout(0),
+                            entries: [
+                                { binding: 0, resource: inputTexture.createView() },
+                                { binding: 1, resource: outputTexture.createView() },
+                                { binding: 2, resource: blitSampler },
+                                {
+                                    binding: 3,
+                                    resource: { buffer: blitUniformBuffer },
+                                },
+                            ],
+                        });
+                        blitBindGroupKeyIn = inputTexture;
+                        blitBindGroupKeyOut = outputTexture;
+                    }
 
                     passEncoder.setPipeline(blitPipeline);
-                    passEncoder.setBindGroup(0, bindGroup);
+                    passEncoder.setBindGroup(0, blitBindGroup);
                     passEncoder.draw(3);
                 } else {
                 }
@@ -1564,11 +1579,13 @@ shaderSelector.addEventListener("change", () => {
 // Color Filters Toggle
 chkColorFilters.addEventListener("change", () => {
     useColorFilters = chkColorFilters.checked;
+    blitUniformsDirty = true; // 濾色狀態變動 → 下一幀重新上傳 blit uniform
 });
 
 // Display Mode Buttons
 document.getElementById("mode-split")?.addEventListener("click", () => {
     displayMode = "split";
+    blitUniformsDirty = true; // 顯示模式變動 → 下一幀重新上傳 blit uniform
     updateModeButtons();
     updateSplitHandle();
     console.log("Switched to split view mode");
@@ -1576,6 +1593,7 @@ document.getElementById("mode-split")?.addEventListener("click", () => {
 
 document.getElementById("mode-single")?.addEventListener("click", () => {
     displayMode = "single";
+    blitUniformsDirty = true; // 顯示模式變動 → 下一幀重新上傳 blit uniform
     updateModeButtons();
     updateSplitHandle();
     console.log("Switched to single view mode");
@@ -1655,7 +1673,10 @@ window.addEventListener("resize", () => {
     updatePanelSizes();
     updateDebugInfoHeight();
     // Also update canvas if needed
-    if (inputSource && canvas.width > 0 && canvas.height > 0) {
+    // 以媒體長寬比重新排版；內部解析度維持目前的 OUTPUT 尺寸
+    if (lastMediaW > 0 && lastMediaH > 0) {
+        resizeCanvas(lastMediaW, lastMediaH, canvas.width, canvas.height);
+    } else if (inputSource && canvas.width > 0 && canvas.height > 0) {
         resizeCanvas(canvas.width, canvas.height);
     }
 });
