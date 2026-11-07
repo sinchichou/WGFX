@@ -1,6 +1,6 @@
 // test_runtime.js — WGFX 執行時驗證套件（Runtime Verification Suite）
 // 以真實 WebGPU 裝置執行四組驗證：A. 核心範例 test.wgsl 端到端（參數元數據 / 預設值 / 動態更新）
-// B. sampled/storaged 成對別名恆等與全 pass 驗證範圍；C. 四個 examples 編譯、逐 pass 執行並讀回非零輸出；
+// B. sampled/storaged 成對別名恆等與全 pass 驗證範圍；C. 全部 examples（EXAMPLE_NAMES）編譯、逐 pass 執行並讀回非零輸出；
 // D. 中間紋理缺少 WIDTH/HEIGHT 時拋出含紋理名稱的明確錯誤。執行：npm run build && node test/test_runtime.js
 
 // ===== 區段 0：WebGPU 全域初始化（必須在載入 dist 之前完成） =====
@@ -154,6 +154,12 @@ const EXAMPLE_NAMES = [
     'Anime4K_Restore_Soft_UL.wgsl',
     'Anime4K_Denoise_Bilateral_Mode.wgsl',
     'Anime4K_Upscale_Denoise_S.wgsl',
+    // 第一波移植特效（Magpie src/Effects；真實 GPU 像素級驗證）
+    'Anime4K_Upscale_S.wgsl',
+    'Anime4K_Restore_S.wgsl',
+    'FSR_x2.wgsl',
+    'Anime4K_Denoise_Bilateral_Mean.wgsl',
+    'Anime4K_Denoise_Bilateral_Median.wgsl',
     'test.wgsl',
 ];
 
@@ -233,7 +239,7 @@ async function testB(device, bundle) {
     runtime.resourceManager.dispose();
 }
 
-// ===== 區段 5：測試 C — 四個範例全部編譯並流動資料（256x256） =====
+// ===== 區段 5：測試 C — EXAMPLE_NAMES 全部編譯並流動資料（256x256） =====
 async function testCExample(device, bundle, name) {
     const { WGFXRuntime } = bundle;
     const code = await fs.readFile(path.join(EXAMPLES_DIR, name), 'utf-8');

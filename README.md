@@ -53,6 +53,28 @@ WGFX/
 
 ---
 
+## 🎨 Available Effects (`examples/`)
+
+All effects are ported from [Magpie](https://github.com/Blinue/Magpie) `src/Effects` (HLSL) into WGFX `.wgsl` DSL and verified on a real GPU device — CNN effects are additionally cross-checked against a CPU reference implementation of the original math (`test/ref_probe_upscale_denoise_s.mjs`).
+
+| Effect | Type | Scale | Source |
+| :----- | :--- | :---- | :----- |
+| `Anime4K_Upscale_S.wgsl` | CNN upscaler (4 passes) | 2x | Magpie Anime4K v4 |
+| `Anime4K_Restore_S.wgsl` | CNN restorer (3 passes) | 1x | Magpie Anime4K v4 |
+| `Anime4K_Upscale_Denoise_S.wgsl` | CNN upscaler + denoiser (4 passes) | 2x | Magpie Anime4K v4 |
+| `Anime4K_Restore_Soft_UL.wgsl` | CNN soft restorer (large) | 1x | Magpie Anime4K v4 |
+| `FSR_x2.wgsl` | EASU upscaler + RCAS sharpening (`Sharpness` parameter) | 2x | AMD FSR 1.0 via Magpie |
+| `Anime4K_Denoise_Bilateral_Mean.wgsl` | Bilateral denoiser (mean) | 1x | Magpie Anime4K v4 |
+| `Anime4K_Denoise_Bilateral_Median.wgsl` | Bilateral denoiser (median, removes color speckle) | 1x | Magpie Anime4K v4 |
+| `Anime4K_Denoise_Bilateral_Mode.wgsl` | Bilateral denoiser (mode) | 1x | Magpie Anime4K |
+| `test.wgsl` | Canonical core example (parameter pipeline demo) | 1x | — |
+
+> 2x effects read `scene.outputSize` / `scene.scale`: create with
+> `WGFX.create({ ..., outWidth, outHeight })`, or call
+> `resourceManager.updateSceneBuffer(inW, inH, outW, outH)` on the low-level API.
+
+---
+
 ## 📦 Installation & Build
 
 ### Installation as a Dependency
