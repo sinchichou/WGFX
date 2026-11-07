@@ -69,7 +69,8 @@ for (const file of files) {
             if (!re.test(bare)) continue;
             const ctx = lines.slice(i, i + 4).join(' ');
             const guarded = /\bsaturate\b|\bselect\b|\bclamp\b|==\s*0\.0|<=\s*0\.0|===\s*0|max\(.*,\s*(1e|1\.0e|0\.0001|\/ ?32768)/.test(ctx)
-                || /\bmax\([^()]{0,80}?\bvec[234]<f32>\(\s*1e-/.test(bare); // max(分母, vecN(eps)) 防護形式
+                || /\bmax\([^()]{0,80}?\bvec[234]<f32>\(\s*1e-/.test(bare) // max(分母, vecN(eps)) 防護形式
+                || /,\s*[A-Z][A-Z0-9_]{2,}\s*\)/.test(bare); // max(x, 上限常數) 防護形式（SCREAMING_CASE 尾參）
             // 分母為模組 const 標識符（如 1.0 / LOCALITY）→ 編譯期常數，可證
             const denomConst = [...bare.matchAll(/\/\s*([A-Za-z_]\w*)/g)].some(m => constNames.has(m[1]));
             const noted = lines.slice(Math.max(0, i - 3), i).join(' ').includes('保護') || lines.slice(Math.max(0, i - 3), i).join(' ').toLowerCase().includes('protect');
