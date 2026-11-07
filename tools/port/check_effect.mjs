@@ -62,6 +62,7 @@ for (const file of files) {
         const bare = ln.replace(/\/\/.*$/, '');
         if (ln.includes('checker:ok')) return;
         if (/^\s*fn\s/.test(bare)) return; // 函式定義簽名（防護責任在呼叫點/函式體）
+        if (/^\s*const\s+\w+\s*=/.test(bare)) return; // 模組級 const（常數運算式，編譯期可證）
         for (const [re, name] of DIV_PATTERNS) {
             re.lastIndex = 0;
             if (!re.test(bare)) continue;
