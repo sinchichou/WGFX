@@ -431,18 +431,24 @@ struct SceneInfo {
         // Remove meta-command comments / 移除元指令註解
         let code = pass.code.replace(/\/\/!.*\n/g, '');
 
-        // Rename PassX / main function to main_cs / 將 PassX 或 main 函式重新命名為 main_cs
-        const entryRegex = new RegExp(`fn\\s+(?:Pass${pass.index}|main)\\s*\\(`);
-        if (!entryRegex.test(code)) {
-            // eslint-disable-next-line no-console
-            console.warn(`[WGFX] Pass ${pass.index}: no "fn Pass${pass.index}(" or "fn main(" found; entry point rename skipped.`);
-        }
-        code = code.replace(entryRegex, `fn main_cs(`);
-
-        // Apply @compute attribute and workgroup size / 套用 @compute 屬性與工作群組大小
+        // Apply @compute attribute and workgroup size, anchored to the ENTRY POINT
+        // function itself (not blindly prepended to the block) so that helper
+        // functions may be defined before fn Pass<N> within the same pass block.
+        // @compute 屬性直接掛在進入點函式上，允許 helper 定義在 fn Pass<N> 之前。
         const numThreads = pass.numThreads || [1, 1, 1];
         code = code.replace(/@compute\s*@workgroup_size\([^)]+\)\s*/g, '');
-        code = `@compute @workgroup_size(${numThreads[0]}, ${numThreads[1]}, ${numThreads[2]})\n${code}`;
+
+        const entryRegex = new RegExp(`fn\\s+(?:Pass${pass.index}|main)\\s*\\(`);
+        if (entryRegex.test(code)) {
+            code = code.replace(
+                entryRegex,
+                `@compute @workgroup_size(${numThreads[0]}, ${numThreads[1]}, ${numThreads[2]})\nfn main_cs(`
+            );
+        } else {
+            // eslint-disable-next-line no-console
+            console.warn(`[WGFX] Pass ${pass.index}: no "fn Pass${pass.index}(" or "fn main(" found; prepending @compute to block start.`);
+            code = `@compute @workgroup_size(${numThreads[0]}, ${numThreads[1]}, ${numThreads[2]})\n${code}`;
+        }
 
         return code;
     }
