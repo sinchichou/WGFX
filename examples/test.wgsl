@@ -46,6 +46,12 @@ fn Luma(c: vec3<f32>) -> f32 {
 //! DESC "A simple color inversion effect with an int threshold."
 
 fn Pass1(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    // 邊界檢查：dispatch 網格向上取整，超出輸出範圍的執行緒直接返回
+    // （模板慣例 — 所有移植特效的進入點都應有此 guard）
+    if (global_id.x >= scene.outputSize.x || global_id.y >= scene.outputSize.y) {
+        return;
+    }
+
     let tex_coords = vec2<f32>(global_id.xy) * scene.outputPt;
     let original_color = textureSampleLevel(INPUT, LinearSampler, tex_coords, 0.0);
 

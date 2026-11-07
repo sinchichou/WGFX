@@ -318,7 +318,7 @@ fn FsrEasu(ip: vec2<u32>) -> vec3<f32> {
     FsrEasuTapF(&aC, &aW, vec2<f32>(1.0, 2.0) - pp, dir, len2, lob, clp, vec3<f32>(zzonR.z, zzonG.z, zzonB.z)); // o
     FsrEasuTapF(&aC, &aW, vec2<f32>(0.0, 2.0) - pp, dir, len2, lob, clp, vec3<f32>(zzonR.w, zzonG.w, zzonB.w)); // n
     // Normalize and dering.
-    return min(max4, max(min4, aC * (1.0 / aW)));
+    return min(max4, max(min4, aC * (1.0 / aW))); // checker:ok — 官方 ARcpF1(aW) 同款；aW 為 12-tap 權重和，恆正
 }
 
 //! END

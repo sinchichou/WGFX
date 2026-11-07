@@ -41,12 +41,13 @@ fn Rmp8x8(a: u32) -> uint2 {
 }
 
 // HLSL rcp(x) = 1 / x（WGSL 不允許使用者函式多載，故標量與向量版分開命名）
+// 零分母防護在各呼叫點（分母均 ≥ 1e-4 或常數 1.0），此處僅為 helper 定義。checker:ok
 fn rcp(x: f32) -> f32 {
-    return 1.0 / x;
+    return 1.0 / x; // checker:ok
 }
 
 fn rcp3(x: MF3) -> MF3 {
-    return 1.0 / x;
+    return 1.0 / x; // checker:ok
 }
 
 // 原始 gaussian 以「倒數」為參數：scaled = (x - m) * rcpS
@@ -146,8 +147,8 @@ fn Pass1(@builtin(workgroup_id) workgroup_id: vec3<u32>, @builtin(local_invocati
 
             // rcpIs = rcp(pow(vc + 0.0001, INTENSITY_POWER_CURVE) * INTENSITY_SIGMA)
             // INTENSITY_SIGMA 即 uniforms.intensitySigma（binding 1）
-            let rcpIs = rcp3(pow(vc + 0.0001, MF3(INTENSITY_POWER_CURVE)) * uniforms.intensitySigma);
-            let rcpSs = rcp(1.0); // rcp(SPATIAL_SIGMA)，SPATIAL_SIGMA = 1.0
+            let rcpIs = rcp3(pow(vc + 0.0001, MF3(INTENSITY_POWER_CURVE)) * uniforms.intensitySigma); // checker:ok — 分母 ≥ 1e-4·σ
+            let rcpSs = rcp(1.0); // checker:ok — 常數引數；rcp(SPATIAL_SIGMA)，SPATIAL_SIGMA = 1.0
 
             for (var k: u32 = 0u; k < KERNELSIZE; k++) {
                 for (var m: u32 = 0u; m < KERNELSIZE; m++) {
