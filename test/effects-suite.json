@@ -1,0 +1,7 @@
+{
+  "_comment": "effects/ 下需要額外資源（宿主必須餵 storage buffer / LUT 紋理）而無法用通用 INPUT+OUTPUT 資源執行的效果；由各自的專屬測試覆蓋。鍵為相對於 effects/ 的路徑（/ 分隔）。",
+  "skip": {
+    "OpenNR/OpenNR_1pass.wgsl": "需要宿主提供 54 個 storage buffer（網路權重與特徵圖）→ test/opennr_network.mjs",
+    "OpenNR/OpenNR_spike.wgsl": "需要宿主提供 conv 權重 storage buffer → test/opennr_spike.mjs"
+  }
+}

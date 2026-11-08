@@ -164,6 +164,39 @@ const EXAMPLE_NAMES = [
     'test.wgsl',
 ];
 
+// ===== 區段 2b：effects/ 樹的通用驗收清單 =====
+//
+// effects/ 下的移植效果一律納入 Test E；需要額外資源者（宿主必須餵 storage
+// buffer 或 LUT 紋理）列於 test/effects-suite.json 的 skip 表，並附上原因。
+// 那些效果由各自的專屬測試覆蓋（test/opennr_network.mjs、test/port_lut_check.mjs …）。
+const EFFECTS_DIR = path.join(HERE, '..', 'effects');
+const EFFECTS_SKIP_FILE = path.join(HERE, 'effects-suite.json');
+
+async function loadEffectsSkipMap() {
+    try {
+        const raw = await fs.readFile(EFFECTS_SKIP_FILE, 'utf-8');
+        const parsed = JSON.parse(raw);
+        return parsed.skip || {};
+    } catch (e) {
+        if (e && e.code === 'ENOENT') return {};
+        throw e;
+    }
+}
+
+async function listWGSLFiles(dir) {
+    const out = [];
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const ent of entries) {
+        const full = path.join(dir, ent.name);
+        if (ent.isDirectory()) {
+            out.push(...await listWGSLFiles(full));
+        } else if (ent.name.endsWith('.wgsl')) {
+            out.push(full);
+        }
+    }
+    return out.sort();
+}
+
 // ===== 區段 3：測試 A — 核心範例 test.wgsl 端到端（WGFX 高階類別） =====
 async function testA(device, bundle) {
     const { WGFX } = bundle;
@@ -295,6 +328,30 @@ async function testD(device, bundle) {
     console.log(`  錯誤訊息: ${thrown.message.split('\n')[0]}`);
 }
 
+// ===== 區段 6：測試 E — effects/ 樹全部移植效果編譯並流動資料（256x256） =====
+async function testEEffect(device, bundle, file, relPath) {
+    const { WGFXRuntime } = bundle;
+    const code = await fs.readFile(file, 'utf-8');
+    const runtime = new WGFXRuntime(device);
+    try {
+        await runtime.compile(code, externalResources(256, 256));
+        const rm = runtime.resourceManager;
+        const outTex = rm.getTexture('OUTPUT');
+        const ow = outTex.width, oh = outTex.height;
+        rm.updateSceneBuffer(256, 256, ow, oh);
+        writePatternTexture(device, rm.getTexture('INPUT'), 256, 256);
+
+        const err = await runEffectPasses(device, runtime);
+        assert(err === null, `error scope 回報驗證錯誤: ${err && err.message}`);
+
+        const out = await readTexture(device, outTex, ow, oh);
+        assert(hasNonZero(out), 'OUTPUT 全為 0（無資料流動）');
+        console.log(`  ${relPath}: passes=${runtime.shaderInfo.passes.length} out=${ow}x${oh} status=DATA`);
+    } finally {
+        runtime.resourceManager.dispose();
+    }
+}
+
 // ===== 區段 7：主流程（裝置請求 → 依序執行測試 → 總結） =====
 async function main() {
     console.log('=== WGFX Runtime 驗證套件 ===');
@@ -328,6 +385,23 @@ async function main() {
         await runTest(`Test C：${name} 編譯 + 全 pass 資料流`, () => testCExample(device, bundle, name));
     }
     await runTest('Test D：缺少 WIDTH/HEIGHT 的明確錯誤', () => testD(device, bundle));
+
+    // Test E：effects/ 樹的移植效果（需額外資源者依 test/effects-suite.json 排除）
+    const skipMap = await loadEffectsSkipMap();
+    const effectFiles = await listWGSLFiles(EFFECTS_DIR);
+    const included = [];
+    for (const file of effectFiles) {
+        const rel = path.relative(EFFECTS_DIR, file).split(path.sep).join('/');
+        if (skipMap[rel]) {
+            console.log(`  [SKIP] effects/${rel} — ${skipMap[rel]}`);
+            continue;
+        }
+        included.push({ file, rel });
+    }
+    for (const { file, rel } of included) {
+        await runTest(`Test E：effects/${rel} 編譯 + 全 pass 資料流`,
+            () => testEEffect(device, bundle, file, rel));
+    }
 
     // 3. 範圍外（未捕捉）的 GPU 錯誤不得出現
     if (uncapturedErrors.length > 0) {
