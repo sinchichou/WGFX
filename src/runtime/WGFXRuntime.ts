@@ -88,7 +88,13 @@ export class WGFXRuntime {
             Logger.debug("WGFXRuntime: ShaderInfo parsed");
 
             // 2. Generate optimized WGSL modules / 步驟 2：產生優化後的 WGSL 模組
-            const generatedModules = this.wgslCodeGenerator.generate(shaderInfo);
+            //    外部 defines 需在產生期就注入為 WGSL 常數（NW/NH/CIN/COUT 等），
+            //    故此處直接取自 externalResources —— 早於 ResourceManager.initialize
+            //    的資源建立時序（產生器必須先產出宣告，管線才有正確的 WGSL）。
+            const generatedModules = this.wgslCodeGenerator.generate(
+                shaderInfo,
+                (externalResources && externalResources.defines) || {},
+            );
             this.generatedModules = generatedModules;
 
             // 3. Prepare GPU textures and buffers / 步驟 3：準備 GPU 紋理與緩衝區
@@ -170,6 +176,38 @@ export class WGFXRuntime {
             throw new Error("Effect not compiled. Call compile() first.");
         }
         this.uniformBinder.updateUniform(name, value);
+    }
+
+    /**
+     * Set the frame counter exposed to shaders as `scene.frame`.
+     * ---
+     * 設定著色器可讀取的影格計數器（`scene.frame`）。
+     *
+     * 值僅記錄於資源層，於下一次 {@link ResourceManager.updateSceneBuffer}
+     * （宿主每幀更新場景資訊時）寫入 GPU。
+     *
+     * @group Update
+     * @param n - Frame index / 影格索引
+     */
+    public setFrame(n: number): void {
+        this.resourceManager.setFrame(n);
+    }
+
+    /**
+     * Advance the frame counter by one.
+     * ---
+     * 將影格計數器遞增 1。
+     *
+     * @group Update
+     * @returns The new frame counter / 遞增後的計數值
+     */
+    public advanceFrame(): number {
+        return this.resourceManager.advanceFrame();
+    }
+
+    /** @group Query */
+    public getFrame(): number {
+        return this.resourceManager.getFrame();
     }
 
     /**

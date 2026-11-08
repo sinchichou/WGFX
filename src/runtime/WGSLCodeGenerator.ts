@@ -28,6 +28,7 @@ const BINDING_LAYOUT = {
     SAMPLERS_START: 5, // Sampler start index / 採樣器起始索引
     SAMPLERS_END: 9, // Sampler end index (inclusive) / 採樣器結束索引
     TEXTURES_START: 10, // Texture start index / 紋理起始索引
+    BUFFERS_START: 40, // Storage buffer start index / storage buffer 起始索引（CNN 權重與特徵圖）
 } as const;
 
 /**
@@ -94,10 +95,13 @@ export class WGSLCodeGenerator {
      *
      * @group Generation
      * @param shaderInfo - The parsed shader metadata / 解析後的著色器元數據
+     * @param defines - External macro definitions emitted as WGSL `const` /
+     *   外部巨集定義，將以 WGSL `const` 形式注入每個 pass 模組開頭
      * @returns Array of generated modules / 產生的模組列表
      */
     public generate(
         shaderInfo: WGFXShaderInfo,
+        defines: Record<string, number> = {},
     ): { wgslCode: string; passIndex: number; resources: any }[] {
         const generatedModules: {
             wgslCode: string;
@@ -132,9 +136,20 @@ export class WGSLCodeGenerator {
         const samplerNameSet = new Set<string>(
             shaderInfo.samplers.map((s: SamplerInfo) => s.name),
         );
+        // Storage buffer names are resource identifiers too（`//! BUFFER x`）。
+        // 早期版本僅以 texture/sampler 名稱過濾 closure，導致 buffer 名稱永遠不進入
+        // referenced 集合、storage buffer 從未被宣告（OpenNR spike 的 x/w/b/o 全部消失）。
+        // Storage buffer 名稱同樣是資源識別字，必須一併納入過濾範圍。
+        const bufferNameSet = new Set<string>(
+            (shaderInfo.buffers || []).map((b: any) => b.name),
+        );
 
         // Generate SceneInfo struct + uniform var / 產生場景資訊結構體與 uniform 變數
         const sceneInfoCode = this._generateSceneInfoStruct();
+
+        // Generate external defines as WGSL constants / 將外部 defines 產生為 WGSL 常數
+        // 每個 pass 模組開頭注入（COMMON 之後），讓 NW/NH/CIN/COUT 之類的識別字可解析。
+        const definesCode = this._generateDefines(defines, shaderInfo.commonCode);
 
         // Generate Uniform buffer struct / 產生 Uniform 緩衝區結構體
         const uniformBufferCode = this._generateUniformStruct(
@@ -160,6 +175,7 @@ export class WGSLCodeGenerator {
             const passResources = {
                 textures: [] as any[],
                 samplers: [] as any[],
+                storageBuffers: [] as any[],
                 parameters: shaderInfo.parameters,
                 hasScene: true,
                 sceneBinding: sceneBinding,
@@ -172,7 +188,13 @@ export class WGSLCodeGenerator {
             const closure = this._resolveCommonClosure(pass.code, fnBodies);
             const referenced = new Set<string>();
             for (const w of closure.identifiers) {
-                if (texNameSet.has(w) || samplerNameSet.has(w)) referenced.add(w);
+                if (
+                    texNameSet.has(w) ||
+                    samplerNameSet.has(w) ||
+                    bufferNameSet.has(w)
+                ) {
+                    referenced.add(w);
+                }
             }
 
             // Emit COMMON header + only the helper functions this pass calls.
@@ -182,6 +204,9 @@ export class WGSLCodeGenerator {
                 wgsl += fnBodies.get(fnName) + "\n";
             }
             wgsl += "\n";
+
+            // Inject external defines as constants / 注入外部 defines 常數宣告
+            wgsl += definesCode;
 
             // Inject SceneInfo (Resolution, scaling etc.) unless COMMON declares its own.
             // 若 COMMON 已自行宣告 scene，則跳過注入（保持與舊版 Magpie 移植相容）。
@@ -200,6 +225,7 @@ export class WGSLCodeGenerator {
             // Setup sampler bindings / 設定採樣器綁定
             // 僅為此 pass 實際引用（含 COMMON 間接引用）的 sampler 配置綁定。
             let samplerBinding = BINDING_LAYOUT.SAMPLERS_START;
+            let bufferBinding = BINDING_LAYOUT.BUFFERS_START;
             shaderInfo.samplers.forEach((sampler: SamplerInfo) => {
                 // Skip if already hand-declared in COMMON / COMMON 已宣告者跳過
                 if (
@@ -270,6 +296,35 @@ export class WGSLCodeGenerator {
                     binding: currentBinding,
                     group: 0,
                     isStorage: isStorage,
+                });
+            });
+            wgsl += "\n";
+
+            // Setup storage buffer bindings / 設定 storage buffer 綁定
+            // OpenNR/CNN 類特效的特徵圖與權重：`//! BUFFER x` + MODE read|read_write +
+            // TYPE u32x2|f32x4|f32（元素型別決定 WGSL 陣列元素與宿主端 stride）。
+            // 綁定槽續接紋理之後（同一遞增計數器），與 PipelineManager 一致。
+            const BUF_ELEM: Record<string, string> = {
+                u32x2: "vec2<u32>",
+                f32x4: "vec4<f32>",
+                f32: "f32",
+            };
+            passResources.storageBuffers = [];
+            shaderInfo.buffers.forEach((buf: any) => {
+                if (!referenced.has(buf.name)) return;
+                const elem = BUF_ELEM[buf.type] || "vec2<u32>";
+                const mode = buf.mode === "read_write" ? "read_write" : "read";
+                while (reservedBindings.has(bufferBinding)) {
+                    bufferBinding++;
+                }
+                const currentBinding = bufferBinding++;
+                wgsl += `@group(0) @binding(${currentBinding}) var<storage, ${mode}> ${buf.name}: array<${elem}>;\n`;
+                passResources.storageBuffers.push({
+                    name: buf.name,
+                    binding: currentBinding,
+                    mode: mode,
+                    type: buf.type,
+                    group: 0,
                 });
             });
             wgsl += "\n";
@@ -370,11 +425,80 @@ export class WGSLCodeGenerator {
     }
 
     /**
+     * Generate WGSL `const` declarations for external defines.
+     * ---
+     * 為外部 defines 產生 WGSL 常數宣告，注入每個 pass 模組的開頭。
+     *
+     * **型別決策（整數 → u32，非整數 → f32）**：
+     * OpenNR/CNN 類特效把 defines 當成**維度與通道數**使用——`NW * NH`（像素數）、
+     * `CIN / 4u`（u32 除法）、`i32(NW)`（顯式轉型），這些在 WGSL 中要求 u32 運算元；
+     * 若產生 f32 則 `NW * NH` 會變成浮點乘法、`CIN / 4u` 直接型別不符而編譯失敗。
+     * 既有特效與測試皆不使用 defines（實測 grep：defines 僅出現於 WGFX.ts 的
+     * INPUT_WIDTH/HEIGHT 與資源管理層），因此無浮點相容性包袱。
+     * 非整數值（如 0.5 之類的比例係數）則以 f32 宣告，維持數值語義。
+     *
+     * 值一律在產生期以字面量寫入（非 uniform），故不佔用綁定槽、無額外頻寬成本。
+     *
+     * @param defines - External defines to emit / 要輸出的外部 defines
+     * @param commonCode - COMMON 原始碼，用於避免重複宣告同名常數
+     * @returns WGSL constant declaration block（無 define 時為空字串）
+     */
+    private _generateDefines(
+        defines: Record<string, number>,
+        commonCode: string,
+    ): string {
+        const names = Object.keys(defines || {}).sort();
+        if (names.length === 0) return "";
+
+        const lines: string[] = [];
+        for (const name of names) {
+            // Only identifiers are emittable / 僅合法識別字可輸出
+            if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+                // eslint-disable-next-line no-console
+                console.warn(
+                    `[WGFX] defines: skipping "${name}" (not a valid WGSL identifier).`,
+                );
+                continue;
+            }
+            const value = Number(defines[name]);
+            if (!Number.isFinite(value)) {
+                // eslint-disable-next-line no-console
+                console.warn(
+                    `[WGFX] defines: skipping "${name}" (non-finite value ${defines[name]}).`,
+                );
+                continue;
+            }
+            // COMMON 已自行宣告同名常數/變數時不得重複宣告（Naga 會報 duplicate）。
+            // 以宣告式 regex 判定 const/let/var，避免誤判一般運算式中的同名識別字。
+            const alreadyDeclared = new RegExp(
+                `\\b(?:const|let|var)\\s+${name}\\b`,
+            ).test(commonCode);
+            if (alreadyDeclared) {
+                continue;
+            }
+
+            if (Number.isInteger(value)) {
+                lines.push(`const ${name}: u32 = ${value}u;`);
+            } else {
+                lines.push(`const ${name}: f32 = ${value};`);
+            }
+        }
+
+        if (lines.length === 0) return "";
+        return `// External defines / 外部定義常數\n${lines.join("\n")}\n\n`;
+    }
+
+    /**
      * Generate SceneInfo struct definition with its uniform binding.
      * ---
      * 產生場景資訊結構體定義與對應的 uniform 綁定宣告。
-     * 記憶體佈局與 ResourceManager.updateSceneBuffer 的寫入格式（40 bytes）一致：
-     * inputSize(u32x2) @0, inputPt(f32x2) @8, outputSize(u32x2) @16, outputPt(f32x2) @24, scale(f32x2) @32。
+     * 記憶體佈局與 ResourceManager.updateSceneBuffer 的寫入格式（48 bytes）一致：
+     * inputSize(u32x2) @0, inputPt(f32x2) @8, outputSize(u32x2) @16, outputPt(f32x2) @24,
+     * scale(f32x2) @32, frame(u32) @40, _pad(f32) @44。
+     *
+     * frame 置於結構尾端：前 40 bytes 沿用既有佈局（向後相容），新增的 u32 之後補一個
+     * f32 pad 將結構填滿 48 bytes。WGSL uniform 結構要求大小為 16 的倍數，
+     * 40 + 4 = 44 不符；補至 48 同時滿足對齊與既有 16-byte 慣例。
      */
     private _generateSceneInfoStruct(): string {
         return `// Scene Info Struct / 場景資訊結構體
@@ -384,6 +508,9 @@ struct SceneInfo {
     outputSize: vec2<u32>,
     outputPt: vec2<f32>,
     scale: vec2<f32>,
+    // 影格計數器（供時間性特效：TAA/降噪的抖動索引等）
+    frame: u32,
+    _pad0: f32,
 };
 @group(0) @binding(${BINDING_LAYOUT.SCENE_INFO}) var<uniform> scene: SceneInfo;
 `;

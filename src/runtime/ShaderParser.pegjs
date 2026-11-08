@@ -6,6 +6,7 @@
     parameters: [],
     textures: [],
     samplers: [],
+    buffers: [],
     passes: [],
     commonCode: ''
   };
@@ -89,6 +90,19 @@
         shaderInfo.samplers.push(data);
         break;
       }
+      case 'BUFFER': {
+        // Storage buffer（OpenNR/CNN 類特效的特徵圖與權重）：
+        //   //! BUFFER x  +  //! MODE read|read_write  +  //! TYPE u32x2|f32x4|f32
+        const name = resolveName(data);
+        if (!name) { currentData = null; return; }
+        data.name = name;
+        if (!data.mode) data.mode = 'read';
+        if (!data.type) data.type = 'u32x2';
+        delete data.id;
+        delete data.lines;
+        shaderInfo.buffers.push(data);
+        break;
+      }
       case 'COMMON': shaderInfo.commonCode = data.lines.join('\n'); break;
       case 'PASS': shaderInfo.passes.push(data); break;
       case 'VERSION': shaderInfo.metadata.version = parseInt(data.id,10); break;
@@ -120,6 +134,15 @@
         data.numThreads = value.split(',').map(Number);
         while(data.numThreads.length<3) data.numThreads.push(1); // Ensure 3 components for num_threads
         break;
+      case 'dispatch':
+        // 明確 workgroup 數（數值運算式字串，執行期以 defines/context 求值）——
+        // buffer-only pass（如 OpenNR 的 1D conv dispatch）沒有 OUT 紋理可推導網格
+        data.dispatch = value.split(',').map(s => s.trim()); break;
+      case 'mode':
+        data.mode = value.trim().toLowerCase(); break;
+      case 'elem':
+      case 'element':
+        data.type = value.trim().toLowerCase(); break;
       case 'default':
       case 'min':
       case 'max':
@@ -183,7 +206,7 @@ directive_line
 
       // Check for block-starting directives.
       // 檢查區塊起始指令。
-      if (["PARAMETER","TEXTURE","SAMPLER","COMMON","PASS", "VERSION","SORT_NAME","USE","CAPABILITY"].includes(directive)) {
+      if (["PARAMETER","TEXTURE","SAMPLER","BUFFER","COMMON","PASS", "VERSION","SORT_NAME","USE","CAPABILITY"].includes(directive)) {
           // If we were in a PASS block, commit its code first before starting a new block.
           // 如果我們在 PASS 區塊中，則在開始新區塊之前先提交其程式碼。
           if (currentBlock === 'PASS' && passCodeBuffer.length > 0) {
@@ -198,7 +221,7 @@ directive_line
 
           // Start a new block based on the directive.
           // 根據指令開始一個新區塊。
-          if (["PARAMETER","TEXTURE","SAMPLER","COMMON","PASS"].includes(directive)) {
+          if (["PARAMETER","TEXTURE","SAMPLER","BUFFER","COMMON","PASS"].includes(directive)) {
             currentBlock = directive;
             currentData = { id: val, lines: [] }; // Initialize currentData for the new block.
             if (directive === 'PASS') currentData.index = parseInt(val,10); // Special handling for PASS index.

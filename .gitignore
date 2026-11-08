@@ -17,6 +17,10 @@ src/runtime/ShaderParser.js
 
 # Tooling caches
 .codegraph/
+.dsh-acl-recovery/
+
+# OpenNR weight-converter generated artifacts / OpenNR 權重轉換器產物
+tools/out/
 
 # Temporary files and logs
 *.zip

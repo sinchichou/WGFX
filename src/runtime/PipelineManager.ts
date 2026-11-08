@@ -157,6 +157,15 @@ export class PipelineManager {
                 });
             });
 
+            // Process storage buffers / 處理 storage buffer（CNN 權重與特徵圖）
+            (module.resources.storageBuffers || []).forEach((buf: any) => {
+                bindingMap.set(buf.binding, {
+                    binding: buf.binding,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: { type: buf.mode === 'read_write' ? 'storage' : 'read-only-storage' }
+                });
+            });
+
             // Create layouts and pipeline / 建立佈局與管線
             const entries = Array.from(bindingMap.values()).sort((a, b) => a.binding - b.binding);
             const bindGroupLayout = this.device.createBindGroupLayout({ entries });
@@ -176,7 +185,7 @@ export class PipelineManager {
                 // BLOCK_SIZE 優先於 NUM_THREADS：BLOCK_SIZE 描述每個工作群組涵蓋的像素範圍。
                 gridBx: Math.max(1, (workgroupSize[0] || 1) | 0),
                 gridBy: Math.max(1, (workgroupSize[1] || 1) | 0),
-                outTexName: pass.out[0]
+                outTexName: (pass.out && pass.out[0]) || ''
             });
         }));
     }
@@ -208,6 +217,19 @@ export class PipelineManager {
         passEncoder.setPipeline(pipeline.computePipeline);
         passEncoder.setBindGroup(0, pipeline.bindGroup);
 
+        // Explicit dispatch（//! DISPATCH）優先：buffer-only pass（如 OpenNR 的 1D conv
+        // dispatch）沒有 OUT 紋理可推導網格，workgroup 數以運算式字串隨 passInfo 提供。
+        if (passInfo.dispatch && passInfo.dispatch.length >= 1) {
+            const dx = this._evalDispatchExpr(passInfo.dispatch[0], passInfo);
+            const dy = passInfo.dispatch.length >= 2 ? this._evalDispatchExpr(passInfo.dispatch[1], passInfo) : 1;
+            if (Logger.wouldLog(LogLevel.DEBUG)) {
+                Logger.debug(`Dispatch Pass ${passInfo.index}: ${dx}x${dy} groups (explicit)`);
+            }
+            passEncoder.dispatchWorkgroups(Math.max(1, dx), Math.max(1, dy), 1);
+            passEncoder.end();
+            return;
+        }
+
         // Grid divisors are precomputed at pipeline creation; only the texture lookup
         // stays per-frame（texture 物件可能因 resize 而重建，故保留查詢）。
         // 網格除數已於管線建立時計算完成。
@@ -225,6 +247,35 @@ export class PipelineManager {
 
         passEncoder.dispatchWorkgroups(dx, dy, 1);
         passEncoder.end();
+    }
+
+    /**
+     * Evaluate a //! DISPATCH expression（數值運算式：defines/OUTPUT_WIDTH/HEIGHT + 四則運算）
+     */
+    private _evalDispatchExpr(expr: string, passInfo: any): number {
+        const ctx: Record<string, number> = {
+            ...(this.resourceManager.defines || {}),
+        };
+        const outTex = this.resourceManager.getTexture('OUTPUT');
+        if (outTex) {
+            ctx.OUTPUT_WIDTH = outTex.width;
+            ctx.OUTPUT_HEIGHT = outTex.height;
+        }
+        const inTex = this.resourceManager.getTexture('INPUT');
+        if (inTex) {
+            ctx.INPUT_WIDTH = inTex.width;
+            ctx.INPUT_HEIGHT = inTex.height;
+        }
+        try {
+            // eslint-disable-next-line no-new-func
+            const fn = new Function(...Object.keys(ctx), `return (${expr});`);
+            const v = fn(...Object.values(ctx));
+            const n = Math.floor(Number(v));
+            if (!Number.isFinite(n) || n < 0) throw new Error('not a non-negative integer');
+            return n;
+        } catch (e: any) {
+            throw new Error(`Pass ${passInfo.index}: DISPATCH expression "${expr}" failed: ${e?.message || e}`);
+        }
     }
 
     /**
@@ -267,6 +318,13 @@ export class PipelineManager {
             const sceneBinding: number = resources.sceneBinding ?? 4;
             groupEntries.push({ binding: sceneBinding, resource: { buffer: sceneBuffer } });
         }
+
+        // 5. Bind storage buffers / 綁定 storage buffer（CNN 權重與特徵圖）
+        (resources.storageBuffers || []).forEach((buf: any) => {
+            const b = this.resourceManager.getStorageBuffer(buf.name);
+            if (!b) throw new Error(`Storage buffer "${buf.name}" not found for pass ${passInfo.index}`);
+            groupEntries.push({ binding: buf.binding, resource: { buffer: b } });
+        });
 
         return this.device.createBindGroup({
             layout: bindGroupLayout,

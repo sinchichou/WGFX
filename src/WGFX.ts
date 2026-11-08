@@ -334,6 +334,13 @@ export class WGFX {
         }
 
         try {
+            // Advance the frame counter before uploading scene info so temporal effects
+            // (TAA / 時域降噪) see a monotonically increasing index that matches this
+            // frame's dispatch — the value rides the same scene-buffer write below.
+            // 先遞增影格計數器，使其與本幀 dispatch 一致；數值隨下方的
+            // scene buffer 寫入一併上傳，不產生額外的 buffer 往返。
+            this.runtime.advanceFrame();
+
             this.runtime.resourceManager.updateTextureFromImage('INPUT', inputSource, options.outWidth, options.outHeight);
 
             const commandEncoder = this.runtime.device.createCommandEncoder({
@@ -360,6 +367,36 @@ export class WGFX {
             Logger.error('Frame processing error:', error);
             throw error;
         }
+    }
+
+    /**
+     * Set the frame counter exposed to shaders as `scene.frame`.
+     * ---
+     * 設定著色器可讀取的影格計數器（`scene.frame`）。
+     * 供時間性特效（TAA、時域降噪等）取得穩定的影格索引。
+     *
+     * @group Rendering
+     * @param n - Frame index / 影格索引
+     */
+    public setFrame(n: number): void {
+        this.runtime.setFrame(n);
+    }
+
+    /**
+     * Advance the frame counter by one.
+     * ---
+     * 將影格計數器遞增 1；{@link process} 每次呼叫亦會自動遞增。
+     *
+     * @group Rendering
+     * @returns The new frame counter / 遞增後的計數值
+     */
+    public advanceFrame(): number {
+        return this.runtime.advanceFrame();
+    }
+
+    /** @group Query */
+    public getFrame(): number {
+        return this.runtime.getFrame();
     }
 
     /**

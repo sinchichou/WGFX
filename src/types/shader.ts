@@ -69,6 +69,8 @@ export interface PassInfo {
   numThreads: [number, number, number];
   /** Optional block size for coordinate calculation / 用於座標計算的選用區塊大小 */
   blockSize?: number[];
+  /** Optional explicit workgroup-count expressions（//! DISPATCH；buffer-only pass 用） */
+  dispatch?: string[];
 }
 
 /**
@@ -95,6 +97,8 @@ export interface WGFXShaderInfo {
   textures: TextureInfo[];
   /** List of all samplers / 所有取樣器的列表 */
   samplers: SamplerInfo[];
+  /** List of all storage buffers (CNN weights/feature maps) / 所有 storage buffer 的列表 */
+  buffers: BufferInfo[];
   /** List of all adjustable parameters / 所有可調整參數的列表 */
   parameters: ParameterInfo[];
   /** List of all execution passes / 所有執行通道的列表 */
@@ -103,4 +107,17 @@ export interface WGFXShaderInfo {
   commonCode: string;
   /** Metadata directives / 元數據指令 */
   metadata: ShaderMetadata;
+}
+
+/**
+ * Storage buffer declaration（//! BUFFER）
+ * storage buffer 宣告資訊
+ */
+export interface BufferInfo {
+  /** Buffer name / 緩衝區名稱 */
+  name: string;
+  /** Access mode: 'read' | 'read_write' / 存取模式 */
+  mode: string;
+  /** Element type: 'u32x2' | 'f32x4' | 'f32' / 元素型別（決定 WGSL 陣列元素與宿主 stride） */
+  type: string;
 }

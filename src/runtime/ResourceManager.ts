@@ -26,13 +26,21 @@ export class ResourceManager {
     public uniformBuffer: GPUBuffer | null;
     /** @zh 場景資訊（寬高、解析度）Uniform 緩衝區 */
     public sceneBuffer: GPUBuffer | null = null;
+    /** @zh storage buffer（CNN 權重與特徵圖）名稱 → GPUBuffer */
+    public storageBuffers: Map<string, GPUBuffer>;
+    /** @zh storage buffer 元素 stride（bytes）名稱 → 4|8|16 */
+    public storageBufferStrides: Map<string, number>;
+    /** @zh 外部 defines（DISPATCH 運算式求值用） */
+    public defines: Record<string, number> = {};
 
     /** @zh 資源版本號：任何紋理/緩衝區（重）建立時遞增，供管線層偵測綁定失效 */
     private resourceVersion = 0;
-    /** @zh updateSceneBuffer 暫存寫入區（重用，避免每幀配置新 ArrayBuffer） */
-    private sceneScratch = new ArrayBuffer(40);
+    /** @zh updateSceneBuffer 暫存寫入區（重用，避免每幀配置新 ArrayBuffer；48B 含 frame） */
+    private sceneScratch = new ArrayBuffer(48);
     private sceneScratchU32 = new Uint32Array(this.sceneScratch);
     private sceneScratchF32 = new Float32Array(this.sceneScratch);
+    /** @zh 目前影格計數器（寫入 SceneInfo.frame，供時間性特效使用） */
+    private frameCounter = 0;
 
     /** @zh 目前資源版本號 / Current resource revision for bind-group cache invalidation */
     public get revision(): number {
@@ -59,6 +67,8 @@ export class ResourceManager {
         this.views = new Map();
         this.samplers = new Map();
         this.uniforms = new Map();
+        this.storageBuffers = new Map();
+        this.storageBufferStrides = new Map();
         this.uniformBuffer = null;
     }
 
@@ -86,6 +96,7 @@ export class ResourceManager {
         // 1. Load external defines / 載入外部巨集定義
         if (externalResources.defines) {
             Object.assign(context, externalResources.defines);
+            this.defines = { ...context }; // 保留供 //! DISPATCH 運算式求值
             Logger.debug('Loaded external defines:', context);
         }
 
@@ -94,6 +105,18 @@ export class ResourceManager {
             for (const [name, descriptor] of Object.entries(externalResources.textures)) {
                 Logger.debug(`Creating external texture: ${name}`, descriptor);
                 this.createTexture(name, descriptor as GPUTextureDescriptor);
+            }
+        }
+
+        // 2b. Create external storage buffers / 建立外部 storage buffer
+        //     OpenNR/CNN 類特效：權重與特徵圖以 storage buffer 餵入。
+        //     每項：{ size: bytes, stride: 4|8|16, usage?, init?: ArrayBuffer }
+        if (externalResources.buffers) {
+            for (const [name, desc] of Object.entries(externalResources.buffers)) {
+                const d = desc as { size: number; stride?: number; init?: ArrayBuffer };
+                this.createStorageBuffer(name, d.size, d.stride || 8);
+                if (d.init) this.writeStorageBuffer(name, d.init);
+                Logger.debug(`Created external storage buffer: ${name} (${d.size} bytes)`);
             }
         }
 
@@ -344,6 +367,63 @@ export class ResourceManager {
     }
 
     /**
+     * Create a storage buffer（CNN 權重與特徵圖）。
+     * ---
+     * USAGE 固定 STORAGE_BINDING | COPY_DST | COPY_SRC（COPY_SRC 供讀回驗證）。
+     *
+     * @group Management
+     * @param name - Buffer name / 緩衝區名稱
+     * @param size - Size in bytes / 大小（bytes）
+     * @param stride - Element stride in bytes (4|8|16) / 元素 stride
+     */
+    public createStorageBuffer(name: string, size: number, stride: number = 8): GPUBuffer {
+        if (this.storageBuffers.has(name)) {
+            this.storageBuffers.get(name)!.destroy();
+        }
+        // WebGPU 要求綁定大小為 4 的倍數
+        const aligned = Math.max(4, Math.ceil(size / 4) * 4);
+        const buffer = this.device.createBuffer({
+            size: aligned,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+            label: name
+        });
+        this.storageBuffers.set(name, buffer);
+        this.storageBufferStrides.set(name, stride);
+        this.bumpRevision();
+        return buffer;
+    }
+
+    /** @group Query */
+    public getStorageBuffer(name: string): GPUBuffer | undefined {
+        return this.storageBuffers.get(name);
+    }
+
+    /** 寫入 storage buffer 內容（queue.writeBuffer） */
+    public writeStorageBuffer(name: string, data: ArrayBuffer | ArrayBufferView): void {
+        const b = this.storageBuffers.get(name);
+        if (!b) throw new Error(`Storage buffer "${name}" not found`);
+        this.device.queue.writeBuffer(b, 0, data as ArrayBuffer);
+    }
+
+    /** 讀回 storage buffer 內容（staging mapRead；供驗證/除錯） */
+    public async readStorageBuffer(name: string): Promise<ArrayBuffer> {
+        const b = this.storageBuffers.get(name);
+        if (!b) throw new Error(`Storage buffer "${name}" not found`);
+        const staging = this.device.createBuffer({
+            size: b.size,
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+        });
+        const cmd = this.device.createCommandEncoder();
+        cmd.copyBufferToBuffer(b, 0, staging, 0, b.size);
+        this.device.queue.submit([cmd.finish()]);
+        await staging.mapAsync(GPUMapMode.READ);
+        const out = staging.getMappedRange().slice(0);
+        staging.unmap();
+        staging.destroy();
+        return out;
+    }
+
+    /**
      * Get uniform buffer segment info for a specific parameter.
      * ---
      * 獲取特定 Uniform 項目的緩衝區位址資訊。
@@ -406,12 +486,15 @@ export class ResourceManager {
      * ---
      * 建立場景資訊緩衝區（包含寬高及其倒數）。
      *
+     * 大小 48 bytes：前 40 bytes 為既有欄位（向後相容），尾端新增 `frame: u32` 與
+     * 一個 f32 pad，使結構大小符合 WGSL uniform 的 16-byte 倍數要求。
+     *
      * @group Management
      */
     public createSceneBuffer(): void {
         if (this.sceneBuffer) return;
         this.sceneBuffer = this.device.createBuffer({
-            size: 40, // Expanded for SceneInfo struct
+            size: 48, // SceneInfo struct: 40B legacy + frame(u32) + pad → 48B
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             label: 'SceneInfo'
         });
@@ -423,10 +506,17 @@ export class ResourceManager {
      * ---
      * 以目前的影像尺寸更新場景資訊緩衝區。
      *
+     * `frame` 為選用參數（向後相容）：未提供時沿用目前內部計數器
+     * （由 {@link setFrame} / {@link advanceFrame} 維護，預設 0），
+     * 既有呼叫端無需修改即可維持原行為。
+     *
      * @group Update
+     * @param frame - Optional frame counter / 選用的影格計數器
      */
-    public updateSceneBuffer(width: number, height: number, outWidth: number = 0, outHeight: number = 0): void {
+    public updateSceneBuffer(width: number, height: number, outWidth: number = 0, outHeight: number = 0, frame?: number): void {
         if (!this.sceneBuffer || width === 0 || height === 0) return;
+
+        if (frame !== undefined) this.frameCounter = frame >>> 0;
 
         if (outWidth === 0) outWidth = width;
         if (outHeight === 0) outHeight = height;
@@ -455,6 +545,10 @@ export class ResourceManager {
         f32[8] = outWidth / width;
         f32[9] = outHeight / height;
 
+        // frame: u32 @40 + _pad0: f32 @44（尾端新增欄位，前 40 bytes 佈局不變）
+        u32[10] = this.frameCounter;
+        f32[11] = 0;
+
         this.device.queue.writeBuffer(this.sceneBuffer, 0, this.sceneScratch);
         Logger.debug(`Updated scene buffer: IN(${width}x${height}), OUT(${outWidth}x${outHeight}), SCALE(${f32[8].toFixed(2)}, ${f32[9].toFixed(2)})`);
     }
@@ -462,6 +556,40 @@ export class ResourceManager {
     /** @group Query */
     public getSceneBuffer(): GPUBuffer | null {
         return this.sceneBuffer;
+    }
+
+    /**
+     * Set the frame counter written into SceneInfo.frame.
+     * ---
+     * 設定寫入 SceneInfo.frame 的影格計數器。
+     *
+     * 僅更新內部計數值，實際 GPU 寫入發生於下一次 {@link updateSceneBuffer}
+     * （通常由宿主每幀觸發），避免額外一次 writeBuffer 往返。
+     *
+     * @group Update
+     * @param n - Frame index / 影格索引
+     */
+    public setFrame(n: number): void {
+        const v = Number(n);
+        this.frameCounter = Number.isFinite(v) ? (Math.max(0, Math.floor(v)) >>> 0) : 0;
+    }
+
+    /**
+     * Advance the frame counter by one.
+     * ---
+     * 將影格計數器遞增 1（u32 環繞，供時間性特效取用）。
+     *
+     * @group Update
+     * @returns The new frame counter / 遞增後的計數值
+     */
+    public advanceFrame(): number {
+        this.frameCounter = (this.frameCounter + 1) >>> 0;
+        return this.frameCounter;
+    }
+
+    /** @group Query */
+    public getFrame(): number {
+        return this.frameCounter;
     }
 
     /**
@@ -476,6 +604,9 @@ export class ResourceManager {
         this.textures.clear();
         this.views.clear();
         this.samplers.clear();
+        this.storageBuffers.forEach(b => b.destroy());
+        this.storageBuffers.clear();
+        this.storageBufferStrides.clear();
 
         if (this.uniformBuffer) {
             this.uniformBuffer.destroy();
