@@ -63,9 +63,10 @@ function f16(h) {
     return (s ? -1 : 1) * Math.pow(2, e - 15) * (1 + f / 1024);
 }
 
-// readTexture()：COPY_SRC → staging buffer（bytesPerRow 對齊 16）→ Uint16Array
+// readTexture()：COPY_SRC → staging buffer（bytesPerRow 對齊 256）→ Uint16Array
 async function readTexture(device, texture, w, h) {
-    const bytesPerRow = Math.ceil((w * 8) / 16) * 16; // rgba16float = 每像素 8 bytes
+    // bytesPerRow 必須是 256 的倍數（WebGPU 規範）
+    const bytesPerRow = Math.ceil((w * 8) / 256) * 256; // rgba16float = 每像素 8 bytes
     const staging = device.createBuffer({
         size: bytesPerRow * h,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
