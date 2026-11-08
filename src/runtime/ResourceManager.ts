@@ -30,6 +30,10 @@ export class ResourceManager {
     public storageBuffers: Map<string, GPUBuffer>;
     /** @zh storage buffer 元素 stride（bytes）名稱 → 4|8|16 */
     public storageBufferStrides: Map<string, number>;
+    /** @zh storage buffer 讀回用 staging buffer 快取（名稱 → MAP_READ buffer；重用以避開原生綁定的不穩定） */
+    private storageStaging: Map<string, GPUBuffer>;
+    /** @zh 同一 storage buffer 的讀取序列化鏈（避免同時 mapAsync 同一 staging） */
+    private storageReadQueue: Map<string, Promise<void>>;
     /** @zh 外部 defines（DISPATCH 運算式求值用） */
     public defines: Record<string, number> = {};
 
@@ -69,6 +73,8 @@ export class ResourceManager {
         this.uniforms = new Map();
         this.storageBuffers = new Map();
         this.storageBufferStrides = new Map();
+        this.storageStaging = new Map();
+        this.storageReadQueue = new Map();
         this.uniformBuffer = null;
     }
 
@@ -389,6 +395,9 @@ export class ResourceManager {
         });
         this.storageBuffers.set(name, buffer);
         this.storageBufferStrides.set(name, stride);
+        // 尺寸可能改變 → 丟棄快取的 staging（下次讀回時重建）
+        this.storageStaging.get(name)?.destroy();
+        this.storageStaging.delete(name);
         this.bumpRevision();
         return buffer;
     }
@@ -409,18 +418,92 @@ export class ResourceManager {
     public async readStorageBuffer(name: string): Promise<ArrayBuffer> {
         const b = this.storageBuffers.get(name);
         if (!b) throw new Error(`Storage buffer "${name}" not found`);
+
+        // 同一 buffer 的讀取序列化：避免對同一 staging buffer 同時 mapAsync
+        // Serialize reads of the same buffer: never map one staging buffer twice at once.
+        const prev = this.storageReadQueue.get(name) ?? Promise.resolve();
+        let release!: () => void;
+        const gate = new Promise<void>((resolve) => { release = resolve; });
+        this.storageReadQueue.set(name, prev.then(() => gate, () => gate));
+        await prev.catch(() => { /* 前一次讀取失敗不阻擋本次 */ });
+
+        try {
+            const staging = this._acquireStaging(name, b.size);
+            const cmd = this.device.createCommandEncoder();
+            cmd.copyBufferToBuffer(b, 0, staging, 0, b.size);
+            this.device.queue.submit([cmd.finish()]);
+            await staging.mapAsync(GPUMapMode.READ);
+            const out = staging.getMappedRange().slice(0);
+            staging.unmap();
+            return out;
+        } finally {
+            release();
+        }
+    }
+
+    /**
+     * 批次讀回多個 storage buffer（單一 staging buffer + **單次** mapAsync）。
+     * Batch-read several storage buffers with one staging buffer and one mapAsync.
+     *
+     * 為何需要批次版：某些原生 WebGPU 綁定（如 Dawn 的 node-webgpu）在
+     * 「多次 submit + 多次 mapAsync」交錯時會不穩定地拋出無訊息的 Error。
+     * 本 API 讓呼叫端以一次提交/映射完成整批讀回。
+     *
+     * @param names - storage buffer 名稱清單 / storage buffer names
+     * @returns 與 names 同順序的 ArrayBuffer 陣列 / one ArrayBuffer per name, in order
+     */
+    public async readStorageBuffers(names: string[]): Promise<ArrayBuffer[]> {
+        if (names.length === 0) return [];
+        const bufs: GPUBuffer[] = [];
+        for (const n of names) {
+            const b = this.storageBuffers.get(n);
+            if (!b) throw new Error(`Storage buffer "${n}" not found`);
+            bufs.push(b);
+        }
+        const total = bufs.reduce((s, b) => s + b.size, 0);
         const staging = this.device.createBuffer({
-            size: b.size,
-            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+            size: Math.max(4, total),
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+            label: 'storage-bulk-staging',
         });
         const cmd = this.device.createCommandEncoder();
-        cmd.copyBufferToBuffer(b, 0, staging, 0, b.size);
+        let offset = 0;
+        for (const b of bufs) {
+            cmd.copyBufferToBuffer(b, 0, staging, offset, b.size);
+            offset += b.size;
+        }
         this.device.queue.submit([cmd.finish()]);
         await staging.mapAsync(GPUMapMode.READ);
-        const out = staging.getMappedRange().slice(0);
+        const range = staging.getMappedRange();
+        const out: ArrayBuffer[] = [];
+        let pos = 0;
+        for (const b of bufs) {
+            out.push(range.slice(pos, pos + b.size));
+            pos += b.size;
+        }
         staging.unmap();
         staging.destroy();
         return out;
+    }
+
+    /**
+     * 取得（並快取）某個 storage buffer 對應的 MAP_READ staging buffer。
+     * Reuse a per-buffer MAP_READ staging buffer instead of allocating one per read.
+     *
+     * 重用而非每次 create/destroy：原生綁定在大量短命緩衝區 churn 下較不穩定，
+     * 且同一名稱的讀取已由 storageReadQueue 序列化，不會同時映射同一 staging。
+     */
+    private _acquireStaging(name: string, size: number): GPUBuffer {
+        const prev = this.storageStaging.get(name);
+        if (prev && prev.size >= size) return prev;
+        prev?.destroy();
+        const buf = this.device.createBuffer({
+            size: Math.max(4, size),
+            usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+            label: `${name}-staging`,
+        });
+        this.storageStaging.set(name, buf);
+        return buf;
     }
 
     /**
@@ -607,6 +690,9 @@ export class ResourceManager {
         this.storageBuffers.forEach(b => b.destroy());
         this.storageBuffers.clear();
         this.storageBufferStrides.clear();
+        this.storageStaging.forEach(b => b.destroy());
+        this.storageStaging.clear();
+        this.storageReadQueue.clear();
 
         if (this.uniformBuffer) {
             this.uniformBuffer.destroy();

@@ -21,6 +21,8 @@
     "build": "rollup -c",
     "pretest": "npm run build",
     "test": "node test/test_runtime.js",
+    "test:opennr": "node test/opennr_network.mjs",
+    "test:opennr:all": "node tools/opennr_weights.test.mjs && node test/opennr_ref_smoke.mjs && node test/opennr_conv_equiv.mjs && node test/opennr_spike.mjs && node test/opennr_network.mjs",
     "test:ref": "node test/ref_probe_upscale_denoise_s.mjs",
     "bench": "node test/bench_runtime.mjs",
     "debug": "npm run dev --prefix debugger",

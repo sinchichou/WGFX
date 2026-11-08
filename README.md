@@ -166,6 +166,60 @@ SamplerState MySampler;
 fn Pass1(...) { ... }
 ```
 
+> **Buffer-only pass**: a pass that produces no texture output may omit `IN`/`OUT`
+> entirely and declare an explicit dispatch grid instead
+> （不輸出紋理的 pass 可省略 `IN`/`OUT`，改用明確的 dispatch 網格）:
+>
+> ```wgsl
+> //! PASS 12
+> //! DISPATCH (NW*NH+63)/64, 1   // workgroup counts; may use external defines
+> fn Pass12(...) { ... }
+> ```
+
+### Storage Buffer Sub-directives (inside `//! BUFFER`)
+
+Storage buffers carry CNN weights and feature maps. They are bound from group 0
+at binding 40+ and declared as `array<T>` in the generated WGSL
+（storage buffer 用於 CNN 權重與特徵圖，綁定於 group 0 的 binding 40+）:
+
+```wgsl
+//! BUFFER WT_conv0
+//! MODE read_write
+//! TYPE u32x2
+//! BUFFER BS_conv0
+//! MODE read_write
+//! TYPE f32x4
+```
+
+| `TYPE` | WGSL element type | stride |
+|--------|-------------------|--------|
+| `u32x2` | `vec2<u32>` | 8 bytes |
+| `f32x4` | `vec4<f32>` | 16 bytes |
+| `f32`   | `f32`            | 4 bytes |
+
+`MODE` is `read` or `read_write`; OpenNR-style effects declare every buffer
+`read_write` so helper functions can share one signature
+（OpenNR 類效果一律宣告 `read_write`，讓 helper 共用同一組函式簽章）.
+
+Buffers are supplied by the host through `externalResources.buffers`
+（由宿主端透過 `externalResources.buffers` 提供）:
+
+```ts
+externalResources: {
+  buffers: {
+    WT_conv0: { size: 4096, stride: 8, init: weightBytes },  // init optional
+    FB_A:     { size: 262144, stride: 8 },
+  }
+}
+```
+
+> **Readback**: `ResourceManager.readStorageBuffer(name)` returns one buffer;
+> `readStorageBuffers(names)` reads several with a **single** staging buffer and a
+> single `mapAsync`. Prefer the batch form in verification loops — some native
+> WebGPU bindings (e.g. Dawn's node-webgpu) become unstable when many
+> submit + mapAsync cycles are interleaved
+> （驗證迴圈建議用批次版；部分原生綁定在大量 submit + mapAsync 交錯時不穩定）.
+
 ---
 
 ## Built-in Example Effects
@@ -181,6 +235,19 @@ Located in `examples/`:
 | `Anime4K_Denoise_Bilateral_*.wgsl` | Bilateral denoise (3 modes) |
 | `Anime4K_Upscale_Denoise_S.wgsl` | Upscale + denoise |
 | `FSR_x2.wgsl` | FidelityFX Super Resolution 2x |
+
+Located in `effects/OpenNR/` (OpenNR-ReShade port, f16 U-Net):
+
+| File | Description |
+|------|-------------|
+| `OpenNR_spike.wgsl` | Single-conv proof of concept (packed f16 storage-buffer conv) |
+| `OpenNR_1pass.wgsl` | Full 37-pass OpenNR network: stage → global branch → encoder → middle → decoder → head → composite |
+
+The OpenNR effects live outside `examples/` because they need host-supplied
+storage buffers (network weights and feature maps)
+（OpenNR 效果需要宿主提供 storage buffer，故不放在 `examples/`）.
+See [docs/opennr-pass-graph.md](docs/opennr-pass-graph.md) for the pass graph and
+[docs/opennr-port-feasibility.md](docs/opennr-port-feasibility.md) for the port plan.
 
 ---
 
@@ -324,6 +391,16 @@ npm run build:docs
 - **Test C**: All example effects compile + full pass execution + non-zero output verification
 - **Test D**: Missing `WIDTH`/`HEIGHT` on intermediate textures throws explicit error
 
+### OpenNR Acceptance (`npm run test:opennr:all`)
+
+| Check | Script | Criterion |
+|-------|--------|-----------|
+| Weight converter | `tools/opennr_weights.test.mjs` | 36/36, byte-identical to upstream |
+| CPU oracle smoke | `test/opennr_ref_smoke.mjs` | stage / pool / upcat / FC semantics |
+| Conv equivalence | `test/opennr_conv_equiv.mjs` | fast conv is bit-identical to readable conv |
+| Conv spike | `test/opennr_spike.mjs` | GPU conv vs CPU, per-channel ≤ 1e-2 |
+| Full network | `test/opennr_network.mjs` | all 19 conv layers + skip S0–S3 per-channel ≤ 1e-2; noise varies with frame; composite at `Strength=0` ≈ input |
+
 ---
 
 ## Project Structure
@@ -345,7 +422,14 @@ WGFX/
 │       ├── UniformBinder.ts     # Uniform binding
 │       └── WGSLCodeGenerator.ts # WGSL code generation
 ├── examples/                    # Built-in effect examples
+├── effects/
+│   └── OpenNR/                  # OpenNR-ReShade port (f16 U-Net, 37 passes)
+├── effects_src/                 # Upstream shader sources used as port references
+│   ├── OpenNR-ReShade/upstream/ # git submodule (pinned v0.2.1)
+│   └── .../                     # Magpie HLSL sources (148 files) pending port
+├── tools/                       # Asset/tooling converters (opennr_weights.mjs)
 ├── test/                        # Test suite
+├── docs/                        # Design docs (opennr-pass-graph.md, …)
 ├── debugger/                    # Debug tools
 ├── package.json
 ├── rollup.config.js
@@ -356,4 +440,4 @@ WGFX/
 
 ## License
 
-MIT License
+License

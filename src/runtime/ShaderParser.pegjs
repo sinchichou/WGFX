@@ -104,7 +104,13 @@
         break;
       }
       case 'COMMON': shaderInfo.commonCode = data.lines.join('\n'); break;
-      case 'PASS': shaderInfo.passes.push(data); break;
+      case 'PASS':
+        // buffer-only pass（無 IN/OUT，僅以 //! DISPATCH 派發）時 in/out 未宣告，
+        // 正規化為空陣列，避免下游 (generator/pipeline) 對 undefined 取 .includes。
+        if (!data.in) data.in = [];
+        if (!data.out) data.out = [];
+        shaderInfo.passes.push(data);
+        break;
       case 'VERSION': shaderInfo.metadata.version = parseInt(data.id,10); break;
       case 'SORT_NAME': shaderInfo.metadata.sortName = dequote(data.id); break;
       case 'USE': data.id.split(',').forEach(f=>shaderInfo.metadata.use[f.trim().toUpperCase()]=true); break;

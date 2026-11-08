@@ -134,3 +134,50 @@ ping-pong 的切換在 WGFX 中需以不同 pass 讀寫不同 buffer 名稱表�
 
 **重要**：WGFX 目前每個 pass 讀寫的 buffer 名稱是靜態的，所以 ping-pong 必須在
 產生效果檔時就展開成明確的 `A`/`B` 交替命名，不能依賴執行期 swap。
+
+## 6. 實作狀態（as-built）
+
+效果檔：`effects/OpenNR/OpenNR_1pass.wgsl`（37 pass）。
+
+### 6.1 Buffer 命名（實作）
+
+| 用途 | 名稱 | 備註 |
+|---|---|---|
+| stage 輸入 16ch | `FB_CH` | |
+| ping-pong | `FB_A` / `FB_B` | 依 `opennr_addon.cpp` 的換手序列展開 |
+| skip | `FB_S0` … `FB_S3` | 由 `enc0b`…`enc3b` 寫入 |
+| 網路輸出 | `FB_HEAD` | `out` 層（4 邏輯通道，buffer 寬 16） |
+| 全幀分支 bias | `GB` | f32×4 |
+| FC 權重 | `WFC` | f32 |
+| conv 權重 | `WT_<layer>` | uint2 = 4 packed f16，stride 8 |
+| conv bias | `BS_<layer>` | float4 = f32，stride 16 |
+
+前綴（`FB_` / `WT_` / `BS_` / `WFC` / `GB`）是為了避免與 helper 函式的參數名稱
+（`x` / `w` / `b` / `o`）撞名——撞名會讓 WGSL 產生器把 helper 內引用的 buffer
+誤判為該 pass 的依賴。
+
+### 6.2 Helper 簽名
+
+所有 helper 以 `ptr<storage, array<...>, read_write>` 收 buffer，不直接引用 buffer 名稱；
+因此每個 pass 只宣告自己實際用到的 buffer。所有 buffer 一律 `MODE read_write` 以統一簽名。
+
+### 6.3 解析度
+
+`NW` / `NH` 由 external defines 提供（注入為 WGSL `const`），通道數為模型常數（字面）。
+上游的 `align_extent(n) = max(320, ceil(n/64)*64)` 由宿主端決定後以 defines 傳入。
+
+### 6.4 驗收結果
+
+`npm run test:opennr`（`test/opennr_network.mjs`）在 `NW=NH=64`：
+
+- 37 pass 編譯 + dispatch 無驗證錯誤
+- 19 層 conv 逐通道 ≤ 1e-2（worstΔ ≈ 3.9e-3）
+- skip S0–S3 逐通道 ≤ 1e-2
+- 噪聲隨 frame 變化（100% 位元不同）、色彩通道不變
+- composite `Strength=0` → OUTPUT ≈ INPUT（worstΔ ≈ 4.9e-4）
+
+> **讀回策略**：驗收測試以「單一 command encoder 跑完 37 pass + 逐層快照 + 單次
+> `mapAsync`」讀回。node-webgpu（Dawn Node 綁定）在「多次 submit + 多次 mapAsync」
+> 交錯時會不穩定地拋出無訊息的 `Error`；快照式讀回同時貼近正式執行路徑
+> （`WGFXRuntime.dispatchAllPasses`：單 encoder 全 pass）。
+
