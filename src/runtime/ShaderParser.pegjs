@@ -120,6 +120,50 @@
   }
 
   /**
+   * Magpie 紋理格式 → WebGPU GPUTextureFormat。
+   * Magpie 使用 DXGI 風格的名稱（R16G16B16A16_FLOAT），WebGPU 使用小寫的
+   * WebGPU 名稱（rgba16float）。未列出的格式原樣傳遞（假設已是 WebGPU 名稱）。
+   * @param {string} value - 宣告的格式字串
+   * @returns {string} WebGPU 格式名稱
+   */
+  function toWebGPUFormat(value) {
+    const v = (value || '').trim();
+    const table = {
+      'r8g8b8a8_unorm': 'rgba8unorm',
+      'r8g8b8a8_snorm': 'rgba8snorm',
+      'r8g8b8a8_uint': 'rgba8uint',
+      'r8g8b8a8_sint': 'rgba8sint',
+      'r8g8b8a8_srgb': 'rgba8unorm-srgb',
+      'r16g16b16a16_float': 'rgba16float',
+      'r16g16b16a16_unorm': 'rgba16unorm',
+      'r16g16b16a16_uint': 'rgba16uint',
+      'r16g16b16a16_snorm': 'rgba16snorm',
+      'r16g16_float': 'rg16float',
+      'r16g16_snorm': 'rg16snorm',
+      'r16g16_uint': 'rg16uint',
+      'r16_float': 'r16float',
+      'r16_snorm': 'r16snorm',
+      'r16_uint': 'r16uint',
+      'r32_float': 'r32float',
+      'r32_uint': 'r32uint',
+      'r32_sint': 'r32sint',
+      'r32g32_float': 'rg32float',
+      'r32g32b32a32_float': 'rgba32float',
+      'r8_unorm': 'r8unorm',
+      'r8_uint': 'r8uint',
+      'r8_snorm': 'r8snorm',
+      'r11g11b10_float': 'rg11b10ufloat',
+      'bc1_unorm': 'bc1-rgba-unorm',
+      'bc3_unorm': 'bc3-rgba-unorm',
+      'bc7_unorm': 'bc7-rgba-unorm',
+    };
+    const lower = v.toLowerCase();
+    if (table[lower]) return table[lower];
+    // 已是 WebGPU 風格（小寫、含底線或連字號）→ 原樣使用
+    return v;
+  }
+
+  /**
    * Parses sub-directives within a block (e.g., //! DEFAULT, //! MIN for PARAMETER).
    * 解析區塊內部的子指令 (例如 PARAMETER 的 //! DEFAULT, //! MIN)。
    * @param {object} data - The current block's data object to populate.
@@ -155,8 +199,7 @@
       case 'step':
         data[key] = parseFloat(value); break;
       case 'format':
-        data[key] = value.toLowerCase()==='r16g16b16a16_float' ? 'rgba16float' : value;
-        break;
+        data[key] = toWebGPUFormat(value); break;
       case 'label':
       case 'desc':
         data[key] = dequote(value); break;
