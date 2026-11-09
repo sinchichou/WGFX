@@ -18,6 +18,8 @@ src/runtime/ShaderParser.js
 # Tooling caches
 .codegraph/
 .dsh-acl-recovery/
+# Agent verification scratch (port_check dumps, probes, sweep output)
+.tmp/
 
 # OpenNR weight-converter generated artifacts / OpenNR 權重轉換器產物
 tools/out/
