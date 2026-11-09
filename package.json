@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "WebGPU Effect Framework — parse and run Magpie-style .wgsl effect files",
   "main": "dist/wgfx.js",
+  "module": "dist/wgfx.browser.esm.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
@@ -10,15 +11,26 @@
       "browser": "./dist/wgfx.browser.esm.js",
       "import": "./dist/wgfx.esm.js",
       "require": "./dist/wgfx.js"
-    }
+    },
+    "./browser": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/wgfx.browser.esm.js"
+    },
+    "./package.json": "./package.json"
   },
+  "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "README_TW.md",
+    "LICENSE"
   ],
   "scripts": {
     "generate:parser": "peggy --format es -o src/runtime/ShaderParser.js src/runtime/ShaderParser.pegjs",
     "prebuild": "npm run generate:parser",
     "build": "rollup -c",
+    "prepare": "npm run build",
+    "pack:check": "npm pack --dry-run",
     "pretest": "npm run build",
     "test": "node test/test_runtime.js",
     "test:opennr": "node test/opennr_network.mjs",

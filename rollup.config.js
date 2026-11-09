@@ -31,6 +31,8 @@ export default [
             name: 'WGFX',
             file: 'dist/wgfx.browser.umd.js',
             format: 'umd',
+            // 同 cjs：同時具名與預設匯出時明確標示 named，避免 .default 包裝警告
+            exports: 'named',
             sourcemap: true
         },
         plugins: [
@@ -52,6 +54,9 @@ export default [
             {
                 file: 'dist/wgfx.js',
                 format: 'cjs',
+                // 同時具名與預設匯出 → 明確標示為 named,避免 CJS 消費者拿到
+                // 巢狀的 .default 包裝(rollup 的預設警告來源)。
+                exports: 'named',
                 sourcemap: true
             },
             {

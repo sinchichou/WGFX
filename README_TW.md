@@ -14,9 +14,53 @@
 
 ```bash
 npm install
+npm run build     # 產生 dist/（bundle + .d.ts）；`npm install` / `npm pack` 時亦會自動執行
 ```
 
 > **注意**：專案使用 ES Modules (`"type": "module"`)，需 Node.js 18+ 或現代瀏覽器環境。
+
+---
+
+## 以程式庫形式使用 WGFX
+
+WGFX 以自足的 ESM 套件形式發布——瀏覽器 bundle **不含任何外部 import**，
+可被 bundler 直接打包，或由瀏覽器擴充套件以 `import()` 載入。
+
+### 進入點
+
+| 條件 | 檔案 | 用途 |
+|------|------|------|
+| `browser` | `dist/wgfx.browser.esm.js` | 瀏覽器／擴充套件（無 Node polyfill） |
+| `import` | `dist/wgfx.esm.js` | Node／bundler |
+| `require` | `dist/wgfx.js` | CommonJS 消費端 |
+| 型別 | `dist/index.d.ts` | TypeScript |
+
+```js
+// 具名或預設匯出皆可：
+import { WGFX } from 'wgfx';
+import WGFX from 'wgfx';
+```
+
+### 從瀏覽器擴充套件（MV3）消費
+
+擴充套件無法在執行期解析套件路徑——`chrome.runtime.getURL(...)` 的目標必須實際存在於
+擴充套件封裝內。可維護的做法是：**以套件相依，再把瀏覽器 bundle 以建置步驟攤銷(vendor)**，
+而不是手動複製。
+
+```bash
+# 在擴充套件專案中
+npm install ../WGFX      # 或日後發布後：npm install wgfx
+npm run sync:wgfx        # 將 node_modules/wgfx/dist/wgfx.browser.esm.js 同步到 vendor/
+```
+
+```js
+// content script — 以動態 ESM import 載入攤銷後的 bundle
+const module = await import(chrome.runtime.getURL('vendor/wgfx.browser.esm.js'));
+const WGFX = module.default || module.WGFX;
+```
+
+可運作的參考實作見 [YouTube VSR](https://github.com/sinchichou/YouTube-VSR)
+（`scripts/sync-wgfx.mjs`、`npm run sync:wgfx`、`npm run check:wgfx`）。
 
 ---
 

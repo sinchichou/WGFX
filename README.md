@@ -14,9 +14,54 @@
 
 ```bash
 npm install
+npm run build     # emits dist/ (bundles + .d.ts); also runs automatically on `npm install`/`npm pack`
 ```
 
 > **Note**: Project uses ES Modules (`"type": "module"`), requires Node.js 18+ or modern browser.
+
+---
+
+## Using WGFX as a library
+
+WGFX ships as a self-contained ESM package — the browser bundle has **no external imports**,
+so it can be loaded directly by a bundler, or by a browser extension via `import()`.
+
+### Entry points
+
+| Condition | File | Use for |
+|-----------|------|---------|
+| `browser` | `dist/wgfx.browser.esm.js` | Browsers / browser extensions (no Node polyfills) |
+| `import` | `dist/wgfx.esm.js` | Node / bundlers |
+| `require` | `dist/wgfx.js` | CommonJS consumers |
+| types | `dist/index.d.ts` | TypeScript |
+
+```js
+// Named or default — both work:
+import { WGFX } from 'wgfx';
+import WGFX from 'wgfx';
+```
+
+### Consuming from a browser extension (MV3)
+
+Extensions cannot resolve package paths at runtime — a
+`chrome.runtime.getURL(...)` target must physically live inside the extension package.
+The maintainable pattern is: depend on the package, then **vendor** its browser bundle as a
+build step instead of copying it by hand.
+
+```bash
+# in the extension project
+npm install ../WGFX      # or: npm install wgfx   once published
+npm run sync:wgfx        # copies node_modules/wgfx/dist/wgfx.browser.esm.js into vendor/
+```
+
+```js
+// content script — dynamic ESM import of the vendored bundle
+const module = await import(chrome.runtime.getURL('vendor/wgfx.browser.esm.js'));
+const WGFX = module.default || module.WGFX;
+```
+
+See [YouTube VSR](https://github.com/sinchichou/YouTube-VSR) for a working reference
+implementation (`scripts/sync-wgfx.mjs`, `npm run sync:wgfx`, `npm run check:wgfx`).
 
 ---
 
