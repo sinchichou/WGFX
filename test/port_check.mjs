@@ -2,6 +2,7 @@
 //
 // 用法：
 //   node test/port_check.mjs <effect.wgsl> [更多檔案…] [--size N] [--quiet]
+//                            [--texture NAME=path ...] [--texture-dir DIR]
 //
 // 每個效果檢查：
 //   1. 編譯無例外、無驗證錯誤。
@@ -10,6 +11,11 @@
 //   4. 報告輸出統計（min/max/mean）與對 INPUT 的平均絕對差，供移植者判斷合理性。
 //
 // 這是**通用**健全性檢查；數值正確性的強驗收請另寫專屬測試。
+//
+// !SOURCE 外部紋理（附加式 CLI,向下相容）：
+//   * --texture NAME=path：顯式餵入外部紋理（可重複;NAME 大小寫不敏感;目前支援 .dds）
+//   * 效果宣告 `//! SOURCE <file>` 且未以 --texture 提供時,自動在 effects_src/
+//     （或 --texture-dir 指定目錄）遞迴、大小寫不敏感地以檔名解析並載入。
 //
 // 注意：node-webgpu（Dawn Node 綁定）在「多次 submit + 多次 mapAsync」交錯時
 // 會不穩定地拋出無訊息的 Error，因此本工具每個效果只做一次 mapAsync。
@@ -21,19 +27,33 @@ import { fileURLToPath } from 'url';
 Object.assign(globalThis, globals);
 const nav = { gpu: create([]) };
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REPO = path.join(HERE, '..');
 
 const argv = process.argv.slice(2);
 let SIZE = 256;
 let quiet = false;
 const files = [];
+const explicitTextures = new Map(); // name(小寫) → path
+let textureDir = path.join(REPO, 'effects_src');
 for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--size') { SIZE = Number(argv[++i]); continue; }
     if (a === '--quiet') { quiet = true; continue; }
+    if (a === '--texture') {
+        const spec = argv[++i];
+        if (spec === undefined || !spec.includes('=')) {
+            console.error('usage: --texture NAME=path（可重複）');
+            process.exit(2);
+        }
+        const eq = spec.indexOf('=');
+        explicitTextures.set(spec.slice(0, eq).trim().toLowerCase(), path.resolve(spec.slice(eq + 1).trim()));
+        continue;
+    }
+    if (a === '--texture-dir') { textureDir = path.resolve(argv[++i]); continue; }
     files.push(a);
 }
 if (files.length === 0) {
-    console.error('usage: node test/port_check.mjs <effect.wgsl> [...] [--size N] [--quiet]');
+    console.error('usage: node test/port_check.mjs <effect.wgsl> [...] [--size N] [--quiet] [--texture NAME=path] [--texture-dir DIR]');
     process.exit(2);
 }
 
@@ -51,6 +71,97 @@ const check = (name, ok, detail = '') => {
     if (!quiet) console.log(`  ${ok ? '[PASS]' : '[FAIL]'} ${name}${detail ? ' — ' + detail : ''}`);
     if (!ok) fail++;
 };
+
+// ---------- !SOURCE 掃描與外部紋理載入 ----------
+
+/** 掃描效果碼中的 //!SOURCE 宣告 → Map<紋理名, 來源檔名>（附加式,不影響既有 CLI） */
+function scanSourceDecls(code) {
+    const map = new Map();
+    let cur = null; // { name, source }
+    const BLOCK_STARTS = ['TEXTURE', 'SAMPLER', 'PARAMETER', 'BUFFER', 'COMMON', 'PASS'];
+    for (const raw of code.split(/\r?\n/)) {
+        const line = raw.trim();
+        const dirM = line.match(/^\/\/!\s*([A-Za-z_]+)\s*(.*)$/);
+        if (dirM) {
+            const dir = dirM[1].toUpperCase();
+            const val = dirM[2].trim();
+            if (dir === 'TEXTURE') {
+                if (cur && cur.name && cur.source) map.set(cur.name, cur.source);
+                cur = { name: null, source: null };
+                continue;
+            }
+            if (cur) {
+                if (dir === 'SOURCE') cur.source = val.replace(/^"|"$/g, '');
+                else if (BLOCK_STARTS.includes(dir) ||
+                    ['VERSION', 'SORT_NAME', 'USE', 'CAPABILITY'].includes(dir)) {
+                    if (cur.name && cur.source) map.set(cur.name, cur.source);
+                    cur = null;
+                }
+            }
+            continue;
+        }
+        if (cur) {
+            const declM = line.match(/^(?:Texture2D|var)\s+([A-Za-z_][A-Za-z0-9_]*)\s*[;:]/);
+            if (declM) cur.name = declM[1].replace(/_(sampled|storaged)$/, '');
+        }
+    }
+    if (cur && cur.name && cur.source) map.set(cur.name, cur.source);
+    return map;
+}
+
+/** 遞迴收集 dir 下所有檔案（小寫 basename → 完整路徑,先到先得） */
+function indexFilesByBasename(dir, index = new Map()) {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return index; }
+    for (const ent of entries) {
+        const full = path.join(dir, ent.name);
+        if (ent.isDirectory()) indexFilesByBasename(full, index);
+        else {
+            const key = ent.name.toLowerCase();
+            if (!index.has(key)) index.set(key, full);
+        }
+    }
+    return index;
+}
+
+/** 載入一個 DDS 為外部紋理描述符 */
+async function loadDDSTexture(file) {
+    const { readDDS } = await import('../tools/dds.mjs');
+    const tex = readDDS(fs.readFileSync(file), file);
+    return {
+        size: [tex.width, tex.height],
+        format: tex.format,
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        data: tex.data,
+        bytesPerRow: tex.bytesPerRow,
+    };
+}
+
+/** 為單一效果準備外部紋理資源（--texture 優先,其次 effects_src 自動解析） */
+async function prepareExternalTextures(code, name) {
+    const decls = scanSourceDecls(code);
+    if (decls.size === 0) return {};
+    const index = indexFilesByBasename(textureDir);
+    const resolved = {};
+    for (const [texName, sourceFile] of decls) {
+        const key = texName.toLowerCase();
+        let file = explicitTextures.get(key);
+        let via = '--texture';
+        if (!file) {
+            file = index.get(sourceFile.toLowerCase());
+            via = `effects_src 自動解析`;
+        }
+        if (!file) {
+            throw new Error(
+                `效果宣告 //! SOURCE ${sourceFile}（紋理 ${texName}）但找不到檔案:` +
+                `請以 --texture ${texName}=<路徑> 提供或確認 effects_src/ 下存在該檔`);
+        }
+        if (!fs.existsSync(file)) throw new Error(`外部紋理檔不存在: ${file}`);
+        resolved[texName] = await loadDDSTexture(file);
+        if (!quiet) console.log(`  [TEXTURE] ${texName} ← ${path.relative(process.cwd(), file)} (${via})`);
+    }
+    return resolved;
+}
 
 // ---------- 紋理讀寫輔助 ----------
 function f16(h) {
@@ -116,6 +227,7 @@ for (const rel of files) {
     try {
         runtime = new WGFXRuntime(dev);
         dev.pushErrorScope('validation');
+        const externalTextures = await prepareExternalTextures(code, name);
         await runtime.compile(code, {
             defines: { INPUT_WIDTH: SIZE, INPUT_HEIGHT: SIZE },
             textures: {
@@ -127,6 +239,7 @@ for (const rel of files) {
                     size: [SIZE, SIZE], format: 'rgba16float',
                     usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC,
                 },
+                ...externalTextures,
             },
         });
         const compileErr = await dev.popErrorScope();

@@ -174,27 +174,56 @@ function stripPreprocessor(text) {
 /**
  * 區域變數宣告：HLSL `f32 a = 0.0, b = 0.0, c;` → WGSL 逐個 `var a: f32 = 0.0;` 等。
  * HLSL 的區域變數預設可變，故一律用 `var`。
- * 值的擷取需括號感知（值內可以有逗號，例如 select(a, b, c)）。
+ * 值的擷取以**括號平衡掃描**（任意巢狀深度）——舊版的固定兩層括號 regex 會在
+ * `vec2<f32> UV = mul(rgb2uv, textureSampleLevel(INPUT, sam, HOOKED_map(pos), 0).rgb);`
+ * 這種深巢狀初始化式上失配，導致 HLSL typed declaration 原樣殘留。
+ * 陣列宣告：`vec4<f32> samples[8];` → `var samples: array<vec4<f32>, 8>;`
  */
 function convertLocalDecls(text) {
-    // 括號感知的「值」樣式：允許一层巢狀括號與其中的逗號
-    const VAL = '((?:[^,;()]|\\((?:[^()]|\\([^()]*\\))*\\))+)';
     const NAME = '[A-Za-z_][A-Za-z0-9_]*';
-    const declRe = new RegExp(
-        `\\b(${WGSL_TYPE_RE})\\s+` +
-        `(${NAME}(?:\\s*=\\s*${VAL})?(?:\\s*,\\s*${NAME}(?:\\s*=\\s*${VAL})?)*)` +
-        `\\s*;`, 'g');
+    const typeRe = new RegExp(`\\b(${WGSL_TYPE_RE})\\s+`, 'g');
 
     // 陣列宣告：`vec4<f32> samples[8];` → `var samples: array<vec4<f32>, 8>;`
     let s = text.replace(
         new RegExp(`\\b(${WGSL_TYPE_RE})\\s+(${NAME})\\s*\\[([^\\]]+)\\]\\s*;`, 'g'),
         (_m, type, name, n) => `var ${name}: array<${type}, ${n.trim()}>;`);
 
-    s = s.replace(declRe, (_m, type, decls) => splitTopLevel(decls).map((d) => {
-        const mm = d.match(new RegExp(`^(${NAME})\\s*(=\\s*([\\s\\S]+))?$`));
-        return mm && mm[2] ? `var ${mm[1]}: ${type} ${mm[2].trim()};` : `var ${d}: ${type};`;
-    }).join(' '));
-    return s;
+    // 純量/向量/矩陣宣告：掃描每個 `TYPE` 出現位置，向後括號平衡掃描到頂層 `;`
+    let out = '';
+    let last = 0;
+    for (const m of s.matchAll(typeRe)) {
+        const i = m.index + m[0].length;
+        // 讀宣告子序列至頂層 `;`（頂層 `,` 分隔多宣告子）
+        let depth = 0;
+        let j = i;
+        for (; j < s.length; j++) {
+            const ch = s[j];
+            if (ch === '(' || ch === '[') depth++;
+            else if (ch === ')' || ch === ']') depth--;
+            else if (ch === ';' && depth === 0) break;
+        }
+        if (j >= s.length || depth !== 0) continue;
+        const body = s.slice(i, j);
+        // 宣告子必須是 `NAME` 或 `NAME = VALUE`（逗號分隔,值可含任意巢狀括號）
+        const parts = splitTopLevel(body);
+        let ok = true;
+        const decls = [];
+        for (const p of parts) {
+            const pm = p.match(new RegExp(`^(${NAME})\\s*(?:=\\s*([\\s\\S]+))?$`));
+            if (!pm) { ok = false; break; }
+            decls.push(pm[2] !== undefined
+                ? `var ${pm[1]}: ${m[1]} = ${pm[2].trim()};`
+                : `var ${pm[1]}: ${m[1]};`);
+        }
+        if (!ok) continue;
+        // 誤傷防護：這不是宣告（如 for 迴圈頭 `f32 i = 0;` 由 for 規則先處理）——
+        // TYPE 前面緊接 `(` 的情況（函式參數等）不在 matchAll 範圍;此處僅在
+        // 宣告子形狀完全吻合時改寫。
+        out += s.slice(last, m.index) + decls.join(' ');
+        last = j + 1;
+    }
+    if (last === 0) return s;
+    return out + s.slice(last);
 }
 
 /**
@@ -204,6 +233,15 @@ function convertLocalDecls(text) {
  */
 export function translateCode(src, textureNames = null) {
     let s = src;
+
+    // --- group_base 以 u32 語意計算 ---
+    // HLSL: `ivec2 group_base = ivec2(gl_WorkGroupID) * ivec2(gl_WorkGroupSize);`
+    // 之後與 `uint x/y` 混算（group_base.x + x）——HLSL 隱式 int→uint 提升使整條
+    // 座標鏈為 uint;WGSL 不做隱式提升,故直接以 u32 計算（模板的 gl_* 別名本來
+    // 就是 vec2<u32>,數值語意與 HLSL 的 uint 運算完全一致）。
+    s = s.replace(
+        /\bivec2\s+group_base\s*=\s*ivec2\s*\(\s*gl_WorkGroupID\s*\)\s*\*\s*ivec2\s*\(\s*gl_WorkGroupSize\s*\)\s*;/g,
+        'uint2 group_base = gl_WorkGroupID * gl_WorkGroupSize;');
 
     // --- 移除 HLSL 專用指示（巨集可能跨行，須整組移除）---
     s = stripPreprocessor(s);
@@ -259,16 +297,34 @@ export function translateCode(src, textureNames = null) {
     s = s.replace(/\(\s*u32\s*\)\s*([A-Za-z_][A-Za-z0-9_]*)/g, 'u32($1)');
     s = s.replace(/\(\s*i32\s*\)\s*([A-Za-z_][A-Za-z0-9_]*)/g, 'i32($1)');
 
-    // --- ivec2(常量) 用於與 u32 相乘 → vec2<u32>（HLSL 會隱式提升）---
-    s = s.replace(/\bvec2<i32>\(\s*(\d+)\s*,\s*(\d+)\s*\)/g, 'vec2<u32>($1u, $2u)');
+    // --- ivec2 常數保持 i32（WGSL 不做 int↔uint 隱式提升）---
+    // 舊版把 `ivec2(1, 2)` 一律轉 `vec2<u32>(1u, 2u)`,會把全 i32 的座標鏈
+    //（`ivec2(gl_GlobalInvocationID) * ivec2(1, 2) + ivec2(0, 1)`）打混成
+    // i32*u32 的無效運算。u32 語境（`threadId.xy * ivec2(1, 2)`）由下方
+    // 專屬規則顯式升為 u32,其餘保持 i32（`vec2<i32>(1, 2)` 合法）。
+    s = s.replace(
+        /\b(threadId\.xy|wgid\.xy|gl_GlobalInvocationID|gl_WorkGroupID|gl_WorkGroupSize|blockStart)\s*\*\s*vec2<i32>\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/g,
+        '$1 * vec2<u32>($2u, $3u)');
+    s = s.replace(
+        /\bvec2<i32>\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*\*\s*(threadId\.xy|wgid\.xy|gl_GlobalInvocationID|gl_WorkGroupID|gl_WorkGroupSize|blockStart)\b/g,
+        'vec2<u32>($1u, $2u) * $3');
 
     // --- 取樣 ---
     s = s.replace(/\b([A-Za-z_][A-Za-z0-9_]*)\.SampleLevel\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*([^,]+),\s*([0-9.]+)\s*\)/g,
         (_m, tex, smp, uv, lvl) => `textureSampleLevel(${tex}, ${smp}, ${uv.trim()}, ${lvl})`);
-    s = s.replace(/\btexture\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,\s*([^)]+)\)/g,
-        (_m, tex, pos) => `textureSampleLevel(${tex}, sam_${tex}, ${pos.trim()}, 0.0)`);
+    // prescalers.hlsli 的 `#define texture(tex, pos) tex.SampleLevel(sam_##tex, pos, 0.0)`
+    // — pos 以括號平衡掃描（`texture(lut, vec2(0.05, coord_y))` 的巢狀括號會讓
+    // `[^)]+` 在第一個 `)` 截斷,產出不平衡的 WGSL）
+    s = replaceCallSites(s, 'texture', 2, (args) => {
+        const tex = args[0].trim();
+        if (!/^[A-Za-z_]\w*$/.test(tex)) return null; // 非識別字：原樣保留
+        return `textureSampleLevel(${tex}, sam_${tex}, ${args[1].trim()}, 0.0)`;
+    });
     s = s.replace(/\b([A-Za-z_][A-Za-z0-9_]*)\.Gather(Red|Green|Blue|Alpha)\s*\(/g,
         (_m, tex, ch) => `textureGather(${({ Red: 0, Green: 1, Blue: 2, Alpha: 3 })[ch]}, ${tex}, `);
+
+    // --- HLSL mul(a, b) → ((a) * (b))（括號平衡,任意巢狀）---
+    s = expandHlslMul(s);
 
     // --- static const X name = expr; → const name: X = expr; ---
     s = s.replace(
@@ -330,8 +386,72 @@ const GLOBAL_DIRECTIVES = ['VERSION', 'SORT_NAME', 'USE', 'CAPABILITY', 'MAGPIE'
 const SUB_DIRECTIVES = [
     'DESC', 'IN', 'OUT', 'BLOCK_SIZE', 'NUM_THREADS', 'DISPATCH',
     'WIDTH', 'HEIGHT', 'FORMAT', 'FILTER', 'ADDRESS', 'LABEL',
-    'MIN', 'MAX', 'DEFAULT', 'STEP', 'TYPE', 'MODE',
+    'MIN', 'MAX', 'DEFAULT', 'STEP', 'TYPE', 'MODE', 'SOURCE',
 ];
+
+// ---------------------------------------------------------------------------
+// 2b. 格式對照表（Magpie/DXGI 名稱 → WebGPU 格式；storage 能力映射）
+// ---------------------------------------------------------------------------
+
+/**
+ * Magpie/DXGI 格式名稱 → WebGPU 格式名稱。
+ * 與 src/runtime/ShaderParser.pegjs 的 toWebGPUFormat 相同語意（此處供轉換器
+ * 在產物端就寫出正確格式，並對「會被當 storage 寫入的紋理」預先映射到
+ * storage-capable 格式——Dawn 拒絕 r16float 等的 storage 存取，
+ * 詳見 tools/_storage_probe.mjs 的實測矩陣與 WGSLCodeGenerator.storageCapableFormat）。
+ */
+const FORMAT_TABLE = {
+    'R8_UNORM': 'r8unorm', 'R8_SNORM': 'r8snorm', 'R8_UINT': 'r8uint', 'R8_SINT': 'r8sint',
+    'R8G8_UNORM': 'rg8unorm', 'R8G8_SNORM': 'rg8snorm',
+    'R8G8B8A8_UNORM': 'rgba8unorm', 'R8G8B8A8_SNORM': 'rgba8snorm',
+    'R8G8B8A8_UINT': 'rgba8uint', 'R8G8B8A8_SINT': 'rgba8sint',
+    'R8G8B8A8_SRGB': 'rgba8unorm-srgb',
+    'R16_FLOAT': 'r16float', 'R16G16_FLOAT': 'rg16float', 'R16G16B16A16_FLOAT': 'rgba16float',
+    'R16_UNORM': 'r16unorm', 'R16G16_UNORM': 'rg16unorm', 'R16G16B16A16_UNORM': 'rgba16unorm',
+    'R16_UINT': 'r16uint', 'R16G16_UINT': 'rg16uint', 'R16G16B16A16_UINT': 'rgba16uint',
+    'R16_SNORM': 'r16snorm', 'R16G16_SNORM': 'rg16snorm', 'R16G16B16A16_SNORM': 'rgba16snorm',
+    'R32_FLOAT': 'r32float', 'R32G32_FLOAT': 'rg32float', 'R32G32B32A32_FLOAT': 'rgba32float',
+    'R32_UINT': 'r32uint', 'R32G32_UINT': 'rg32uint', 'R32G32B32A32_UINT': 'rgba32uint',
+    'R32_SINT': 'r32sint', 'R32G32_SINT': 'rg32sint', 'R32G32B32A32_SINT': 'rgba32sint',
+    'R11G11B10_FLOAT': 'rg11b10ufloat',
+    'RGB10A2_UNORM': 'rgb10a2unorm',
+    'BC1_UNORM': 'bc1-rgba-unorm', 'BC3_UNORM': 'bc3-rgba-unorm', 'BC7_UNORM': 'bc7-rgba-unorm',
+};
+
+/** WebGPU core（本 Dawn 建置）支援 write-only storage 的格式（_storage_probe.mjs 實測） */
+const STORAGE_CAPABLE = new Set([
+    'rgba8unorm', 'rgba8snorm', 'rgba8uint', 'rgba8sint',
+    'rgba16float', 'rgba16uint', 'rgba16sint',
+    'r32float', 'rg32float', 'rgba32float',
+    'r32uint', 'rg32uint', 'rgba32uint',
+    'r32sint', 'rg32sint', 'rgba32sint',
+]);
+
+/** 不支援 storage 的格式 → 最接近的可 storage 替代（與 WGSLCodeGenerator 一致） */
+const STORAGE_FORMAT_SUBSTITUTE = {
+    'r8unorm': 'rgba8unorm', 'r8snorm': 'rgba8snorm', 'r8uint': 'rgba8uint', 'r8sint': 'rgba8sint',
+    'rg8unorm': 'rgba8unorm', 'rg8snorm': 'rgba8snorm', 'rg8uint': 'rgba8uint', 'rg8sint': 'rgba8sint',
+    'rgba8unorm-srgb': 'rgba8unorm',
+    'r16float': 'rgba16float', 'rg16float': 'rgba16float',
+    'r16uint': 'rgba16uint', 'rg16uint': 'rgba16uint',
+    'r16sint': 'rgba16sint', 'rg16sint': 'rgba16sint',
+    'r16unorm': 'rgba16float', 'rg16unorm': 'rgba16float', 'rgba16unorm': 'rgba16float',
+    'rg11b10ufloat': 'rgba16float', 'rgb9e5ufloat': 'rgba16float', 'rgb10a2unorm': 'rgba16float',
+};
+
+/** 已是 WebGPU 風格的名稱（小寫含 - 或純小寫）原樣映射 */
+function toWebGPUFormat(value) {
+    const v = (value || '').trim();
+    if (FORMAT_TABLE[v.toUpperCase()]) return FORMAT_TABLE[v.toUpperCase()];
+    return v; // 假設已是 WebGPU 名稱
+}
+
+/** storage-capable 格式（與框架 storageCapableFormat 相同映射） */
+function storageCapableFormat(webgpuFormat) {
+    const f = (webgpuFormat || '').toLowerCase();
+    if (STORAGE_CAPABLE.has(f)) return f;
+    return STORAGE_FORMAT_SUBSTITUTE[f] || f;
+}
 
 /** 把 HLSL 效果檔拆成區塊 */
 function splitEffect(src) {
@@ -392,6 +512,290 @@ function splitEffect(src) {
     return blocks;
 }
 
+// ---------------------------------------------------------------------------
+// 3b. per-pass 巨集展開（magpie-prescalers 模板的定義語意）
+// ---------------------------------------------------------------------------
+
+/** 依括號深度切分字串（沿用頂層定義） */
+
+/**
+ * 解析 per-pass `#define`（連續行感知），回傳 { macros, stripped }。
+ * macros: name → { params: string[] | null, body: string }
+ */
+function parseMacros(code) {
+    const macros = new Map();
+    const kept = [];
+    const lines = code.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+        const t = lines[i].trim();
+        const m = t.match(/^#\s*define\s+([A-Za-z_][A-Za-z0-9_]*)\s*(\(([^)]*)\))?\s*(.*)$/);
+        if (m) {
+            let body = m[4] || '';
+            // 行尾 `\` 接續
+            while (/\\\s*$/.test(lines[i]) && i + 1 < lines.length) {
+                i++;
+                body = body.replace(/\\\s*$/, '') + ' ' + lines[i].trim();
+            }
+            body = body.replace(/\\\s*$/, '').trim();
+            const params = m[3] !== undefined
+                ? m[3].split(',').map((s) => s.trim()).filter((s) => s.length)
+                : null;
+            macros.set(m[1], { params, body });
+            continue; // 定義行從程式碼移除
+        }
+        kept.push(lines[i]);
+    }
+    return { macros, stripped: kept.join('\n') };
+}
+
+/**
+ * 展開 magpie-prescalers 模板 per-pass 定義的**已知語意**：
+ *
+ * 1. 存取器定義 `#define X_tex(p) BODY`：
+ *    - `GET_SAMPLE(vec4(texture(X, p)))`      → 純量（GET_SAMPLE 語意,此模板為 luma）
+ *    - `(float(texture(X, p).x))`             → 純量（x 通道）
+ *    - `(vec4(texture(X, p)))`                → vec4
+ *    產生 WGSL fn（textureSampleLevel(X, sam_X, p, 0.0)）並把呼叫端的 `.x` 後綴
+ *    剝除（HLSL 純量 swizzle 在 WGSL 不合法）。
+ * 2. 別名 `#define HOOKED_tex(p) X_tex(p)` / `#define HOOKED_pt X_pt` →
+ *    識別字改寫到實際名稱。
+ * 3. `#define imageStore(out_image, pos, val) BODY` → 呼叫端以位置參數代入 BODY。
+ * 4. `HOOKED_map(id)`（prescalers.hlsli 的 frag_map）→ 呼叫端包 vec2<f32>(...)，
+ *    本體由 COMMON prelude 的 fn HOOKED_map 提供（scene.outputPt * (id + 0.5)）。
+ *
+ * 僅在「存取器確實被使用」時輸出 fn，避免不必要的 sampler 綁定需求。
+ *
+ * @param {string} code - 前處理後的 pass HLSL（仍含 #define 行）
+ * @param {{samplers: Set<string>, textures: Set<string>}} env - 資源名稱集合
+ * @returns {string} 展開後的程式碼（已移除 #define 行、已插入 WGSL 存取器）
+ */
+function expandPassDefines(code, env) {
+    const { macros, stripped } = parseMacros(code);
+
+    // --- 1. 分類存取器定義 ---
+    // name → { tex, param, kind: 'luma'|'chanX'|'vec4' }
+    const accessors = new Map();
+    // name → 別名目標（fn 別名）
+    const fnAliases = new Map();
+    // name → 純識別字別名
+    const idAliases = new Map();
+    let imageStoreMacro = null;
+    let getSampleBody = null;
+
+    for (const [name, def] of macros) {
+        const body = def.body || '';
+        if (name === 'GET_SAMPLE' && def.params && def.params.length === 1) {
+            getSampleBody = { arg: def.params[0], body };
+            continue;
+        }
+        if (name === 'imageStore' && def.params && def.params.length === 3) {
+            imageStoreMacro = { params: def.params, body };
+            continue;
+        }
+        if (/_tex$/.test(name) && def.params && def.params.length === 1) {
+            const param = def.params[0];
+            let m = body.match(
+                new RegExp(`^GET_SAMPLE\\s*\\(\\s*vec4\\s*\\(\\s*texture\\s*\\(\\s*(\\w+)\\s*,\\s*${param}\\s*\\)\\s*\\)\\s*\\)$`));
+            if (m) { accessors.set(name, { tex: m[1], param, kind: 'luma' }); continue; }
+            m = body.match(
+                new RegExp(`^\\(?\\s*float\\s*\\(\\s*texture\\s*\\(\\s*(\\w+)\\s*,\\s*${param}\\s*\\)\\s*\\.x\\s*\\)\\s*\\)?$`));
+            if (m) { accessors.set(name, { tex: m[1], param, kind: 'chanX' }); continue; }
+            m = body.match(
+                new RegExp(`^\\(?\\s*vec4\\s*\\(\\s*texture\\s*\\(\\s*(\\w+)\\s*,\\s*${param}\\s*\\)\\s*\\)\\s*\\)?$`));
+            if (m) { accessors.set(name, { tex: m[1], param, kind: 'vec4' }); continue; }
+            // fn 別名形狀：`#define HOOKED_tex(p) X_tex(p)`（指向另一個存取器）
+            m = body.match(new RegExp(`^(\\w+)\\s*\\(\\s*${param}\\s*\\)$`));
+            if (m && (accessors.has(m[1]) || /_tex$/.test(m[1]))) {
+                fnAliases.set(name, m[1]);
+                continue;
+            }
+            // 不認得的形狀：留給一般 #define 移除（呼叫端會得到明確的 WGSL 錯誤）
+            continue;
+        }
+        // fn 別名：`#define HOOKED_tex(p) X_tex(p)`
+        if (def.params && def.params.length === 1 && /_tex$/.test(name)) {
+            const m = body.match(new RegExp(`^(\\w+)\\s*\\(\\s*${def.params[0]}\\s*\\)$`));
+            if (m && (accessors.has(m[1]) || /_tex$/.test(m[1]))) {
+                fnAliases.set(name, m[1]);
+                continue;
+            }
+        }
+        // 純識別字別名（HOOKED_pt → temp_pt 等）
+        if (!def.params && /^[A-Za-z_]\w*$/.test(body) && /_(pt|size)$/.test(name)) {
+            idAliases.set(name, body);
+            continue;
+        }
+    }
+
+    // --- 2. fn 別名先解析到最終存取器（可鏈式） ---
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (const [from, to] of fnAliases) {
+            const resolved = fnAliases.get(to);
+            if (resolved) { fnAliases.set(from, resolved); changed = true; }
+        }
+    }
+
+    // --- 3. 改寫識別字別名（HOOKED_pt → temp_pt 等） ---
+    let s = stripped;
+    for (const [from, to] of idAliases) {
+        s = s.replace(new RegExp(`\\b${from}\\b`, 'g'), to);
+    }
+
+    // --- 4. 改寫 fn 別名呼叫端（HOOKED_tex( → X_tex(） ---
+    for (const [from, to] of fnAliases) {
+        s = s.replace(new RegExp(`\\b${from}\\s*\\(`, 'g'), `${to}(`);
+    }
+
+    // --- 5. imageStore 巨集呼叫端代入（imageStore(a, b, c) → BODY 代入） ---
+    if (imageStoreMacro) {
+        const { params, body } = imageStoreMacro;
+        s = replaceCallSites(s, 'imageStore', 3, (args) => {
+            let out = body;
+            params.forEach((p, i) => {
+                out = out.replace(new RegExp(`\\b${p}\\b`, 'g'), args[i]);
+            });
+            return out;
+        });
+    }
+
+    // --- 6. HOOKED_map(id) 呼叫端包 vec2<f32>(...); 本體在 COMMON prelude ---
+    s = replaceCallSites(s, 'HOOKED_map', 1, (args) => `HOOKED_map(vec2<f32>(${args[0]}))`);
+
+    // --- 7. 純量存取器的 `.x` 後綴剝除（HLSL 純量 swizzle） ---
+    for (const [name, acc] of accessors) {
+        if (acc.kind === 'vec4') continue;
+        s = stripScalarXSuffix(s, name);
+    }
+
+    // --- 8. 產生「實際被使用」的存取器 fn（模組層級） ---
+    const accessorFns = [];
+    for (const [name, acc] of accessors) {
+        const usedRe = new RegExp(`\\b${name}\\s*\\(`);
+        if (!usedRe.test(s)) continue;
+        const sampler = `sam_${acc.tex}`;
+        if (env.samplers && !env.samplers.has(sampler)) {
+            console.warn(`[prescaler2wgsl] 存取器 ${name} 需要 ${sampler} 但效果未宣告 sampler,略過該存取器`);
+            continue;
+        }
+        if (env.textures && !env.textures.has(acc.tex)) {
+            console.warn(`[prescaler2wgsl] 存取器 ${name} 引用未宣告紋理 ${acc.tex},略過`);
+            continue;
+        }
+        const sample = `textureSampleLevel(${acc.tex}, ${sampler}, ${acc.param}, 0.0)`;
+        if (acc.kind === 'luma') {
+            if (!getSampleBody) {
+                throw new Error(`存取器 ${name} 使用 GET_SAMPLE 但該 pass 未定義 GET_SAMPLE`);
+            }
+            const expr = getSampleBody.body.replace(
+                new RegExp(`\\b${getSampleBody.arg}\\b`, 'g'), sample);
+            accessorFns.push(`fn ${name}(${acc.param}: vec2<f32>) -> f32 {\n    return ${expr};\n}`);
+        } else if (acc.kind === 'chanX') {
+            accessorFns.push(`fn ${name}(${acc.param}: vec2<f32>) -> f32 {\n    return ${sample}.x;\n}`);
+        } else {
+            accessorFns.push(`fn ${name}(${acc.param}: vec2<f32>) -> vec4<f32> {\n    return ${sample};\n}`);
+        }
+    }
+
+    if (accessorFns.length) {
+        s = accessorFns.join('\n') + '\n\n' + s;
+    }
+    return s;
+}
+
+/**
+ * 改寫具名函式的呼叫端（括號感知）：name(a0, a1, …) → fn(args)
+ * fn 回傳 null 時原樣保留該呼叫。僅處理頂層程式碼（WGSL 程式碼沒有字串）。
+ */
+function replaceCallSites(code, name, argCount, fn) {
+    let out = '';
+    let i = 0;
+    const re = new RegExp(`\\b${name}\\s*\\(`, 'g');
+    while (i < code.length) {
+        re.lastIndex = i;
+        const m = re.exec(code);
+        if (!m) { out += code.slice(i); break; }
+        const open = m.index + m[0].length - 1;
+        let depth = 0;
+        let end = -1;
+        for (let j = open; j < code.length; j++) {
+            if (code[j] === '(') depth++;
+            else if (code[j] === ')') { depth--; if (depth === 0) { end = j; break; } }
+        }
+        if (end < 0) { out += code.slice(i); break; }
+        const args = splitTopLevel(code.slice(open + 1, end));
+        const repl = (args.length === argCount) ? fn(args) : null;
+        if (repl === null || repl === undefined) {
+            out += code.slice(i, end + 1); // 參數數不符或 fn 放棄：原樣保留
+            i = end + 1;
+            continue;
+        }
+        out += code.slice(i, m.index) + repl;
+        i = end + 1;
+    }
+    return out;
+}
+
+/**
+ * HLSL mul(a, b) → ((a) * (b))：括號平衡掃描,任意巢狀深度
+ * （`mul(yuv2rgb, float3(value.x, UV))`、mul 內再含 mul 皆可;迴圈到不再出現為止）。
+ */
+function expandHlslMul(code) {
+    const re = /\bmul\s*\(/;
+    let s = code;
+    for (let iter = 0; iter < 256; iter++) {
+        const m = re.exec(s);
+        if (!m) break;
+        const open = m.index + m[0].length - 1;
+        let depth = 0;
+        let end = -1;
+        for (let j = open; j < s.length; j++) {
+            if (s[j] === '(') depth++;
+            else if (s[j] === ')') { depth--; if (depth === 0) { end = j; break; } }
+        }
+        if (end < 0) break;
+        const args = splitTopLevel(s.slice(open + 1, end));
+        if (args.length !== 2) break; // 不認得的形狀：原樣保留（會得到明確編譯錯誤）
+        s = s.slice(0, m.index) + `((${args[0]}) * (${args[1]}))` + s.slice(end + 1);
+    }
+    return s;
+}
+
+/**
+ * 剝除純量函式呼叫後的 `.x` 後綴：`X_tex(...).x` → `X_tex(...)`
+ * （HLSL 純量 swizzle;WGSL 的 f32 沒有分量存取）
+ */
+function stripScalarXSuffix(code, name) {
+    let out = '';
+    let i = 0;
+    const re = new RegExp(`\\b${name}\\s*\\(`, 'g');
+    while (i < code.length) {
+        re.lastIndex = i;
+        const m = re.exec(code);
+        if (!m) { out += code.slice(i); break; }
+        const open = m.index + m[0].length - 1;
+        let depth = 0;
+        let end = -1;
+        for (let j = open; j < code.length; j++) {
+            if (code[j] === '(') depth++;
+            else if (code[j] === ')') { depth--; if (depth === 0) { end = j; break; } }
+        }
+        if (end < 0) { out += code.slice(i); break; }
+        // 檢查後綴 .x
+        const tail = code.slice(end + 1);
+        const sm = tail.match(/^\s*\.\s*x\b/);
+        if (sm) {
+            out += code.slice(i, end + 1);
+            i = end + 1 + sm[0].length;
+        } else {
+            out += code.slice(i, end + 1);
+            i = end + 1;
+        }
+    }
+    return out;
+}
+
 /** COMMON 區塊中的 prescalers 巨集 → WGFL 輔助函式 */
 const WGSL_COMMON_PRELUDE = `
 // --- magpie-prescalers 模板輔助（由 tools/magpie_prescaler2wgsl.mjs 產生）---
@@ -411,6 +815,11 @@ const yuv2rgb: mat3x3<f32> = mat3x3<f32>(
 // HLSL fmod（對負數亦成立）；WGSL 沒有內建 fmod。
 fn fmodWGSL(x: f32, y: f32) -> f32 {
     return x - y * trunc(x / y);
+}
+// Magpie prescalers.hlsli 的 HOOKED_map(id) = frag_map(id) = OUTPUT_pt * (vec2(id) + 0.5)
+//（呼叫端已包 vec2<f32>(...);pos 型別 i32/u32 皆可正確轉換）。
+fn HOOKED_map(id: vec2<f32>) -> vec2<f32> {
+    return scene.outputPt * (id + vec2<f32>(0.5));
 }
 `;
 
@@ -508,13 +917,35 @@ export function convert(src, { sourceName = 'input.hlsl', sourceUrl = '' } = {})
         }
     }
 
-    // 4b2. 紋理名稱（供 storage texture 寫入規則辨識）
+    // 4b2. 紋理/取樣器名稱（供 storage texture 寫入規則與存取器產生辨識）
     const textureNames = new Set();
+    const samplerNames = new Set();
     for (const r of blocks.resources) {
-        if (r.kind !== 'TEXTURE') continue;
-        for (const line of r.code) {
-            const m = line.match(/^\s*(?:Texture2D|var)\s+([A-Za-z_][A-Za-z0-9_]*)/);
-            if (m) textureNames.add(m[1]);
+        if (r.kind === 'TEXTURE') {
+            for (const line of r.code) {
+                const m = line.match(/^\s*(?:Texture2D|var)\s+([A-Za-z_][A-Za-z0-9_]*)/);
+                if (m) textureNames.add(m[1]);
+            }
+        } else if (r.kind === 'SAMPLER') {
+            for (const line of r.code) {
+                const m = line.match(/^\s*(?:SamplerState|var)\s+([A-Za-z_][A-Za-z0-9_]*)/);
+                if (m) samplerNames.add(m[1]);
+            }
+        }
+    }
+
+    // 4b3. 被任一 pass 寫入（//! OUT）的紋理 → 其 FORMAT 需為 storage-capable
+    //      （Dawn 拒絕 r16float 等的 storage 存取,見 tools/_storage_probe.mjs）
+    const writtenTextures = new Set();
+    for (const p of prepared) {
+        for (const d of p.directives) {
+            const m = d.match(/^\/\/!\s*OUT\s+(.*)$/i);
+            if (m) {
+                m[1].split(',').forEach((s) => {
+                    const n = s.trim();
+                    if (n) writtenTextures.add(n.replace(/_(sampled|storaged)$/, ''));
+                });
+            }
         }
     }
 
@@ -530,15 +961,31 @@ export function convert(src, { sourceName = 'input.hlsl', sourceUrl = '' } = {})
     out.push('//     prescalers.hlsli 定義重建 blockStart 與 gl_* 別名（數值完全一致）。');
     out.push('//   - 權重以 `bitcast<f32>(整數位元)` 表示，逐字保留 HLSL 的 int 位元常數。');
     out.push('//   - HLSL `mix(a, b, bool)` → WGSL `select(b, a, bool)`（HLSL 為 c ? b : a）。');
+    out.push('//   - HLSL `mul(a, b)` → WGSL `(a) * (b)`；HLSL typed local declaration →');
+    out.push('//     `var NAME: TYPE = EXPR;`（模板 per-pass 定義 X_tex/HOOKED_* 已展開為');
+    out.push('//     具名 WGSL 存取函式,GET_SAMPLE 語意保留）。');
     out.push('//   - HLSL `float2x3` / `float3x3` 為列優先，WGSL 為欄優先；此處以「欄 = HLSL 的欄」');
     out.push('//     重建，`M * v` 的結果與 HLSL `mul(M, v)` 完全相同。');
     out.push('//   - `shared` 陣列 → `var<workgroup>`；`barrier()` → `workgroupBarrier()`。');
     out.push('//   - 跨 pass 共用的權重函式移入 //! COMMON（每個 pass 模組各自一份）。');
+    out.push('//   - 被 pass 寫入的紋理 FORMAT 映射為 storage-capable 格式（Dawn 限制）。');
     out.push('');
     out.push(...blocks.meta.filter((l) => l.trim().length > 0));
 
-    // 資源區塊（原樣保留：WGFX 解析器支援 HLSL 風格的宣告）
+    // 資源區塊（FORMAT 正規化為 WebGPU 名稱;storage 寫入者映射為 storage-capable）
     for (const r of blocks.resources) {
+        const texNameM = r.code.map((l) => l.match(/^\s*(?:Texture2D|var)\s+([A-Za-z_][A-Za-z0-9_]*)/))
+            .find((m) => m);
+        const texName = texNameM ? texNameM[1].replace(/_(sampled|storaged)$/, '') : null;
+        const fmtIdx = r.directives.findIndex((d) => /^\/\/!\s*FORMAT\s+/i.test(d));
+        if (fmtIdx >= 0) {
+            const declared = r.directives[fmtIdx].replace(/^\/\/!\s*FORMAT\s+/i, '').trim();
+            let webgpu = toWebGPUFormat(declared);
+            if (texName && (writtenTextures.has(texName))) {
+                webgpu = storageCapableFormat(webgpu);
+            }
+            r.directives[fmtIdx] = `//! FORMAT ${webgpu}`;
+        }
         out.push('');
         out.push(...r.directives);
         out.push(...r.code.filter((l) => l.trim().length > 0));
@@ -568,6 +1015,9 @@ export function convert(src, { sourceName = 'input.hlsl', sourceUrl = '' } = {})
             const f = funcs.find((x) => x.name === name);
             if (f) code = code.slice(0, f.start) + code.slice(f.end);
         }
+        // per-pass 模板定義展開（X_tex 存取器 / HOOKED_* 別名 / imageStore /
+        // HOOKED_map 包裝;必須在 translateCode 之前,因為要吃 HLSL 形狀的定義）
+        code = expandPassDefines(code, { samplers: samplerNames, textures: textureNames });
         code = translateCode(code, textureNames);
         code = rewriteFunctionDefs(code);
         code = rewriteEntry(code, p.index, passPrelude(bs, nt));

@@ -1,7 +1,45 @@
 /// <reference types="@webgpu/types" />
 import { WGFXShaderInfo, TextureInfo } from '../types/shader';
-import { logicalTextureName, paramType } from './WGSLCodeGenerator';
+import { logicalTextureName, paramType, storageCapableFormat } from './WGSLCodeGenerator';
 import { Logger } from '../utils/Logger';
+
+/**
+ * Bytes per texel for a WebGPU texture format（未壓縮格式；供 writeTexture 預設行距）。
+ * Block-compressed formats fall back to 4（此類格式不應以 writeTexture 整塊上傳）。
+ */
+export function textureBytesPerPixel(format: GPUTextureFormat): number {
+    const f = (format || '').toLowerCase();
+    if (/^(rgba|bgra)8/.test(f)) return 4;
+    if (/^rgba16/.test(f)) return 8;
+    if (/^rgba32/.test(f)) return 16;
+    if (/^rg32/.test(f)) return 8;
+    if (/^r32/.test(f)) return 4;
+    if (/^rg16/.test(f)) return 4;
+    if (/^r16/.test(f)) return 2;
+    if (/^rg11b10|^rgb9e5|^rgb10a2/.test(f)) return 4;
+    if (/^rg8/.test(f)) return 2;
+    if (/^r8/.test(f)) return 1;
+    if (/^depth32float|^depth24plus/.test(f)) return 4;
+    if (/^depth16/.test(f)) return 2;
+    if (/^stencil8/.test(f)) return 1;
+    return 4;
+}
+
+/**
+ * External texture pixel data attached to a GPUTextureDescriptor.
+ * ---
+ * 附著在紋理描述符上的外部像素資料（//!SOURCE 外部紋理契約）。
+ * 宿主以「名稱 → 描述符」提供外部紋理；`data` 為解碼後的像素位元組
+ * （順序：由上到下、由左到右，與 WebGPU writeTexture 一致）。
+ */
+export interface ExternalTextureData {
+    /** Initial pixel data (bytes) / 初始像素資料 */
+    data?: ArrayBuffer | ArrayBufferView;
+    /** Row stride in bytes（預設 width × bytesPerPixel）/ 每列位元組數 */
+    bytesPerRow?: number;
+    /** Rows per image（預設 height）/ 每圖列數 */
+    rowsPerImage?: number;
+}
 
 /**
  * Manages WebGPU resources including textures, views, samplers, and buffers.
@@ -106,6 +144,37 @@ export class ResourceManager {
             Logger.debug('Loaded external defines:', context);
         }
 
+        // 1b. Seed INPUT_WIDTH/HEIGHT / OUTPUT_WIDTH/HEIGHT into the expression context.
+        //     紋理尺寸運算式（如 `//! HEIGHT OUTPUT_HEIGHT`）可用這些名稱：
+        //     - 宿主已提供 INPUT/OUTPUT 外部紋理時，以「實際尺寸」為準（同
+        //       PipelineManager._evalDispatchExpr 的 dispatch 期語意）；
+        //     - 宿主未提供 OUTPUT 時，先以宣告式求值（僅依賴 defines/INPUT 尺寸時可解），
+        //       讓後續引用 OUTPUT_WIDTH/HEIGHT 的紋理宣告能解析。
+        const extInput = externalResources.textures?.INPUT;
+        if (Array.isArray(extInput?.size)) {
+            context.INPUT_WIDTH = extInput.size[0];
+            context.INPUT_HEIGHT = extInput.size[1];
+        }
+        const extOutput = externalResources.textures?.OUTPUT;
+        if (Array.isArray(extOutput?.size)) {
+            context.OUTPUT_WIDTH = extOutput.size[0];
+            context.OUTPUT_HEIGHT = extOutput.size[1];
+        }
+        if (context.OUTPUT_WIDTH === undefined) {
+            const declaredOutput = shaderInfo.textures.find((t: TextureInfo) =>
+                logicalTextureName(t.name) === 'OUTPUT');
+            if (declaredOutput) {
+                try {
+                    const w = this.evaluateSize(declaredOutput.width, context);
+                    const h = this.evaluateSize(declaredOutput.height, context);
+                    if (w > 0 && h > 0) {
+                        context.OUTPUT_WIDTH = w;
+                        context.OUTPUT_HEIGHT = h;
+                    }
+                } catch { /* OUTPUT 宣告依賴其他紋理尺寸時,留待迴圈內解析 */ }
+            }
+        }
+
         // 2. Create external textures / 建立外部指定紋理
         if (externalResources.textures) {
             for (const [name, descriptor] of Object.entries(externalResources.textures)) {
@@ -130,57 +199,18 @@ export class ResourceManager {
          * Recursive helper to evaluate numeric expressions from shader strings.
          * ---
          * 遞迴輔助函式：解析並計算著色器定義中的數值運算式。
+         * 語意（與歷史行為一致）：
+         *   * 運算式本身缺漏（非 string/number）→ **向上拋出** 'expression missing',
+         *     由呼叫端的 catch 產生含紋理名稱與 WIDTH/HEIGHT 的明確錯誤訊息;
+         *   * 運算式引用未定義變數 → warn 並回傳 0（由「尺寸為 0」檢查接手）。
          */
         const evaluate = (expr: string | number, ctx: Record<string, number>): number => {
             if (typeof expr === 'number') return expr;
             if (typeof expr !== 'string') {
                 throw new Error('expression missing');
             }
-            expr = expr.replace(/\s+/g, ''); // Remove spaces / 移除空白
-            let pos = 0;
-
-            // Internal parser steps / 內部解析步驟
-            const parseNumber = (): number => {
-                let startKey = pos;
-                if (/[a-zA-Z_]/.test(expr[pos])) { // Handle variables / 處理變數
-                    while (pos < expr.length && /[a-zA-Z0-9_]/.test(expr[pos])) pos++;
-                    const key = expr.slice(startKey, pos);
-                    if (key in ctx) return ctx[key];
-                    throw new Error(`Undefined variable: ${key}`);
-                } else if (/[0-9.]/.test(expr[pos])) { // Handle constants / 處理常數
-                    while (pos < expr.length && /[0-9.]/.test(expr[pos])) pos++;
-                    return parseFloat(expr.slice(startKey, pos));
-                } else if (expr[pos] === '(') { // Handle parenthesis / 處理括號
-                    pos++;
-                    const val = parseExpression();
-                    pos++; // skip ')'
-                    return val;
-                }
-                throw new Error(`Unexpected character at ${pos}: ${expr[pos]}`);
-            };
-
-            const parseFactor = (): number => {
-                let val = parseNumber();
-                while (pos < expr.length && (expr[pos] === '*' || expr[pos] === '/')) {
-                    const op = expr[pos++];
-                    const right = parseNumber();
-                    val = (op === '*') ? val * right : val / right;
-                }
-                return val;
-            };
-
-            const parseExpression = (): number => {
-                let val = parseFactor();
-                while (pos < expr.length && (expr[pos] === '+' || expr[pos] === '-')) {
-                    const op = expr[pos++];
-                    const right = parseFactor();
-                    val = (op === '+') ? val + right : val - right;
-                }
-                return val;
-            };
-
             try {
-                return parseExpression();
+                return this.evaluateSize(expr, ctx);
             } catch (e: any) {
                 Logger.warn(`Failed to evaluate expression: ${expr}`, e.message);
                 return 0;
@@ -235,6 +265,15 @@ export class ResourceManager {
                 width = evaluate(tex.width as string | number, context);
                 height = evaluate(tex.height as string | number, context);
             } catch (e: any) {
+                if (tex.source) {
+                    // //!SOURCE 外部紋理：尺寸來自宿主餵入的檔案（如 DDS LUT），
+                    // 效果檔不需（也無法）宣告 WIDTH/HEIGHT。
+                    throw new Error(
+                        `Texture "${tex.name}" declares //! SOURCE ${tex.source} but no texture was ` +
+                        `provided. Supply it via externalResources.textures["${tex.name}"] ` +
+                        `(port_check: --texture ${tex.name}=<path>).`
+                    );
+                }
                 throw new Error(
                     `Texture "${tex.name}": WIDTH/HEIGHT missing or unresolvable (declare //!WIDTH///!HEIGHT or provide the texture via externalResources)`
                 );
@@ -246,8 +285,13 @@ export class ResourceManager {
 
             // Format: declared FORMAT wins; INPUT defaults to rgba8unorm, others to rgba16float.
             // 格式：優先使用宣告的 FORMAT；INPUT 預設 rgba8unorm，其餘預設高精度浮點。
-            const format: GPUTextureFormat = (tex.format as GPUTextureFormat)
+            // 內部建立的紋理一律帶 STORAGE_BINDING usage（見下方 descriptor），因此格式
+            // 必須經 storageCapableFormat 映射（Dawn 拒絕 r16float 等的 storage 存取），
+            // 與 WGSLCodeGenerator 的 texture_storage_2d 宣告共用同一映射保持一致。
+            const declaredFormat = (tex.format as GPUTextureFormat)
                 || (logicalName === 'INPUT' ? 'rgba8unorm' : 'rgba16float');
+            const format: GPUTextureFormat =
+                storageCapableFormat(declaredFormat) as GPUTextureFormat;
 
             const descriptor: GPUTextureDescriptor = {
                 size: [width, height],
@@ -289,12 +333,16 @@ export class ResourceManager {
      * ---
      * 建立或更新紋理及其雙重視圖。若名稱重複則先銷毀舊有資源。
      *
+     * 描述符可附帶 `data`（宿主餵入的初始像素，如 //!SOURCE 的 DDS 解碼結果），
+     * 建立後立即以 queue.writeTexture 上傳。行距預設取 `width * bytesPerPixel`；
+     * 可用 `bytesPerRow` / `rowsPerImage` 覆寫（例如帶 padding 的資料）。
+     *
      * @group Management
      * @param name - Unique texture name / 紋理唯一名稱
-     * @param descriptor - WebGPU texture descriptor / 紋理描述符
+     * @param descriptor - WebGPU texture descriptor（可附 data）/ 紋理描述符（可附資料）
      * @returns The newly created {@link GPUTexture}
      */
-    public createTexture(name: string, descriptor: GPUTextureDescriptor): GPUTexture {
+    public createTexture(name: string, descriptor: GPUTextureDescriptor & ExternalTextureData): GPUTexture {
         if (this.textures.has(name)) {
             this.textures.get(name)!.destroy(); // Clean up old texture / 清理舊紋理
         }
@@ -302,6 +350,11 @@ export class ResourceManager {
         const texture = this.device.createTexture(descriptor);
         texture.label = name;
         this.textures.set(name, texture);
+
+        // Upload initial pixel data if provided / 若提供初始資料則立即上傳
+        if (descriptor.data) {
+            this.writeTextureData(texture, descriptor.data, descriptor.bytesPerRow, descriptor.rowsPerImage);
+        }
 
         // Create both views for flexible pipeline usage / 建立兩種視圖供不同管線階段使用
         this.views.set(name, {
@@ -314,6 +367,66 @@ export class ResourceManager {
         this.bumpRevision();
 
         return texture;
+    }
+
+    /**
+     * Write (or overwrite) the full pixel content of a named texture.
+     * ---
+     * 以像素資料覆寫具名紋理的全部內容（queue.writeTexture）。
+     * 供宿主更新 //!SOURCE 外部紋理（LUT）或測試圖樣。
+     *
+     * @group Update
+     * @param name - Texture name / 紋理名稱
+     * @param data - Pixel data (bytes) / 像素資料
+     * @param bytesPerRow - Optional row stride in bytes / 選用的每列位元組數
+     * @param rowsPerImage - Optional rows per image / 選用的每圖列數
+     */
+    public uploadTexture(
+        name: string,
+        data: ArrayBuffer | ArrayBufferView,
+        bytesPerRow?: number,
+        rowsPerImage?: number,
+    ): void {
+        const texture = this.textures.get(name) ?? this.textures.get(logicalTextureName(name));
+        if (!texture) {
+            throw new Error(`Texture "${name}" not found`);
+        }
+        this.writeTextureData(texture, data, bytesPerRow, rowsPerImage);
+    }
+
+    /** writeTexture helper with sane defaults for row/image strides / 上傳輔助（補齊預設行距 + 256 對齊重排） */
+    private writeTextureData(
+        texture: GPUTexture,
+        data: ArrayBuffer | ArrayBufferView,
+        bytesPerRow?: number,
+        rowsPerImage?: number,
+    ): void {
+        const bpp = textureBytesPerPixel(texture.format);
+        let bpr = bytesPerRow && bytesPerRow > 0 ? bytesPerRow : texture.width * bpp;
+        let payload = data;
+
+        // WebGPU 規範:buffer-texture 拷貝的 bytesPerRow 必須是 256 的倍數。
+        // 外部像素資料（如 //!SOURCE 的 DDS LUT）行距常為 width×bpp 的自然值,
+        // 此處在必要時以 CPU 重排到 256 對齊行距,宿主端免處理。
+        if (texture.height > 1 && bpr % 256 !== 0) {
+            const aligned = Math.ceil(bpr / 256) * 256;
+            const src = payload instanceof ArrayBuffer
+                ? new Uint8Array(payload)
+                : new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength);
+            const padded = new Uint8Array(aligned * texture.height);
+            for (let y = 0; y < texture.height; y++) {
+                padded.set(src.subarray(y * bpr, (y + 1) * bpr), y * aligned);
+            }
+            payload = padded;
+            bpr = aligned;
+        }
+
+        this.device.queue.writeTexture(
+            { texture },
+            payload as ArrayBuffer,
+            { bytesPerRow: bpr, rowsPerImage: rowsPerImage && rowsPerImage > 0 ? rowsPerImage : texture.height },
+            [texture.width, texture.height, 1],
+        );
     }
 
     /**
@@ -562,6 +675,69 @@ export class ResourceManager {
     /** @group Query */
     public getUniformBuffer(): GPUBuffer | null {
         return this.uniformBuffer;
+    }
+
+    /**
+     * Evaluate a numeric size expression from shader declarations (strict).
+     * ---
+     * 嚴格求值紋理尺寸運算式（如 `INPUT_WIDTH * 2`、`OUTPUT_HEIGHT`）。
+     * 運算式缺漏或引用未定義變數時拋出錯誤；非嚴格包裝（warn + 0）見 initialize()
+     * 內的 evaluate 閉包。
+     *
+     * 支援四則運算與括號；變數來自 ctx（defines 與 OUTPUT_WIDTH/OUTPUT_HEIGHT、
+     * INPUT_WIDTH/INPUT_HEIGHT 等已注入的場景尺寸）。
+     *
+     * @group Query
+     */
+    public evaluateSize(expr: string | number | undefined, ctx: Record<string, number>): number {
+        if (typeof expr === 'number') return expr;
+        if (typeof expr !== 'string') {
+            throw new Error('expression missing');
+        }
+        expr = expr.replace(/\s+/g, ''); // Remove spaces / 移除空白
+        let pos = 0;
+
+        // Internal parser steps / 內部解析步驟
+        const parseNumber = (): number => {
+            let startKey = pos;
+            if (/[a-zA-Z_]/.test(expr[pos])) { // Handle variables / 處理變數
+                while (pos < expr.length && /[a-zA-Z0-9_]/.test(expr[pos])) pos++;
+                const key = expr.slice(startKey, pos);
+                if (key in ctx) return ctx[key];
+                throw new Error(`Undefined variable: ${key}`);
+            } else if (/[0-9.]/.test(expr[pos])) { // Handle constants / 處理常數
+                while (pos < expr.length && /[0-9.]/.test(expr[pos])) pos++;
+                return parseFloat(expr.slice(startKey, pos));
+            } else if (expr[pos] === '(') { // Handle parenthesis / 處理括號
+                pos++;
+                const val = parseExpression();
+                pos++; // skip ')'
+                return val;
+            }
+            throw new Error(`Unexpected character at ${pos}: ${expr[pos]}`);
+        };
+
+        const parseFactor = (): number => {
+            let val = parseNumber();
+            while (pos < expr.length && (expr[pos] === '*' || expr[pos] === '/')) {
+                const op = expr[pos++];
+                const right = parseNumber();
+                val = (op === '*') ? val * right : val / right;
+            }
+            return val;
+        };
+
+        const parseExpression = (): number => {
+            let val = parseFactor();
+            while (pos < expr.length && (expr[pos] === '+' || expr[pos] === '-')) {
+                const op = expr[pos++];
+                const right = parseFactor();
+                val = (op === '+') ? val + right : val - right;
+            }
+            return val;
+        };
+
+        return parseExpression();
     }
 
     /**

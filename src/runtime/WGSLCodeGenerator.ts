@@ -42,6 +42,72 @@ export function logicalTextureName(name: string): string {
     return name.replace(/_(sampled|storaged)$/, "");
 }
 
+/**
+ * WebGPU core(本 Dawn/node-webgpu 建置)支援 write-only storage 存取的格式集合。
+ * ---
+ * Set of formats that support write-only storage texture access on this
+ * Dawn/node-webgpu build. 實測矩陣見 tools/_storage_probe.mjs(2026-11 實測):
+ *
+ * 可 storage:rgba8unorm, rgba8snorm, rgba8uint, rgba8sint, rgba16float,
+ *            rgba16uint, rgba16sint, r32float, rg32float, rgba32float,
+ *            r32uint, rg32uint, rgba32uint, r32sint, rg32sint, rgba32sint
+ * 不可 storage(常見):r8*、rg8*、r16float、rg16float、r16uint、rg16uint、
+ *            r16sint、rg16sint、*16unorm(需 TextureFormatsTier1 feature)、
+ *            *-srgb、bgra8unorm、rg11b10ufloat、rgb9e5ufloat、rgb10a2unorm
+ */
+const STORAGE_CAPABLE_FORMATS = new Set<string>([
+    "rgba8unorm", "rgba8snorm", "rgba8uint", "rgba8sint",
+    "rgba16float", "rgba16uint", "rgba16sint",
+    "r32float", "rg32float", "rgba32float",
+    "r32uint", "rg32uint", "rgba32uint",
+    "r32sint", "rg32sint", "rgba32sint",
+]);
+
+/**
+ * 不支援 storage 存取的格式 → 最接近的可 storage 替代格式。
+ * 單/雙通道升為四通道(取樣端讀 .x/.xy 語意不變;textureStore 一律寫 vec4),
+ * srgb → 對應 unorm,窄色域/特殊 packing → rgba16float。
+ */
+const STORAGE_FORMAT_SUBSTITUTE: Record<string, string> = {
+    "r8unorm": "rgba8unorm",
+    "r8snorm": "rgba8snorm",
+    "r8uint": "rgba8uint",
+    "r8sint": "rgba8sint",
+    "rg8unorm": "rgba8unorm",
+    "rg8snorm": "rgba8snorm",
+    "rg8uint": "rgba8uint",
+    "rg8sint": "rgba8sint",
+    "rgba8unorm-srgb": "rgba8unorm",
+    "bgra8unorm": "rgba8unorm",
+    "bgra8unorm-srgb": "rgba8unorm",
+    "r16float": "rgba16float",
+    "rg16float": "rgba16float",
+    "r16uint": "rgba16uint",
+    "rg16uint": "rgba16uint",
+    "r16sint": "rgba16sint",
+    "rg16sint": "rgba16sint",
+    "r16unorm": "rgba16float",
+    "rg16unorm": "rgba16float",
+    "rgba16unorm": "rgba16float",
+    "rg11b10ufloat": "rgba16float",
+    "rgb9e5ufloat": "rgba16float",
+    "rgb10a2unorm": "rgba16float",
+};
+
+/**
+ * Map a declared texture format to one that supports storage texture access.
+ * ---
+ * 將宣告的紋理格式映射為支援 storage 存取的格式(已是 storage-capable 時原樣返回)。
+ * WGFX 的中間紋理一律以 STORAGE_BINDING 建立並以 `texture_storage_2d<fmt, write>`
+ * 綁定;Dawn 拒絕如 r16float 的 storage 存取,故宣告端與建立端必須共用本映射,
+ * 確保 WGSL 宣告、BindGroupLayout 與 GPUTexture 三者格式一致。
+ */
+export function storageCapableFormat(format: string): string {
+    const f = (format || "").toLowerCase();
+    if (STORAGE_CAPABLE_FORMATS.has(f)) return f;
+    return STORAGE_FORMAT_SUBSTITUTE[f] || f;
+}
+
 /** Scalar size (bytes) and WGSL type for a parameter type. */
 const PARAM_TYPE_MAP: Record<string, { wgsl: string; size: number }> = {
     float: { wgsl: "f32", size: 4 },
@@ -276,9 +342,15 @@ export class WGSLCodeGenerator {
                         pass.out.includes(logical) ||
                         tex.name === "OUTPUT";
                 }
-                const format =
+                const declaredFormat =
                     (tex.format as string) ||
                     (logical === "INPUT" ? "rgba8unorm" : "rgba16float");
+                // storage 綁定必須使用 storage-capable 格式(r16float 等被 Dawn 拒絕);
+                // 與 ResourceManager.createTexture 的建立端映射共用 storageCapableFormat,
+                // 確保 WGSL 宣告 / BindGroupLayout / GPUTexture 三者一致。
+                const format = isStorage
+                    ? storageCapableFormat(declaredFormat)
+                    : declaredFormat;
                 const textureType = isStorage
                     ? `texture_storage_2d<${format}, write>`
                     : `texture_2d<f32>`;
@@ -332,6 +404,11 @@ export class WGSLCodeGenerator {
             // Transform pass logic to compute shader entry point / 轉換通道邏輯為計算著色器進入點
             let passCode = this._transformPassToComputeShader(pass);
             wgsl += passCode;
+
+            // Module-level compat post-process / 模組層級相容後處理:
+            // HLSL 風格的殘留語法(typed local declaration、mul()、scalar swizzle)與
+            // 「引用 uniform 的 module-scope const」(WGSL 禁止)在此統一轉換。
+            wgsl = this._postProcessModule(wgsl, pass.index);
 
             generatedModules.push({
                 wgslCode: wgsl,
@@ -580,5 +657,425 @@ struct SceneInfo {
         }
 
         return code;
+    }
+
+    // =====================================================================
+    // Module-level compat post-processing / 模組層級相容後處理
+    // =====================================================================
+
+    /** WGSL 型別樣式（可用於 HLSL typed local declaration 的型別） */
+    private static readonly WGSL_TYPE_SRC = "(?:f32|i32|u32|bool|vec[234]<[fiub]32>|mat[234]x[234]<f32>)";
+    private static readonly WGSL_NAME_SRC = "[A-Za-z_][A-Za-z0-9_]*";
+
+    /**
+     * Apply all module-level compat transforms, in a fixed order.
+     * ---
+     * 固定順序套用全部模組層級相容轉換：
+     * 1. HLSL typed local declaration → `var NAME: TYPE = EXPR;`
+     * 2. HLSL `mul(a, b)` → `((a) * (b))`（任意巢狀位置）
+     * 3. scalar swizzle 消除（`value.x`，value 為 f32/i32/u32/bool 時 → `value`）
+     * 4. `vecN<f32>(…)` 參數內的 u32 場景尺寸運算式補 f32 轉換
+     * 5. 引用 uniform 的 module-scope const → `var<private>` + entry point 開頭初始化
+     */
+    private _postProcessModule(wgsl: string, passIndex: number): string {
+        let code = this._convertHlslTypedDecls(wgsl, passIndex);
+        code = this._expandHlslMul(code, passIndex);
+        code = this._eliminateScalarSwizzles(code);
+        code = this._wrapU32ArgsInF32VectorCtors(code);
+        code = this._promoteUniformConstsToPrivate(code, passIndex);
+        return code;
+    }
+
+    /**
+     * Wrap u32 scene-size expressions inside `vecN<f32>(…)` constructors with `f32(...)`.
+     * ---
+     * WGSL 的多參數向量建構子要求參數型別與分量型別完全一致（僅單參數有
+     * conversion/splat 重載），因此 `vec2<f32>(scene.inputSize.x * 1, scene.inputSize.y * 2)`
+     * 這種 HLSL 隱式轉換（float2(uint, uint) 合法）在 WGSL 不合法。
+     * `scene.inputSize` / `scene.outputSize` 為 vecN<u32>，凡參數引用其一且
+     * 參數不是「整個向量本身」時，補 `f32(arg)`。
+     */
+    private _wrapU32ArgsInF32VectorCtors(wgsl: string): string {
+        const re = /\bvec[234]<f32>\s*\(/g;
+        let out = "";
+        let last = 0;
+        let i = 0;
+        while (i < wgsl.length) {
+            re.lastIndex = i;
+            const m = re.exec(wgsl);
+            if (!m) break; // 無更多建構子;尾段由最終 return 統一拼接
+            const open = m.index + m[0].length - 1;
+            let depth = 0;
+            let end = -1;
+            for (let j = open; j < wgsl.length; j++) {
+                if (wgsl[j] === "(") depth++;
+                else if (wgsl[j] === ")") { depth--; if (depth === 0) { end = j; break; } }
+            }
+            if (end < 0) break; // 括號不平衡(不完整程式碼)
+            const inner = wgsl.slice(open + 1, end);
+            const args = WGSLCodeGenerator.splitTopLevelCommas(inner);
+            let changed = false;
+            const newArgs = args.map((arg) => {
+                const t = arg.trim();
+                if (t === "scene.inputSize" || t === "scene.outputSize") return arg; // 整向量轉換建構子,合法
+                if (/\b(scene\.inputSize|scene\.outputSize)\b/.test(t)) {
+                    changed = true;
+                    return `f32(${t})`;
+                }
+                return arg;
+            });
+            if (changed) {
+                out += wgsl.slice(last, open + 1) + newArgs.join(", ") + ")";
+                last = end + 1;
+            }
+            i = end + 1;
+        }
+        if (last === 0) return wgsl;
+        return out + wgsl.slice(last);
+    }
+
+    /** 依括號深度切分頂層逗號（不含字串/正規語法；WGSL 程式碼足夠安全） */
+    private static splitTopLevelCommas(s: string): string[] {
+        const out: string[] = [];
+        let depth = 0;
+        let cur = "";
+        for (const ch of s) {
+            if (ch === "(" || ch === "[") depth++;
+            else if (ch === ")" || ch === "]") depth--;
+            if (ch === "," && depth === 0) {
+                if (cur.trim().length) out.push(cur.trim());
+                cur = "";
+                continue;
+            }
+            cur += ch;
+        }
+        if (cur.trim().length) out.push(cur.trim());
+        return out;
+    }
+
+    /**
+     * Convert HLSL-style typed local declarations to WGSL `var` declarations.
+     * ---
+     * 將 HLSL 式區域宣告轉為 WGSL：
+     *   `vec2<f32> UV = ...;`        → `var UV: vec2<f32> = ...;`
+     *   `f32 a = 0.0, b = 1.0;`      → `var a: f32 = 0.0; var b: f32 = 1.0;`
+     *   `f32 acc;`                   → `var acc: f32;`
+     *   `vec4<f32> samples[8];`      → `var samples: array<vec4<f32>, 8>;`
+     * 值的擷取以括號平衡掃描（任意巢狀深度），僅在陳述式起點
+     *（`{` / `;` / 行首之後）觸發，避免誤傷運算式中繼位置。
+     */
+    private _convertHlslTypedDecls(code: string, passIndex: number): string {
+        // 前綴括號深度（僅計 `(`）：深度 > 0 的位置在參數列/呼叫引數內，一律跳過，
+        // 避免把多行 fn 參數（`fn X(a: f32,\n f32 b)`）誤判為區域宣告。
+        const parenDepth = new Int32Array(code.length + 1);
+        {
+            let d = 0;
+            for (let i = 0; i < code.length; i++) {
+                parenDepth[i] = d;
+                if (code[i] === "(") d++;
+                else if (code[i] === ")") d--;
+                if (d < 0) d = 0;
+            }
+            parenDepth[code.length] = d;
+        }
+
+        const typeRe = new RegExp(
+            `(?<=[{;\\n])([ \\t]*)(${WGSLCodeGenerator.WGSL_TYPE_SRC})[ \\t]+` +
+            `(${WGSLCodeGenerator.WGSL_NAME_SRC})[ \\t]*`,
+            "g",
+        );
+        let result = "";
+        let last = 0;
+        for (const m of code.matchAll(typeRe)) {
+            if (parenDepth[m.index] !== 0) continue; // 參數列/呼叫引數內，非陳述式起點
+            const ws = m[1];
+            const type = m[2];
+            const firstName = m[3];
+            let i = m.index + m[0].length;
+
+            // 陣列宣告：`TYPE NAME[N];`（HLSL 陣列式）
+            if (code[i] === "[") {
+                let depth = 0;
+                let j = i;
+                for (; j < code.length; j++) {
+                    if (code[j] === "[") depth++;
+                    else if (code[j] === "]") { depth--; if (depth === 0) { j++; break; } }
+                }
+                if (j >= code.length) continue;
+                const dims = code.slice(i + 1, j - 1).trim();
+                let k = j;
+                while (k < code.length && /\s/.test(code[k])) k++;
+                if (code[k] !== ";" || !/^\d+$/.test(dims)) continue;
+                result += code.slice(last, m.index) + `${ws}var ${firstName}: array<${type}, ${dims}>;`;
+                last = k + 1;
+                continue;
+            }
+
+            // 純量/向量/矩陣宣告（可含多個宣告子與初始化值）
+            // 掃描到頂層 `;`；頂層 `,` 分隔宣告子。
+            let depth = 0;
+            let j = i;
+            for (; j < code.length; j++) {
+                const ch = code[j];
+                if (ch === "(" || ch === "[") depth++;
+                else if (ch === ")" || ch === "]") depth--;
+                else if (ch === ";" && depth === 0) break;
+            }
+            if (j >= code.length || depth !== 0) continue;
+            const declBody = code.slice(i, j);
+            const parts = WGSLCodeGenerator.splitTopLevelCommas(declBody.replace(/^[ \t]+/, ""));
+            if (parts.length === 0) continue;
+            // 每個宣告子：`NAME` 或 `NAME = VALUE`
+            const decls: string[] = [];
+            let bad = false;
+            for (const p of parts) {
+                const pm = p.match(new RegExp(`^(${WGSLCodeGenerator.WGSL_NAME_SRC})[ \\t]*([\\s\\S]*)$`));
+                if (!pm) { bad = true; break; }
+                const [, name, rhs] = pm;
+                decls.push(rhs.trim().length
+                    ? `var ${name}: ${type} = ${rhs.trim()};`
+                    : `var ${name}: ${type};`);
+            }
+            if (bad) continue;
+            result += code.slice(last, m.index) + ws + decls.join(" ");
+            last = j + 1;
+        }
+        if (last === 0) return code;
+        void passIndex;
+        return result + code.slice(last);
+    }
+
+    /**
+     * Expand HLSL `mul(a, b)` into `(a) * (b)` at arbitrary nesting depth.
+     * ---
+     * HLSL `mul(x, y)` 與 WGSL 的 `x * y` 一致（矩陣方向由建構時的欄/列安排決定，
+     * WGFX 已在轉換器層以「欄 = HLSL 的欄」重建矩陣）。以括號平衡掃描處理，
+     * 支援任意巢狀（mul 內再含 mul、函式呼叫等）。
+     */
+    private _expandHlslMul(code: string, passIndex: number): string {
+        if (/\bfn\s+mul\s*\(/.test(code)) {
+            // eslint-disable-next-line no-console
+            console.warn(`[WGFX] Pass ${passIndex}: 使用者自訂了 fn mul()，跳過 mul() → * 轉換。`);
+            return code;
+        }
+        const re = /\bmul\s*\(/;
+        let s = code;
+        for (let iter = 0; iter < 64; iter++) {
+            const m = re.exec(s);
+            if (!m) break;
+            const open = m.index + m[0].length - 1;
+            let depth = 0;
+            let end = -1;
+            for (let j = open; j < s.length; j++) {
+                if (s[j] === "(") depth++;
+                else if (s[j] === ")") { depth--; if (depth === 0) { end = j; break; } }
+            }
+            if (end < 0) break; // 括號不平衡（不完整程式碼），放棄
+            const args = WGSLCodeGenerator.splitTopLevelCommas(s.slice(open + 1, end));
+            let repl: string;
+            if (args.length === 2) {
+                repl = `((${args[0]}) * (${args[1]}))`;
+            } else {
+                // eslint-disable-next-line no-console
+                console.warn(`[WGFX] Pass ${passIndex}: mul() 需要恰好 2 個參數，原樣保留。`);
+                repl = s.slice(m.index, end + 1);
+            }
+            s = s.slice(0, m.index) + repl + s.slice(end + 1);
+        }
+        return s;
+    }
+
+    /**
+     * Eliminate HLSL scalar swizzles on scalar-typed values (e.g. `value.x` → `value`).
+     * ---
+     * HLSL 允許對純量做 swizzle（`value.x` == value）；WGSL 不允許。
+     * 逐函式收集「確定為純量」的識別字（參數與 var/let 宣告），
+     * 僅改寫這些識別字上的單分量 swizzle，避免誤傷向量。
+     *
+     * **位置感知**：同名識別字在同一函式可能以不同型別重複宣告
+     * （如 `let p = textureLoad(...)` 之後又有 `for (var p: u32 = ...)` 迴圈計數器）。
+     * 僅在「該純量宣告結束位置之後」出現的 swizzle 才消除——WGSL 要求使用前宣告,
+     * 因此宣告前出現的同名識別字必然是另一個（向量）值。
+     */
+    private _eliminateScalarSwizzles(code: string): string {
+        // 找出所有 fn 的主體（含簽名），逐一處理
+        const fnRe = /\bfn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
+        let out = "";
+        let last = 0;
+        let match: RegExpExecArray | null;
+        while ((match = fnRe.exec(code)) !== null) {
+            const openParen = match.index + match[0].length - 1;
+            // 簽名括號
+            let depth = 0;
+            let j = openParen;
+            for (; j < code.length; j++) {
+                if (code[j] === "(") depth++;
+                else if (code[j] === ")") { depth--; if (depth === 0) { break; } }
+            }
+            if (j >= code.length) continue;
+            const params = code.slice(openParen + 1, j);
+            // 找函式主體 `{`（可能帶回傳型別 `) -> T {`）
+            let k = j + 1;
+            while (k < code.length && /\s/.test(code[k])) k++;
+            if (code[k] === "-") { // 回傳型別 `-> T {`：跳至 `{`
+                const brace = code.indexOf("{", k);
+                if (brace < 0) continue;
+                k = brace;
+            }
+            if (code[k] !== "{") continue;
+            let bDepth = 0;
+            let end = -1;
+            for (let b = k; b < code.length; b++) {
+                if (code[b] === "{") bDepth++;
+                else if (code[b] === "}") { bDepth--; if (bDepth === 0) { end = b; break; } }
+            }
+            if (end < 0) continue;
+            const body = code.slice(k + 1, end);
+
+            // 收集純量識別字「及其宣告結束位置」：參數（位置=0）+ var/let 宣告
+            const scalarDecls = new Map<string, number>(); // name → 宣告在 body 內的結束 offset
+            for (const pm of params.matchAll(
+                new RegExp(`\\b([A-Za-z_][A-Za-z0-9_]*)\\s*:\\s*(?:f32|i32|u32|bool)\\b`, "g"),
+            )) scalarDecls.set(pm[1], 0); // 參數在整個函式可見
+            for (const dm of body.matchAll(
+                new RegExp(`\\b(?:var|let)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*:\\s*(?:f32|i32|u32|bool)\\b`, "g"),
+            )) {
+                const endPos = (dm.index ?? 0) + dm[0].length;
+                scalarDecls.set(dm[1], Math.max(scalarDecls.get(dm[1]) ?? 0, endPos));
+            }
+            if (scalarDecls.size === 0) continue;
+
+            // 位置感知改寫單分量 swizzle：僅消除「宣告結束位置之後」出現者
+            const nameAlt = [...scalarDecls.keys()].map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+            const swizzleRe = new RegExp(`\\b(${nameAlt})\\.(?:x|y|z|w|r|g|b|a)\\b`, "g");
+            const newBody = body.replace(swizzleRe, (m0, name, off) => {
+                const declEnd = scalarDecls.get(name) ?? 0;
+                return off >= declEnd ? name : m0;
+            });
+            out += code.slice(last, k + 1) + newBody;
+            last = end;
+        }
+        if (last === 0) return code;
+        return out + code.slice(last);
+    }
+
+    /**
+     * Promote module-scope `const` declarations that reference uniform variables
+     * to `var<private>` initialized at the top of the entry point.
+     * ---
+     * WGSL 禁止在 module-scope const 的初始化式中引用 uniform var
+     *（`'var scene' cannot be referenced at module-scope`）。
+     * 本轉換將「直接或間接（鏈式引用其他被提升的 const）」依賴 uniform 的
+     * module-scope const 改為 `var<private> NAME: TYPE;`，並在 entry point
+     *（`fn main_cs`）開頭以原初始化式依宣告順序賦值，使所有 pass 與 COMMON
+     * 輔助函式都能取得與 Magpie HLSL 相同的語意。
+     *
+     * 純常數的 const（如 `const N: u32 = 429u;`，可能作為 array 尺寸）不會被提升。
+     */
+    private _promoteUniformConstsToPrivate(wgsl: string, passIndex: number): string {
+        // 收集 uniform 變數名（注入的 scene/uniforms 或 COMMON 自行宣告者）
+        const uniformNames = new Set<string>();
+        for (const m of wgsl.matchAll(/\bvar<uniform>\s+([A-Za-z_][A-Za-z0-9_]*)/g)) {
+            uniformNames.add(m[1]);
+        }
+        if (uniformNames.size === 0) return wgsl;
+
+        // 以「註解剝除」的同長度影子字串做掃描，避免註解內的括號干擾深度計算；
+        // 位置索引在原字串上仍然有效（置換字元數相同）。
+        const shadow = wgsl
+            .replace(/\/\*[\s\S]*?\*\//g, (m) => " ".repeat(m.length))
+            .replace(/\/\/[^\n]*/g, (m) => " ".repeat(m.length));
+
+        // 找出 module-scope（所有括號深度為 0）的 const 宣告
+        interface ConstDecl { name: string; type: string | null; expr: string; start: number; end: number; }
+        const consts: ConstDecl[] = [];
+        let depth = 0;
+        let i = 0;
+        while (i < shadow.length) {
+            const ch = shadow[i];
+            if (ch === "{" || ch === "(" || ch === "[") { depth++; i++; continue; }
+            if (ch === "}" || ch === ")" || ch === "]") { depth--; i++; continue; }
+            if (depth === 0 && /^const\b/.test(shadow.slice(i, i + 6))) {
+                // 掃描至頂層 `;`
+                let d = 0;
+                let j = i;
+                for (; j < shadow.length; j++) {
+                    const c = shadow[j];
+                    if (c === "{" || c === "(" || c === "[") d++;
+                    else if (c === "}" || c === ")" || c === "]") d--;
+                    else if (c === ";" && d === 0) break;
+                }
+                if (j >= shadow.length) break;
+                const text = wgsl.slice(i, j + 1);
+                const cm = text.match(
+                    new RegExp(`^const\\s+(${WGSLCodeGenerator.WGSL_NAME_SRC})\\s*(?::\\s*([^=]+?))?\\s*=\\s*([\\s\\S]+);\\s*$`),
+                );
+                if (cm) {
+                    consts.push({ name: cm[1], type: cm[2] ? cm[2].trim() : null, expr: cm[3].trim(), start: i, end: j + 1 });
+                }
+                i = j + 1;
+                continue;
+            }
+            i++;
+        }
+        if (consts.length === 0) return wgsl;
+
+        // 不動點提升：引用 uniform，或引用其他被提升 const 的，一律提升
+        const promoted = new Set<string>();
+        let changed = true;
+        while (changed) {
+            changed = false;
+            for (const c of consts) {
+                if (promoted.has(c.name)) continue;
+                const refsUniform = [...uniformNames].some((u) =>
+                    new RegExp(`\\b${u}\\b`).test(c.expr));
+                const refsPromoted = [...promoted].some((p) =>
+                    new RegExp(`\\b${p}\\b`).test(c.expr));
+                if (refsUniform || refsPromoted) {
+                    promoted.add(c.name);
+                    changed = true;
+                }
+            }
+        }
+        if (promoted.size === 0) return wgsl;
+
+        // 改寫宣告（**由後往前**,避免前面改寫造成的索引位移）,
+        // 並依原宣告順序收集初始化陳述式（鏈式引用 temp_pt ← temp_size 依此有序）。
+        const inits: string[] = [];
+        const promotedAll = consts.filter((c) => promoted.has(c.name)).sort((a, b) => a.start - b.start);
+        for (const c of promotedAll) {
+            if (c.type === null) {
+                // 無型別標註的 const 無法推出 var<private> 的型別——保留原樣（Tint 會報
+                // 較清晰的錯誤）；實務上轉換器產出的宣告都帶型別。
+                // eslint-disable-next-line no-console
+                console.warn(
+                    `[WGFX] Pass ${passIndex}: const ${c.name} 引用 uniform 但無型別標註，無法提升為 var<private>;請補型別。`,
+                );
+                continue;
+            }
+            inits.push(`${c.name} = ${c.expr};`);
+        }
+        if (inits.length === 0) return wgsl;
+        const rewritable = promotedAll.filter((c) => c.type !== null);
+        for (let k = rewritable.length - 1; k >= 0; k--) {
+            const c = rewritable[k];
+            wgsl = wgsl.slice(0, c.start) + `var<private> ${c.name}: ${c.type};` + wgsl.slice(c.end);
+        }
+
+        // 在 entry point（fn main_cs）主體開頭插入初始化（依宣告順序）
+        const entryIdx = wgsl.search(/\bfn\s+main_cs\s*\(/);
+        if (entryIdx < 0) {
+            // eslint-disable-next-line no-console
+            console.warn(
+                `[WGFX] Pass ${passIndex}: 找不到 fn main_cs，已提升 ${inits.length} 個 const 為 var<private> 但無法插入初始化。`,
+            );
+            return wgsl;
+        }
+        const braceIdx = wgsl.indexOf("{", entryIdx);
+        if (braceIdx < 0) return wgsl;
+        const initBlock =
+            "\n    // module-scope const(引用 uniform)→ var<private>,於進入點開頭初始化\n    " +
+            inits.join("\n    ") + "\n";
+        return wgsl.slice(0, braceIdx + 1) + initBlock + wgsl.slice(braceIdx + 1);
     }
 }

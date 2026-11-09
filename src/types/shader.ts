@@ -13,6 +13,14 @@ export interface TextureInfo {
   height?: string | number;
   /** GPU texture format / GPU 紋理格式 */
   format?: GPUTextureFormat;
+  /**
+   * External source file declared with `//! SOURCE <file>` (e.g. a DDS LUT).
+   * The host must supply this texture by name via externalResources.textures
+   * (port_check: --texture NAME=path). Size comes from the supplied file.
+   * 以 `//! SOURCE <file>` 宣告的外部來源檔（如 DDS LUT）。宿主必須按名稱
+   * 透過 externalResources.textures 提供該紋理；尺寸由所提供的檔案決定。
+   */
+  source?: string;
 }
 
 /**

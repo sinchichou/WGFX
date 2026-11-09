@@ -203,6 +203,9 @@
       case 'label':
       case 'desc':
         data[key] = dequote(value); break;
+      case 'source':
+        // //!SOURCE <file> — 外部紋理來源檔（如 DDS LUT）；宿主必須按名稱餵入。
+        data.source = dequote(value); break;
       case 'type':
         data[key] = value.trim(); break;
       default:

@@ -30,7 +30,8 @@
     "bench": "node test/bench_runtime.mjs",
     "debug": "npm run dev --prefix debugger",
     "build:docs": "typedoc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:external": "node test/test_external_textures.mjs"
   },
   "private": true,
   "dependencies": {
