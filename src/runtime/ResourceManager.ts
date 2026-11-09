@@ -1,7 +1,7 @@
 /// <reference types="@webgpu/types" />
 import { WGFXShaderInfo, TextureInfo } from '../types/shader';
 import { logicalTextureName, paramType, storageCapableFormat } from './WGSLCodeGenerator';
-import { Logger } from '../utils/Logger';
+import { Logger, LogLevel } from '../utils/Logger';
 
 /**
  * Bytes per texel for a WebGPU texture format（未壓縮格式；供 writeTexture 預設行距）。
@@ -631,6 +631,26 @@ export class ResourceManager {
     }
 
     /**
+     * Classify an INPUT source as a video/image element for scene-info updates.
+     * ---
+     * 判定輸入源是否為「可取得實際像素尺寸」的影像物件（VideoFrame /
+     * HTMLVideoElement / ImageBitmap），並回傳其類別；Canvas/OffscreenCanvas 與
+     * 未知物件回傳 null（不更新場景資訊）。
+     *
+     * 為何不寫裸 `instanceof`：Node（node-webgpu/Dawn）沒有 DOM 全域建構子，
+     * `source instanceof HTMLVideoElement` 會直接丟 TypeError/ReferenceError，
+     * 使每幀的 updateTextureFromImage 在無 DOM 環境完全失效。此處先確認建構子
+     * 存在再比對，瀏覽器語意與原本**完全相同**。
+     */
+    private static _classifyImageSource(source: any): 'videoframe' | 'media' | null {
+        const g: any = globalThis;
+        if (typeof g.VideoFrame === 'function' && source instanceof g.VideoFrame) return 'videoframe';
+        if (typeof g.HTMLVideoElement === 'function' && source instanceof g.HTMLVideoElement) return 'media';
+        if (typeof g.ImageBitmap === 'function' && source instanceof g.ImageBitmap) return 'media';
+        return null;
+    }
+
+    /**
      * Update a texture's content from an external image source.
      * ---
      * 從外部影像來源（如 Video 或 Canvas）更新紋理內容，並同步更新場景資訊。
@@ -654,9 +674,11 @@ export class ResourceManager {
         );
 
         // Update scene info if INPUT changes / 若輸入源改變，更新場景解析度資訊
-        if (name === 'INPUT' && (source instanceof HTMLVideoElement || source instanceof ImageBitmap || source instanceof VideoFrame)) {
-            const width = (source instanceof VideoFrame) ? source.displayWidth : source.width;
-            const height = (source instanceof VideoFrame) ? source.displayHeight : source.height;
+        const src: any = source;
+        const kind = name === 'INPUT' ? ResourceManager._classifyImageSource(src) : null;
+        if (kind !== null) {
+            const width = (kind === 'videoframe') ? src.displayWidth : src.width;
+            const height = (kind === 'videoframe') ? src.displayHeight : src.height;
 
             // Use provided output dimensions or fallback to OUTPUT texture dimensions / 使用提供的輸出維度或獲取輸出紋理維度
             let outW = outWidth;
@@ -809,7 +831,11 @@ export class ResourceManager {
         f32[11] = 0;
 
         this.device.queue.writeBuffer(this.sceneBuffer, 0, this.sceneScratch);
-        Logger.debug(`Updated scene buffer: IN(${width}x${height}), OUT(${outWidth}x${outHeight}), SCALE(${f32[8].toFixed(2)}, ${f32[9].toFixed(2)})`);
+        // P3：熱路徑日誌加閘——本函式每幀呼叫一次，未加閘時字串樣板（含兩次 toFixed）
+        // 會在呼叫端就先被求值，即使層級高於 DEBUG 也照樣產生垃圾與字串成本。
+        if (Logger.wouldLog(LogLevel.DEBUG)) {
+            Logger.debug(`Updated scene buffer: IN(${width}x${height}), OUT(${outWidth}x${outHeight}), SCALE(${f32[8].toFixed(2)}, ${f32[9].toFixed(2)})`);
+        }
     }
 
     /** @group Query */

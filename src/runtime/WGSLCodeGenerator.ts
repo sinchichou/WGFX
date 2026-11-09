@@ -693,45 +693,88 @@ struct SceneInfo {
      * conversion/splat 重載），因此 `vec2<f32>(scene.inputSize.x * 1, scene.inputSize.y * 2)`
      * 這種 HLSL 隱式轉換（float2(uint, uint) 合法）在 WGSL 不合法。
      * `scene.inputSize` / `scene.outputSize` 為 vecN<u32>，凡參數引用其一且
-     * 參數不是「整個向量本身」時，補 `f32(arg)`。
+     * 參數本身是需要 u32→f32 轉換的純量運算式時，補 `f32(arg)`。
+     *
+     * **只包裹真正需要轉換的引數（2026-11 修正）**：
+     * 舊版僅以「引數文字中是否出現 scene.inputSize/outputSize」判定，於是
+     * 已是 `vec2<f32>(scene.inputSize)` 的引數被二次包裹成 `f32(vec2<f32>(…))`，
+     * 產生 `vec4<f32>(scene.inputPt, vec2<f32>(scene.inputSize))` →
+     * `f32(vec2<f32>(scene.inputSize))`，Tint 報
+     * `no matching constructor for 'f32(vec2<f32>)'`（SMAA 移植時實際踩到）。
+     * 現在：
+     *   - 以 {@link _argNeedsF32Wrap} 判定，已是向量建構式／已顯式 f32() 的引數一律略過；
+     *   - **遞迴由內而外**處理巢狀建構式，因此
+     *     `vec4<f32>(scene.inputPt, vec2<f32>(scene.inputSize))` 原樣保留（合法），
+     *     而 `vec2<f32>(scene.inputSize.x, scene.inputSize.y)` 的純量引數仍正確補上
+     *     `f32(…)`（這正是 SMAA 檔頭 Porting notes 提到的逐分量繞法）。
      */
     private _wrapU32ArgsInF32VectorCtors(wgsl: string): string {
+        return this._wrapU32ArgsIn(wgsl, 0);
+    }
+
+    /** 遞迴實作：`depth` 為巢狀深度護欄（異常深巢狀時放棄改寫，交由 Tint 回報原始錯誤）。 */
+    private _wrapU32ArgsIn(code: string, depth: number): string {
+        if (depth > 64) return code;
         const re = /\bvec[234]<f32>\s*\(/g;
         let out = "";
         let last = 0;
-        let i = 0;
-        while (i < wgsl.length) {
-            re.lastIndex = i;
-            const m = re.exec(wgsl);
-            if (!m) break; // 無更多建構子;尾段由最終 return 統一拼接
-            const open = m.index + m[0].length - 1;
-            let depth = 0;
-            let end = -1;
-            for (let j = open; j < wgsl.length; j++) {
-                if (wgsl[j] === "(") depth++;
-                else if (wgsl[j] === ")") { depth--; if (depth === 0) { end = j; break; } }
-            }
-            if (end < 0) break; // 括號不平衡(不完整程式碼)
-            const inner = wgsl.slice(open + 1, end);
+        let match: RegExpExecArray | null;
+        while ((match = re.exec(code)) !== null) {
+            const open = match.index + match[0].length - 1;
+            const end = WGSLCodeGenerator._matchingParen(code, open);
+            if (end < 0) break; // 括號不平衡(不完整程式碼);尾段由最終 return 統一拼接
+            const inner = code.slice(open + 1, end);
             const args = WGSLCodeGenerator.splitTopLevelCommas(inner);
+            // 先遞迴處理內層建構子（由內而外），再決定這一層的引數要不要補 f32()
+            const processed = args.map((a) => this._wrapU32ArgsIn(a, depth + 1));
             let changed = false;
-            const newArgs = args.map((arg) => {
-                const t = arg.trim();
-                if (t === "scene.inputSize" || t === "scene.outputSize") return arg; // 整向量轉換建構子,合法
-                if (/\b(scene\.inputSize|scene\.outputSize)\b/.test(t)) {
-                    changed = true;
-                    return `f32(${t})`;
-                }
-                return arg;
+            const newArgs = processed.map((arg, k) => {
+                if (arg !== args[k]) changed = true;
+                if (!WGSLCodeGenerator._argNeedsF32Wrap(arg)) return arg;
+                changed = true;
+                return `f32(${arg.trim()})`;
             });
             if (changed) {
-                out += wgsl.slice(last, open + 1) + newArgs.join(", ") + ")";
+                out += code.slice(last, open + 1) + newArgs.join(", ") + ")";
                 last = end + 1;
             }
-            i = end + 1;
+            re.lastIndex = end + 1;
         }
-        if (last === 0) return wgsl;
-        return out + wgsl.slice(last);
+        if (last === 0) return code;
+        return out + code.slice(last);
+    }
+
+    /**
+     * Decide whether a single `vecN<f32>(…)` argument needs an explicit `f32(…)` wrap.
+     * ---
+     * 需要包裹 = 引數「提到 u32 場景尺寸」且「本身不是 f32 向量」。
+     * 此階段是原始碼層改寫、沒有型別資訊，故以引數文字開頭判定：
+     *   - 未提及 `scene.inputSize` / `scene.outputSize` → 不需要（一般 f32 運算式）；
+     *   - 以 `vecN<…>(` 開頭（含 `vecN<f32>(`）→ 整體已是向量，`f32(向量)` 不合法，
+     *     且巢狀的 `vecN<f32>(…)` 已在遞迴中處理完畢 → 略過（本 bug 的根因）；
+     *   - 以 `f32(` 開頭 → 已顯式轉換，避免重複包裹（冪等）；
+     *   - 恰好是整個 `scene.inputSize` / `scene.outputSize` → 單引數 conversion
+     *     建構子（`vec2<f32>(scene.inputSize)`）合法 → 略過。
+     * 其餘（`scene.inputSize.x`、`.y * 2.0`、`max(.x, 1u)` 等純量運算式）→ 包裹。
+     */
+    private static _argNeedsF32Wrap(arg: string): boolean {
+        const t = arg.trim();
+        if (!/\bscene\.(?:inputSize|outputSize)\b/.test(t)) return false;
+        if (/^vec[234]\s*</.test(t)) return false;
+        if (/^f32\s*\(/.test(t)) return false;
+        if (/^scene\.(?:inputSize|outputSize)\s*$/.test(t)) return false;
+        return true;
+    }
+
+    /** 回傳索引 `open`（必須指向 `(`）對應的右括號索引；括號不平衡時回傳 -1。 */
+    private static _matchingParen(code: string, open: number): number {
+        let depth = 0;
+        for (let j = open; j < code.length; j++) {
+            const c = code[j];
+            if (c === "(") depth++;
+            else if (c === ")") { depth--; if (depth === 0) return j; }
+        }
+        return -1;
     }
 
     /** 依括號深度切分頂層逗號（不含字串/正規語法；WGSL 程式碼足夠安全） */

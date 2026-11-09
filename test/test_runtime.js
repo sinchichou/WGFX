@@ -1,7 +1,9 @@
 // test_runtime.js — WGFX 執行時驗證套件（Runtime Verification Suite）
 // 以真實 WebGPU 裝置執行四組驗證：A. 核心範例 test.wgsl 端到端（參數元數據 / 預設值 / 動態更新）
 // B. sampled/storaged 成對別名恆等與全 pass 驗證範圍；C. 全部 examples（EXAMPLE_NAMES）編譯、逐 pass 執行並讀回非零輸出；
-// D. 中間紋理缺少 WIDTH/HEIGHT 時拋出含紋理名稱的明確錯誤。執行：npm run build && node test/test_runtime.js
+// D. 中間紋理缺少 WIDTH/HEIGHT 時拋出含紋理名稱的明確錯誤。
+// 另含兩個回歸測試：F. codegen 過度包裹（test/fixtures/codegen_u32_wrap.wgsl）；
+// G. //! DISPATCH 預編譯求值與 resize 快取失效。執行：npm run build && node test/test_runtime.js
 
 // ===== 區段 0：WebGPU 全域初始化（必須在載入 dist 之前完成） =====
 // 注意：Node 的 globalThis.navigator 只有 getter，無法整個覆寫；
@@ -331,6 +333,115 @@ async function testD(device, bundle) {
     console.log(`  錯誤訊息: ${thrown.message.split('\n')[0]}`);
 }
 
+// ===== 區段 6b：測試 F — codegen「過度包裹」回歸（u32 場景尺寸 × vecN<f32> 建構子）=====
+// 修正前：`vec4<f32>(scene.inputPt, vec2<f32>(scene.inputSize))` 的第二個引數
+// 會被改寫成 `f32(vec2<f32>(scene.inputSize))` → Tint `no matching constructor for
+// 'f32(vec2<f32>)'`（SMAA 移植時實際踩到）。SMAA 現行版本用逐分量繞法，不會覆蓋此 bug，
+// 故以獨立最小 fixture（test/fixtures/codegen_u32_wrap.wgsl）納入本套件。
+async function testF(device, bundle) {
+    const { WGFXRuntime } = bundle;
+    const code = await fs.readFile(path.join(HERE, 'fixtures', 'codegen_u32_wrap.wgsl'), 'utf-8');
+    const runtime = new WGFXRuntime(device);
+    try {
+        // 1) 必須能編譯（bug 未修時 createComputePipelineAsync 會 reject）
+        await runtime.compile(code, externalResources(64, 64));
+        const wgsl = runtime.generatedModules[0].wgslCode;
+
+        // 2) 產物字串：已是 f32 向量建構式的引數不得被再包一層
+        assert(!/f32\s*\(\s*vec[234]\s*<\s*f32\s*>/.test(wgsl),
+            '生成 WGSL 出現 f32(vecN<f32>(…)) 過度包裹');
+        assert(wgsl.includes('vec2<f32>(scene.inputSize)'),
+            '生成 WGSL 遺失合法引數 vec2<f32>(scene.inputSize)');
+
+        // 3) 產物字串：真正的 u32 純量引數仍必須補 f32()（否則多引數向量建構子不合法）
+        assert(wgsl.includes('f32(scene.inputSize.x)') && wgsl.includes('f32(scene.inputSize.y)'),
+            '生成 WGSL 未對 u32 純量引數補 f32()');
+
+        // 4) 實跑：無驗證錯誤、輸出有資料流動
+        const rm = runtime.resourceManager;
+        rm.updateSceneBuffer(64, 64, 64, 64);
+        writePatternTexture(device, rm.getTexture('INPUT'), 64, 64);
+        const err = await runEffectPasses(device, runtime);
+        assert(err === null, `執行觸發驗證錯誤: ${err && err.message}`);
+        assert(hasNonZero(await readTexture(device, rm.getTexture('OUTPUT'), 64, 64)),
+            'OUTPUT 全為 0（轉換後的值未流入輸出）');
+    } finally {
+        runtime.resourceManager.dispose();
+    }
+}
+
+// 檢查 rgba16float 輸出是否每個像素都被寫入（以 alpha 為覆蓋指標；未寫入區域為 0）
+function assertAlphaCoverage(view, w, h, label) {
+    let zeros = 0;
+    for (let i = 3; i < w * h * 4; i += 4) if (view[i] === 0) zeros++;
+    assert(zeros === 0, `${label}：${zeros}/${w * h} 個像素未被寫入（DISPATCH 網格不足或快取未失效）`);
+}
+
+// ===== 區段 6c：測試 G — //! DISPATCH 求值（P1 預編譯 + resize 快取失效）=====
+// 兩個 buffer-style pass：Pass1 以 OUTPUT 尺寸推導網格，Pass2 以 defines(NW/NH) 推導。
+// 驗證 (a) 預編譯路徑求值正確、(b) OUTPUT 紋理尺寸改變（資源版本遞增）後快取確實失效。
+// 網格正確性以「輸出被寫入的範圍」量測：pass 寫入常數 alpha=1，未被 dispatch 到的
+// 像素維持 0，因此任何網格不足（含快取未失效）都會留下可數的零像素。
+async function testG(device, bundle) {
+    const { WGFXRuntime } = bundle;
+    const pass = (idx, dispatch) => [
+        `//! PASS ${idx}`,
+        '//! IN INPUT',
+        '//! OUT OUTPUT',
+        `//! DISPATCH ${dispatch}`,
+        '//! NUM_THREADS 8,8,1',
+        `fn Pass${idx}(@builtin(global_invocation_id) gid: vec3<u32>) {`,
+        // 寫入常數（alpha=1）：覆蓋率即「DISPATCH 網格涵蓋的像素範圍」的直接量測。
+        // 不可改為讀 INPUT——INPUT 只有 64x64，越界的 textureLoad 回傳 0，
+        // 會讓 128x128 的覆蓋率檢查出現假性缺口（實測踩過）。
+        '    textureStore(OUTPUT, vec2<i32>(gid.xy), vec4<f32>(1.0, 0.5, 0.25, 1.0));',
+        '}',
+    ].join('\n');
+    const code = [
+        '//! VERSION 4',
+        '//! TEXTURE INPUT',
+        '//! WIDTH INPUT_WIDTH',
+        '//! HEIGHT INPUT_HEIGHT',
+        'Texture2D INPUT;',
+        '//! TEXTURE OUTPUT',
+        '//! WIDTH INPUT_WIDTH',
+        '//! HEIGHT INPUT_HEIGHT',
+        'Texture2D OUTPUT;',
+        pass(1, '(OUTPUT_WIDTH+7)/8, (OUTPUT_HEIGHT+7)/8'),
+        pass(2, '(NW+7)/8, (NH+7)/8'),
+    ].join('\n');
+
+    const runtime = new WGFXRuntime(device);
+    try {
+        const res = externalResources(64, 64);
+        res.defines = { ...res.defines, NW: 64, NH: 64 };
+        await runtime.compile(code, res);
+        const rm = runtime.resourceManager;
+        rm.updateSceneBuffer(64, 64, 64, 64);
+        writePatternTexture(device, rm.getTexture('INPUT'), 64, 64);
+
+        // (a) DISPATCH 網格正確 → 每個像素都被寫入（alpha=1）
+        let err = await runEffectPasses(device, runtime);
+        assert(err === null, `64x64 執行觸發驗證錯誤: ${err && err.message}`);
+        assertAlphaCoverage(await readTexture(device, rm.getTexture('OUTPUT'), 64, 64), 64, 64,
+            '64x64 首次 DISPATCH');
+
+        // (b) 把 OUTPUT 換成 128x128（createTexture → 資源版本遞增）：運算式必須重算為
+        //     (128+7)/8 = 16 群組，否則右/下區域永遠不會被寫入（快取未失效）。
+        rm.createTexture('OUTPUT', {
+            size: [128, 128], format: 'rgba16float',
+            usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING,
+        });
+        rm.updateSceneBuffer(64, 64, 128, 128);
+        err = await runEffectPasses(device, runtime);
+        assert(err === null, `128x128 執行觸發驗證錯誤: ${err && err.message}`);
+        assertAlphaCoverage(await readTexture(device, rm.getTexture('OUTPUT'), 128, 128), 128, 128,
+            '128x128 resize 後 DISPATCH');
+    } finally {
+        runtime.resourceManager.dispose();
+    }
+}
+
 // ===== 區段 6：測試 E — effects/ 樹全部移植效果編譯並流動資料（256x256） =====
 async function testEEffect(device, bundle, file, relPath) {
     const { WGFXRuntime } = bundle;
@@ -405,6 +516,8 @@ async function main() {
         await runTest(`Test C：${name} 編譯 + 全 pass 資料流`, () => testCExample(device, bundle, name));
     }
     await runTest('Test D：缺少 WIDTH/HEIGHT 的明確錯誤', () => testD(device, bundle));
+    await runTest('Test F：codegen 過度包裹回歸（u32 場景尺寸 × vecN<f32>）', () => testF(device, bundle));
+    await runTest('Test G：//! DISPATCH 求值（預編譯 + resize 快取失效）', () => testG(device, bundle));
 
     // Test E：effects/ 樹的移植效果（需額外資源者依 test/effects-suite.json 排除）
     const skipMap = await loadEffectsSkipMap();

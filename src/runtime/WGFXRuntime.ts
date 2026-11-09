@@ -224,7 +224,11 @@ export class WGFXRuntime {
         if (!outputTexture) {
             throw new Error("Output texture 'OUTPUT' not found.");
         }
-        return outputTexture.createView();
+        // P2：重用 ResourceManager 在 createTexture 時建立、且隨紋理重建一併更新的
+        // sampled view，避免每幀 createView() 產生新的原生物件（消費端每幀取輸出）。
+        // 快取失效由 ResourceManager 的視圖表本身承擔（紋理重建即換新視圖）。
+        const cached = this.resourceManager.views.get('OUTPUT')?.sampled;
+        return cached ?? outputTexture.createView();
     }
 
     /**
