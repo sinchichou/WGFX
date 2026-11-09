@@ -38,6 +38,19 @@ Coverage, verification method and known limitations of the Magpie HLSL → WGFX 
 All 117 HLSL sources across 13 families are ported; plus 10 effects from the earlier
 `effects-port` line and OpenNR, for **127 effect files** total.
 
+### 驗收紀錄 / Verification record
+
+最後一次全量驗收（2026-11-10，commit `8696c08`，真實 WebGPU / Dawn）：
+
+| 驗收項 | 結果 |
+|---|---|
+| `effects/` 全部效果逐一真跑（一檔一 process，OpenNR 2 檔除外） | **125 / 125 PASS** |
+| OpenNR 37-pass f16 U-Net 全網路 | **ALL PASS**（`test/opennr_network.mjs`） |
+| OpenNR conv spike | **PASS**（`test/opennr_spike.mjs`） |
+| 框架測試套件 `npm test` | **140 / 140** |
+| 型別檢查 `npm run typecheck` | exit 0 |
+| 執行紀錄 | `.tmp/final-verification.txt`（未進版控） |
+
 ---
 
 ## 2. 驗收方法 / How to verify
@@ -153,9 +166,14 @@ const device = await adapter.requestDevice({
 | 分支 Branch | 狀態 Status |
 |---|---|
 | `opennr-port` | **主線**：框架 + 全部 127 個效果 + 測試 + 文件 |
-| `main` | 早期線（無 `effects/`），為 `opennr-port` 的祖先 → 可快進 |
-| `effects-port` | 早期扁平式 Tier-1 移植，內容已被主線超集吸收（`-s ours` 記錄式合併） |
-| `backup/before-author-fix` | 歷史快照；`git cherry` 確認 11 個 commit 的 patch 皆已等價存在於主線 |
+| `main` | 已快進至 `opennr-port`（原為無 `effects/` 的早期線，為其祖先；純快進、無分歧） |
+| `effects-port` | 早期扁平式 Tier-1 移植，內容已被主線超集吸收（`-s ours` 記錄式合併，`6ecc28b`） |
+| `backup/before-author-fix` | 歷史快照；`git cherry` 確認 11 個 commit 的 patch 皆已等價存在於主線（刻意保留為安全網） |
+
+> 分支整理為純快進／記錄式合併，**沒有任何 commit 被丟棄**；`backup/before-author-fix`
+> 保留原樣，如需清理可再另行決定。
+>
+> Branch tidy-up was fast-forward / recorded-merge only — **no commits were discarded**.
 
 ---
 
