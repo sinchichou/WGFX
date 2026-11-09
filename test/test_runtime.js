@@ -14,10 +14,13 @@ const nav = { gpu: create([]) };
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+// //! SOURCE 外部紋理的共用解析（與 test/port_check.mjs 同一份實作）
+import { prepareExternalTextures } from '../tools/source_textures.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(HERE, '..', 'dist', 'wgfx.esm.js');
 const EXAMPLES_DIR = path.join(HERE, '..', 'examples');
+const EFFECTS_SRC_DIR = path.join(HERE, '..', 'effects_src');
 
 // ===== 區段 1：小型測試框架（結果收集 / 斷言） =====
 const results = [];
@@ -334,7 +337,17 @@ async function testEEffect(device, bundle, file, relPath) {
     const code = await fs.readFile(file, 'utf-8');
     const runtime = new WGFXRuntime(device);
     try {
-        await runtime.compile(code, externalResources(256, 256));
+        // 效果宣告 //! SOURCE 時自動備妥外部紋理（自 effects_src/ 依檔名解析），
+        // 讓 LUT 系效果（RAVU / SMAA / NIS）也能由通用套件驗收，而不必列入 skip。
+        const base = externalResources(256, 256);
+        const externalTextures = await prepareExternalTextures(code, {
+            textureDir: EFFECTS_SRC_DIR,
+            quiet: true,
+        });
+        const resources = Object.keys(externalTextures).length > 0
+            ? { ...base, textures: { ...base.textures, ...externalTextures } }
+            : base;
+        await runtime.compile(code, resources);
         const rm = runtime.resourceManager;
         const outTex = rm.getTexture('OUTPUT');
         const ow = outTex.width, oh = outTex.height;
