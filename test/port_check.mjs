@@ -60,7 +60,16 @@ if (files.length === 0) {
 const { WGFXRuntime } = await import('../dist/wgfx.esm.js');
 
 const adapter = await nav.gpu.requestAdapter();
-const dev = await adapter.requestDevice();
+// 向 adapter 索取它支援的上限：部分效果（如 RAVU R3/R4 的 RGB 變體）每個 workgroup
+// 需要 4 塊 tile，用量 19–23 KB，超過 WebGPU 預設的 maxComputeWorkgroupStorageSize
+// (16 KB)。這不是效果檔缺陷——D3D 宿主本來就開 32 KB——所以驗收端應比照真實宿主
+// 把 adapter 支援的上限要進來，否則會誤判為 FAIL。
+// 注意：這代表該類效果要求宿主在 requestDevice 時帶上此 requiredLimits（見 README）。
+const dev = await adapter.requestDevice({
+    requiredLimits: {
+        maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
+    },
+});
 const uncaptured = [];
 dev.onuncapturederror = (e) => {
     uncaptured.push(String((e.error && e.error.message) || e));

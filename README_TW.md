@@ -62,6 +62,28 @@ const WGFX = module.default || module.WGFX;
 可運作的參考實作見 [YouTube VSR](https://github.com/sinchichou/YouTube-VSR)
 （`scripts/sync-wgfx.mjs`、`npm run sync:wgfx`、`npm run check:wgfx`）。
 
+### 裝置上限（宿主契約）
+
+WGFX 不建立 `GPUDevice`，裝置由宿主建立。部分效果需要高於 WebGPU **預設**的上限，
+因此宿主應索取 adapter 實際支援的值：
+
+```js
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter.requestDevice({
+    requiredLimits: {
+        // CNN 效果（CuNNy / NNEDI3）單一 pass 可能寫多張 storage texture
+        maxStorageTexturesPerShaderStage: 8,
+        // RAVU R3/R4 RGB 每個 workgroup 需 19–23 KB（預設 16 KB；D3D 宿主為 32 KB）
+        maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
+    },
+});
+```
+
+| 上限 | 需要它的效果 |
+|------|-------------|
+| `maxStorageTexturesPerShaderStage` | CuNNy 4x24/4x32/8x32 及其他多輸出 CNN pass |
+| `maxComputeWorkgroupStorageSize` | `RAVU_R3_RGB`、`RAVU_R4_RGB`（以及任何每 workgroup 超過 16 KB 的效果） |
+
 ---
 
 ## 快速開始

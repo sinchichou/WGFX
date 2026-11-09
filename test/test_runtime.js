@@ -381,8 +381,15 @@ async function main() {
     // 1. 取得真實 GPU 裝置
     const adapter = await nav.gpu.requestAdapter();
     assert(adapter, '無法取得 WebGPU adapter');
+    // 比照真實宿主索取 adapter 支援的上限：
+    //   - maxStorageTexturesPerShaderStage:CNN 效果單一 pass 可寫多張 storage texture
+    //   - maxComputeWorkgroupStorageSize:RAVU R3/R4 RGB 變體每 workgroup 需 19–23 KB
+    //     （WebGPU 預設 16 KB；D3D 宿主本來就開 32 KB）→ 不索取會誤判為失敗
     const device = await adapter.requestDevice({
-        requiredLimits: { maxStorageTexturesPerShaderStage: 8 },
+        requiredLimits: {
+            maxStorageTexturesPerShaderStage: 8,
+            maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
+        },
     });
     device.onuncapturederror = (e) => {
         const msg = String((e.error && e.error.message) || e);

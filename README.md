@@ -63,6 +63,28 @@ const WGFX = module.default || module.WGFX;
 See [YouTube VSR](https://github.com/sinchichou/YouTube-VSR) for a working reference
 implementation (`scripts/sync-wgfx.mjs`, `npm run sync:wgfx`, `npm run check:wgfx`).
 
+### Device limits (host contract)
+
+WGFX never creates the `GPUDevice` — the host does. Some effects need more than the WebGPU
+**default** limits, so the host should request the adapter's supported values:
+
+```js
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter.requestDevice({
+    requiredLimits: {
+        // CNN effects (CuNNy / NNEDI3) may write several storage textures in one pass
+        maxStorageTexturesPerShaderStage: 8,
+        // RAVU R3/R4 RGB need 19–23 KB per workgroup (default is 16 KB; D3D hosts use 32 KB)
+        maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
+    },
+});
+```
+
+| Limit | Needed by |
+|-------|-----------|
+| `maxStorageTexturesPerShaderStage` | CuNNy 4x24/4x32/8x32 and other multi-output CNN passes |
+| `maxComputeWorkgroupStorageSize` | `RAVU_R3_RGB`, `RAVU_R4_RGB` (and any effect tiling > 16 KB per workgroup) |
+
 ---
 
 ## Quick Start
