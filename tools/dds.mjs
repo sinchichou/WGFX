@@ -1,6 +1,7 @@
-// dds.mjs — 完整 DDS 讀取器（未壓縮、非 BC 格式 + D3DFMT 數值型 fourCC 的 f16/f32 通道）
+// dds.mjs — DDS 讀取器（build-time 封裝用）
 //
-// WGFX !SOURCE 外部紋理（RAVU / SMAA / NIS 的 .dds LUT）用。
+// WGFX `//! SOURCE` 外部紋理（RAVU / SMAA / NIS 的 .dds LUT）用。
+//
 // 支援：
 //   * 標準 DDS 標頭（124 bytes + optional DX10 extension header）
 //   * 未壓縮格式：
@@ -12,6 +13,10 @@
 //   * mip0 的像素資料（列序:上到下、左到右,與 WebGPU writeTexture 一致,免翻轉）
 //   * header 的 pitch 欄位不可靠時（如 SearchTex pitch=1024 而 64x16 L8）
 //     以「payload 尺寸 == height × width×bpp」優先回推行距
+//
+// ⚠️ 執行期有**另一份等價實作**在 `src/runtime/DDSReader.ts`（供 .wgx 套件包在
+// 瀏覽器中載入外部紋理）。兩份實作的一致性由 `test/dds_consistency.test.mjs`
+// 對全部真實 DDS 檔逐一比對保證。
 //
 // 回傳 { width, height, format, data: Uint8Array, mipCount, bytesPerPixel }
 // 用法：
