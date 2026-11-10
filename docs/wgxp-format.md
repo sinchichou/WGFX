@@ -14,9 +14,12 @@
 | 問題 | 傳統做法 | `.wgx` 的解法 |
 |---|---|---|
 | **MV3 CSP 禁止動態程式碼** | runtime 用 `new Function` 求值運算式 → 直接 `EvalError` | 改用手寫 AST 求值器（`src/runtime/DispatchExpr.ts`），套件包內只有**資料** |
-| **執行期解析代價高** | 每個效果載入時都要解析 DSL + codegen（實測 CuNNy-16x16C 完整 compile **2,826 ms**） | WGSL 於建置期預生成；runtime 只做 `createShaderModule` |
+| **執行期解析代價高** | 每個效果載入時都要解析 DSL + codegen（實測 CuNNy-16x16C 完整 compile **2,826 ms**） | WGSL 於建置期預生成；runtime 只做 `createShaderModule`（實測快 8–22%） |
 | **效果檔體積大** | 20 MiB 的 WGSL 文字（含內嵌權重） | 打包後 **11.15 MiB**（55.6%；其中 WGSL 文字部分壓縮率約 22%） |
 | **外部資源散落** | LUT 紋理留在 `effects_src/`，執行期還要去那裡找 | DDS 一併收進套件包 → **自足** |
+
+> **驗收**:套件包路徑與原效果**逐像素一致**（六個家族，含 2x/3x/4x 放大效果與
+> 外部 LUT 效果），且解出的 WGSL 與執行期 codegen 的輸出**逐字相同** → 語意零風險。
 
 ---
 
@@ -125,46 +128,93 @@ node tools/pack/wgxp.mjs --batch effects --out-dir dist/wgx --only CuNNy,NNEDI3
 
 ## 5. 執行期載入 / Loading at runtime
 
-```js
-import { unzip, readText } from './tools/pack/unzip.mjs';
+### 5.1 高階 API
 
-const files = await unzip(arrayBuffer);          // Map<path, Uint8Array>
-const manifest = JSON.parse(readText(files, 'manifest.json'));
+```js
+import { WGFXPackage } from 'wgfx';
+
+// 擴充套件：URL 來自 chrome.runtime.getURL()
+const pkg = await WGFXPackage.fromURL(chrome.runtime.getURL('wgx/Scalers/Bicubic.wgx'));
+
+const instance = await pkg.createInstance({
+    device,
+    width: 1920,
+    height: 1080,
+    // outWidth / outHeight 可省略 → 依效果自身的宣告（如升頻 2x/3x/4x）
+    onProgress: (stage) => console.log('[wgx]', stage),
+});
+
+instance.updateUniforms({ Scale: 2.0 });
+const output = await instance.process(videoFrame);   // → GPUTexture
+instance.dispose();
+```
+
+`WGFXPackageInstance` 的 API 與 `WGFX` 對齊（`process` / `updateUniforms` /
+`initialize` / `getOutputView` / `dispose`），消費端可兩者互換使用。
+
+### 5.2 底層 API
+
+```js
+import { unzipPackage } from 'wgfx';
+
+const files = await unzipPackage(arrayBuffer);      // Map<path, Uint8Array>
+const manifest = JSON.parse(new TextDecoder().decode(files.get('manifest.json')));
 
 // 各 pass 的 WGSL 已預生成 → 直接建立 shader module，不做 DSL 解析
 for (const pass of manifest.passes) {
-    const code = readText(files, pass.file);
+    const code = new TextDecoder().decode(files.get(pass.file));
     const module = device.createShaderModule({ code, label: `pass${pass.index}` });
     // …建立 pipeline
 }
 ```
 
-正式的高階 API（`WGFXPackage.load()`）屬階段 4 的範圍；目前 `tools/pack/unzip.mjs`
-已可在瀏覽器與 Node 兩側運作。
+解壓使用瀏覽器內建的 `DecompressionStream('deflate-raw')`（Chrome 103+），
+不依賴 Node API，也不使用 `eval` —— 可直接用於 MV3 擴充套件。
+
+### 5.3 與一般管線的關係
+
+一般效果的 `WGFXRuntime.compile()` 依序做四件事：
+
+| 步驟 | 一般效果 | `.wgx` 套件包 |
+|---|---|---|
+| 1. 解析 DSL → shaderInfo | 執行期 | **建置期**（manifest 帶精簡版） |
+| 2. 程式碼生成 → 各 pass WGSL | 執行期 | **建置期**（`shaders/passN.wgsl`） |
+| 3. 建立資源 | 執行期 | 執行期（重用 `ResourceManager`） |
+| 4. 建立管線 | 執行期 | 執行期（重用 `PipelineManager`） |
+
+套件包路徑**完全重用**既有的 `ResourceManager` / `PipelineManager` /
+`UniformBinder`，不另建一套平行執行環境 —— 因此資源語意、管線綁定、
+`//! DISPATCH` 求值、裝置上限行為都與一般效果一致。
 
 ---
 
 ## 6. 驗收 / Verification
 
 ```bash
-npm run test:wgxp
+npm run test:wgxp            # 打包/解包/manifest/批次打包
+npm run test:wgxp:runtime    # 套件包路徑 vs 一般路徑:逐像素一致
+npm run test:dds             # 兩份 DDS 實作對真實 DDS 檔的一致性
+npm run test:split           # pass 自動拆分器與等價性
 ```
 
 涵蓋：
 - 打包成功、產出非空、manifest 版本與 id 正確
 - **解出的 WGSL 與執行期 codegen 輸出逐字相同**（語意零風險的直接證據）
-- 解出的 WGSL 可在真實 WebGPU 裝置編譯
+- **套件包路徑與原效果逐像素一致**（六個家族，含放大效果與外部紋理效果）
 - **批次打包 127/127 個效果**，16 個家族全部可解包並真跑
 - 外部紋理由**套件包內**載入（驗證自足性）
+- 載入時間比一般路徑快約 8–22%（省去解析與程式碼生成）
 
 ---
 
 ## 7. 已知限制 / Known limitations
 
-- **權重仍為內嵌 WGSL 常數**（CuNNy 家族為主）。轉為二進位 storage buffer 屬階段 2；
-  預期收益是消除編譯端瓶頸（CuNNy-16x16C 生成碼 1.25 MB / 4,681 個建構子）。
+- **權重仍為內嵌 WGSL 常數**（CuNNy 家族為主）。這是**實測後的定案**：
+  轉為二進位 storage buffer 會使每幀慢 **375%**、編譯慢 **351%**，只換到
+  39% 的套件大小 —— 得不償失。詳見 [`weight-strategy.md`](weight-strategy.md)。
 - **OpenNR 類效果**需要宿主提供 54 個特徵圖 storage buffer（大小隨輸入尺寸變動），
-  故其 `runtimeSized` 資源由 runtime 依輸入尺寸配置；權重部分同樣待階段 2。
+  故其 `runtimeSized` 資源由 runtime 依輸入尺寸配置。
 - **套件包不可遠端載入**：MV3 禁止遠端程式碼，`.wgx` 必須隨擴充套件出貨。
-- **pass 自動拆分**屬階段 3：目前 `CuNNy 4x24/4x32/8x32` 的拆分是人工做的
-  （當年因 Dawn 的 `maxStorageTexturesPerShaderStage` 預設為 4）。
+- **pass 自動拆分**（`tools/pack/split_passes.mjs`）已可用：CuNNy2 的
+  `4x24` / `4x32` / `8x32` 可自動重現人工拆分結果（逐行 0 差異 + 逐像素
+  max|Δ| = 0），7 條白名單規則確保無法證明語意不變時直接 throw。

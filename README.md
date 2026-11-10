@@ -87,6 +87,35 @@ const device = await adapter.requestDevice({
 
 ---
 
+### Pre-built packages (`.wgx`)
+
+Effects can be shipped as **pre-built packages** — a zip container holding pre-generated
+WGSL, external textures and a JSON manifest. This is the recommended way to deliver effects
+to constrained hosts such as Chrome MV3 extensions:
+
+```bash
+npm run pack          # → dist/wgx/<Family>/<Effect>.wgx  (127 effects)
+```
+
+```js
+import { WGFXPackage } from 'wgfx';
+
+const pkg = await WGFXPackage.fromURL(chrome.runtime.getURL('wgx/Scalers/Bicubic.wgx'));
+const instance = await pkg.createInstance({ device, width: 1920, height: 1080 });
+const output = await instance.process(videoFrame);
+```
+
+- **No DSL parsing, no code generation at runtime** — the WGSL is generated at build time
+- **Self-contained** — external LUT textures (`.dds`) are bundled inside
+- **No `eval` / `new Function` anywhere** — safe under the MV3 default CSP
+- **Verified equivalent** — package output is pixel-identical to the source effect
+
+See [`docs/wgxp-format.md`](docs/wgxp-format.md) for the format specification and
+[`docs/weight-strategy.md`](docs/weight-strategy.md) for the measured trade-offs behind the
+weight-storage design.
+
+---
+
 ## Quick Start
 
 ### 1. Get WebGPU Device

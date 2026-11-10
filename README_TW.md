@@ -86,6 +86,34 @@ const device = await adapter.requestDevice({
 
 ---
 
+### 預編套件包（`.wgx`）
+
+效果可以以**預編套件包**的形式交付 —— 一個 zip 容器，內含預生成的 WGSL、
+外部紋理與 JSON manifest。這是向受限宿主（如 Chrome MV3 擴充套件）供應效果的
+建議做法：
+
+```bash
+npm run pack          # → dist/wgx/<家族>/<效果>.wgx（127 個效果）
+```
+
+```js
+import { WGFXPackage } from 'wgfx';
+
+const pkg = await WGFXPackage.fromURL(chrome.runtime.getURL('wgx/Scalers/Bicubic.wgx'));
+const instance = await pkg.createInstance({ device, width: 1920, height: 1080 });
+const output = await instance.process(videoFrame);
+```
+
+- **執行期不做 DSL 解析、不做程式碼生成** —— WGSL 於建置期產好
+- **自足** —— 外部 LUT 紋理（`.dds`）一併收在套件包內
+- **全程無 `eval` / `new Function`** —— 在 MV3 預設 CSP 下安全
+- **已驗證等價** —— 套件包輸出與原效果**逐像素一致**
+
+格式規格見 [`docs/wgxp-format.md`](docs/wgxp-format.md)；權重存放策略的實測取捨見
+[`docs/weight-strategy.md`](docs/weight-strategy.md)。
+
+---
+
 ## 快速開始
 
 ### 1. 取得 WebGPU 裝置
