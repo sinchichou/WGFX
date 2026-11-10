@@ -98,8 +98,8 @@ export interface WgxManifest {
 export interface WGFXPackageOptions {
     /** WebGPU 裝置 */
     device: GPUDevice;
-    /** `.wgx` 的位元組（zip 容器） */
-    data: ArrayBuffer | Uint8Array;
+    /** `.wgx` 的位元組（zip 容器）。已由 `fromURL`/`fromBytes` 載入時可省略。 */
+    data?: ArrayBuffer | Uint8Array;
     /** 輸入寬度 */
     width: number;
     /** 輸入高度 */
@@ -272,6 +272,15 @@ export class WGFXPackage {
      */
     public async createInstance(options: WGFXPackageOptions): Promise<WGFXPackageInstance> {
         const { device, width, height, outWidth, outHeight, onProgress } = options;
+
+        // `data` 可省略 —— 當套件包已由 fromURL()/fromBytes() 載入時,
+        // 不需重複解壓(擴充套件的 fromURL 路徑即屬此情形)。
+        if (options.data) {
+            // 重新解壓並以解出的內容為準(覆蓋本物件的 files)
+            const files = await unzipPackage(options.data);
+            this.files.clear();
+            for (const [k, v] of files) this.files.set(k, v);
+        }
 
         // ---- 1. 外部紋理（套件包內的 DDS）----
         onProgress?.('preparing-textures');
