@@ -9,6 +9,8 @@ export {
     parseDispatchExpression,
     evaluateDispatchExpression,
 } from './runtime/DispatchExpr';
+export { WGFXPackage, WGFXPackageInstance, unzipPackage } from './runtime/WGFXPackage';
+export { readDDS } from './runtime/DDSReader';
 export { Logger, LogLevel } from './utils/Logger';
 
 // Default export so consumers can write either form:

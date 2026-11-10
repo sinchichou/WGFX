@@ -241,45 +241,45 @@ export async function packEffect(opts) {
         });
     }
 
+    // ---- 預生成的 WGSL 與其資源描述 ----
     for (const m of modules) {
         const passInfo = shaderInfo.passes.find((p) => p.index === m.passIndex);
         const file = `shaders/pass${m.passIndex}.wgsl`;
         zip.add(file, Buffer.from(m.wgslCode, 'utf8'), true);
 
-        const resources = [];
-        for (const tex of m.resources.textures || []) {
-            resources.push({
-                kind: 'texture',
-                name: tex.name,
-                binding: tex.binding,
-                format: tex.format,
-                isStorage: !!tex.isStorage,
-            });
-        }
-        for (const samp of m.resources.samplers || []) {
-            resources.push({ kind: 'sampler', name: samp.name, binding: samp.binding });
-        }
-        for (const buf of m.resources.storageBuffers || []) {
-            resources.push({
-                kind: 'storageBuffer',
-                name: buf.name,
-                binding: buf.binding,
-                mode: buf.mode,
-                // 權重與特徵圖的大小取決於效果架構與輸入尺寸；打包期無法得知
-                // 特徵圖的最終大小（隨解析度變動），故標記為執行期決定。
-                // 權重則會在階段 2 轉為二進位檔（帶 file 欄位）。
-                runtimeSized: !buf.file,
-            });
-        }
-
         passes.push({
             index: m.passIndex,
             file,
+            // 資源描述直接沿用 codegen 的輸出 —— 執行期餵給 PipelineManager，
+            // 使套件包路徑與一般效果路徑**完全一致**（只少了 parse + codegen）。
+            resources: {
+                parameters: m.resources.parameters || [],
+                hasScene: m.resources.hasScene !== false,
+                sceneBinding: m.resources.sceneBinding ?? 4,
+                textures: (m.resources.textures || []).map((t) => ({
+                    id: t.id, name: t.name, logicalName: t.logicalName,
+                    width: t.width, height: t.height,
+                    format: t.format, binding: t.binding, group: t.group,
+                    isStorage: !!t.isStorage, declStyle: t.declStyle,
+                    source: t.source,
+                })),
+                samplers: (m.resources.samplers || []).map((s) => ({
+                    id: s.id, name: s.name, binding: s.binding, group: s.group,
+                    filter: s.filter, address: s.address, declStyle: s.declStyle,
+                })),
+                storageBuffers: (m.resources.storageBuffers || []).map((b) => ({
+                    id: b.id, name: b.name, binding: b.binding, group: b.group,
+                    mode: b.mode, type: b.type, stride: b.stride, file: b.file,
+                    // 權重與特徵圖的大小取決於效果架構與輸入尺寸；打包期無法得知
+                    // 特徵圖的最終大小（隨解析度變動），故標記為執行期決定。
+                    // 帶 file 的權重則已有二進位檔，大小由該檔決定。
+                    runtimeSized: !b.file,
+                })),
+            },
             dispatch: passInfo?.dispatch || undefined,
             workgroupSize: passInfo?.blockSize || passInfo?.numThreads || undefined,
             inputs: passInfo?.in || [],
             outputs: passInfo?.out || [],
-            resources,
         });
     }
 
@@ -320,6 +320,35 @@ export async function packEffect(opts) {
         parameters,
         passes,
         resources: [...externalTextures.values()],
+        // 精簡後的 shaderInfo：執行期供 ResourceManager 建立資源用。
+        // pass 的原始程式碼（`code`）不帶入 —— 已被預生成的 WGSL 取代。
+        shaderInfo: {
+            textures: (shaderInfo.textures || []).map((t) => ({
+                id: t.id, name: t.name, logicalName: t.logicalName,
+                width: t.width, height: t.height, format: t.format,
+                binding: t.binding, group: t.group, isStorage: !!t.isStorage,
+                declStyle: t.declStyle, source: t.source,
+            })),
+            buffers: (shaderInfo.buffers || []).map((b) => ({
+                id: b.id, name: b.name, mode: b.mode, type: b.type,
+                stride: b.stride, size: b.size, file: b.file,
+            })),
+            samplers: (shaderInfo.samplers || []).map((s) => ({
+                id: s.id, name: s.name, filter: s.filter, address: s.address,
+                binding: s.binding, group: s.group, declStyle: s.declStyle,
+            })),
+            parameters: shaderInfo.parameters || [],
+            metadata: shaderInfo.metadata || {},
+            passes: (shaderInfo.passes || []).map((p) => ({
+                index: p.index,
+                in: p.in || [],
+                out: p.out || [],
+                blockSize: p.blockSize,
+                numThreads: p.numThreads,
+                dispatch: p.dispatch,
+                desc: p.desc,
+            })),
+        },
         limits: Object.keys(limits).length ? limits : undefined,
         buildTool: `wgxp/1.0.0 (manifest v${MANIFEST_VERSION})`,
     });

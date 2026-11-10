@@ -37,7 +37,19 @@ export const MANIFEST_VERSION = 1;
  * @property {number[]} [workgroupSize]
  * @property {string[]} [inputs]        邏輯紋理名
  * @property {string[]} [outputs]       邏輯紋理名
- * @property {WgxResource[]} [resources] 此 pass 實際綁定的資源
+ * @property {WgxPassResources} [resources] 此 pass 的資源描述（codegen 的 module.resources）
+ */
+
+/**
+ * 一個 pass 的資源描述 —— 直接對應 codegen 的 `module.resources`，
+ * 執行期餵給 `PipelineManager.createPipelines`，使套件包路徑與一般效果路徑一致。
+ * @typedef {object} WgxPassResources
+ * @property {any[]} [parameters]
+ * @property {boolean} [hasScene]
+ * @property {number} [sceneBinding]
+ * @property {any[]} [textures]
+ * @property {any[]} [samplers]
+ * @property {any[]} [storageBuffers]
  */
 
 /**
@@ -54,6 +66,7 @@ export const MANIFEST_VERSION = 1;
  * @property {object} [parameters]      可調參數（沿用 WGFX 的 ParameterInfo 形狀）
  * @property {WgxPass[]} passes
  * @property {WgxResource[]} [resources] 全域資源（權重、外部紋理）
+ * @property {object} [shaderInfo] 精簡後的 shaderInfo（執行期供 ResourceManager 建立資源）
  * @property {object} [limits]          此效果建議的裝置上限
  * @property {string} [buildTool]       產生此套件包的工具版本
  * @property {string} [builtAt]         ISO 時間戳
@@ -77,6 +90,7 @@ export function createManifest(fields) {
         parameters: fields.parameters || [],
         passes: fields.passes || [],
         resources: fields.resources || [],
+        shaderInfo: fields.shaderInfo,
         limits: fields.limits,
         buildTool: fields.buildTool,
         builtAt: fields.builtAt || new Date().toISOString(),
@@ -136,9 +150,21 @@ export function validateManifest(manifest, opts = {}) {
     });
 
     // 資源：二進位資源必須有檔案,且檔案需存在
+    // 全域資源（manifest.resources）與 pass 層級的資源描述都要檢查。
+    // pass.resources 為 codegen 的資源形狀（{ textures, samplers, storageBuffers, … }），
+    // 其中帶 `file` 的項才需要檔案存在性檢查。
     const allResources = [...(manifest.resources || [])];
     for (const p of manifest.passes) {
-        for (const r of p.resources || []) allResources.push(r);
+        const r = p.resources;
+        if (!r) continue;
+        if (Array.isArray(r)) {
+            // 舊格式：資源陣列
+            for (const item of r) allResources.push(item);
+            continue;
+        }
+        for (const group of [r.textures || [], r.samplers || [], r.storageBuffers || []]) {
+            for (const item of group) allResources.push(item);
+        }
     }
     for (const r of allResources) {
         if (!r.name) {
@@ -149,7 +175,7 @@ export function validateManifest(manifest, opts = {}) {
             if (opts.files && !opts.files.has(r.file)) {
                 issues.push(`資源 ${r.name} 指向不存在的檔案: ${r.file}`);
             }
-        } else if (r.kind === 'storageBuffer') {
+        } else if (r.kind === 'storageBuffer' || r.mode) {
             // 沒有二進位檔的 storage buffer 必須宣告大小。
             // 例外：`runtimeSized` 者（如 CNN 的特徵圖緩衝區）大小取決於輸入
             // 尺寸，只能在執行期決定 —— 這類資源由 manifest 記錄「來源」，
