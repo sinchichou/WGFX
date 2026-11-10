@@ -38,6 +38,8 @@
     "test:port": "node test/port_check.mjs",
     "test:dispatch": "node test/dispatch_expr.test.mjs",
     "test:csp": "node test/csp_mv3_sim.test.mjs && node test/csp_mv3_opennr.test.mjs",
+    "test:wgxp": "node test/wgxp.test.mjs",
+    "pack": "node tools/pack/wgxp.mjs --batch effects --out-dir dist/wgx",
     "test:scalers": "node test/scalers_ref.mjs",
     "test:f16": "node test/f16_conversion.mjs",
     "test:ref": "node test/ref_probe_upscale_denoise_s.mjs",
