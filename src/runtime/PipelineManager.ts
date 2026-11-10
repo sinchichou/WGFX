@@ -1,20 +1,25 @@
 /// <reference types="@webgpu/types" />
 import { ResourceManager } from './ResourceManager';
 import { Logger, LogLevel } from '../utils/Logger';
+import { DispatchExpression, parseDispatchExpression } from './DispatchExpr';
 
 /**
  * A precompiled `//! DISPATCH` expression evaluator.
  * ---
- * 已預先編譯的 `//! DISPATCH` 運算式求值器。
+ * 已預先剖析的 `//! DISPATCH` 運算式求值器。
  * `keys` 為運算元名稱（defines 與 INPUT/OUTPUT 尺寸），於管線建立時固定，
- * 熱路徑只按相同順序傳值即可，無需每幀重新 `new Function(...)` 或組字串。
+ * 熱路徑只按相同順序傳值即可，無需每幀重新剖析運算式或組字串。
+ *
+ * ⚠️ 求值**不使用** `new Function` / `eval` —— 這是為了讓 WGFX 能執行於
+ * Chrome MV3 擴充套件（其預設 CSP 禁止將字串當程式碼求值）。
+ * 求值器為 AST 走訪，語意見 {@link DispatchExpression}。
  */
 export interface DispatchEvaluator {
     /** Original expression text (for error messages) / 原始運算式字串（錯誤訊息用） */
     expr: string;
     /** Operand names, bound as the compiled function's parameters / 運算元名稱（編譯後函式的參數） */
     keys: string[];
-    /** Compiled evaluator / 編譯後的求值函式 */
+    /** Parsed evaluator / 剖析後的求值器（AST 走訪，非動態程式碼） */
     fn: (...operands: number[]) => unknown;
 }
 
@@ -327,22 +332,33 @@ export class PipelineManager {
      * ---
      * P1：原本 `_evalDispatchExpr` 對每個 pass、**每一幀**都執行 `new Function(...)`
      * （運算式重新解析 + 產生新函式），是每幀熱路徑最明確的浪費。
-     * 這裡在建管線時就編譯好，並以當時的 context 鍵集固定參數名；dispatch 時只需
+     * 這裡在建管線時就剖析好，並以當時的 context 鍵集固定參數名；dispatch 時只需
      * 在快取失效時按相同鍵序傳值。
      *
-     * 編譯失敗（運算式語法錯誤）時回傳 null → 該 pass 走回 `_evalDispatchExpr`，
+     * MV3 相容性：剖析走 {@link parseDispatchExpression}（AST），**不使用**
+     * `new Function` / `eval` —— Chrome MV3 擴充套件的預設 CSP 禁止動態程式碼生成。
+     *
+     * 剖析失敗（語法錯誤）時回傳 null → 該 pass 走回 `_evalDispatchExpr`，
      * 讓錯誤時機與訊息文字與舊版完全相同。
      */
     private _compileDispatchExprs(pass: any): DispatchEvaluator[] | null {
         if (!pass || !pass.dispatch || pass.dispatch.length < 1) return null;
         const keys = Object.keys(this._dispatchContext());
         try {
-            return pass.dispatch.slice(0, 2).map((expr: string) => ({
-                expr,
-                keys,
-                // eslint-disable-next-line no-new-func
-                fn: new Function(...keys, `return (${expr});`) as (...operands: number[]) => unknown,
-            }));
+            return pass.dispatch.slice(0, 2).map((expr: string) => {
+                const parsed: DispatchExpression = parseDispatchExpression(expr);
+                return {
+                    expr,
+                    keys,
+                    // 以 AST 求值取代 new Function：同樣的鍵序傳值、同樣的數值語意，
+                    // 但不產生任何動態程式碼。
+                    fn: (...operands: number[]): unknown => {
+                        const ctx: Record<string, number> = {};
+                        for (let i = 0; i < keys.length; i++) ctx[keys[i]] = operands[i];
+                        return parsed.evaluate(ctx);
+                    },
+                };
+            });
         } catch {
             return null;
         }
@@ -366,14 +382,15 @@ export class PipelineManager {
     /**
      * Evaluate a //! DISPATCH expression（數值運算式：defines/OUTPUT_WIDTH/HEIGHT + 四則運算）
      * ---
-     * 舊路徑（未預編譯或預編譯失敗時使用）；語意與錯誤訊息與歷史版本一致。
+     * 舊路徑（未預剖析或剖析失敗時使用）；語意與錯誤訊息與歷史版本一致。
+     *
+     * MV3 相容性：走 AST 剖析 + 求值，**不使用** `new Function` / `eval`。
      */
     private _evalDispatchExpr(expr: string, passInfo: any): number {
         const ctx = this._dispatchContext();
         try {
-            // eslint-disable-next-line no-new-func
-            const fn = new Function(...Object.keys(ctx), `return (${expr});`);
-            return PipelineManager._normalizeDispatchResult(fn(...Object.values(ctx)));
+            const parsed = parseDispatchExpression(expr);
+            return PipelineManager._normalizeDispatchResult(parsed.evaluate(ctx));
         } catch (e: any) {
             throw new Error(`Pass ${passInfo.index}: DISPATCH expression "${expr}" failed: ${e?.message || e}`);
         }

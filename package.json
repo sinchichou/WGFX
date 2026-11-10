@@ -36,6 +36,8 @@
     "test:opennr": "node test/opennr_network.mjs",
     "test:opennr:all": "node tools/opennr_weights.test.mjs && node test/opennr_ref_smoke.mjs && node test/opennr_conv_equiv.mjs && node test/opennr_spike.mjs && node test/opennr_network.mjs",
     "test:port": "node test/port_check.mjs",
+    "test:dispatch": "node test/dispatch_expr.test.mjs",
+    "test:csp": "node test/csp_mv3_sim.test.mjs && node test/csp_mv3_opennr.test.mjs",
     "test:scalers": "node test/scalers_ref.mjs",
     "test:f16": "node test/f16_conversion.mjs",
     "test:ref": "node test/ref_probe_upscale_denoise_s.mjs",
