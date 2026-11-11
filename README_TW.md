@@ -439,7 +439,11 @@ WGFX/
 │       ├── UniformBinder.ts     # Uniform 綁定
 │       └── WGSLCodeGenerator.ts # WGSL 代碼生成
 ├── examples/                    # 內建特效範例
+├── effects/                     # 127 個移植效果（16 家族：Anime4K、CuNNy、RAVU、OpenNR…）
+├── effects_src/                 # 上游移植參考（Magpie HLSL 126 檔，125 已移植；ACNet 待移植）＋ OpenNR submodule
+├── tools/                       # 轉換器與驗收輔助工具
 ├── test/                        # 測試套件
+├── docs/                        # 設計與移植文件
 ├── debugger/                    # 偵錯工具
 ├── package.json
 ├── rollup.config.js

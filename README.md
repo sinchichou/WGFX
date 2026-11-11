@@ -518,11 +518,10 @@ WGFX/
 │       ├── UniformBinder.ts     # Uniform binding
 │       └── WGSLCodeGenerator.ts # WGSL code generation
 ├── examples/                    # Built-in effect examples
-├── effects/
+├── effects/                     # 127 ported effects in 16 families (Anime4K, CuNNy, RAVU, OpenNR, …)
 │   └── OpenNR/                  # OpenNR-ReShade port (f16 U-Net, 37 passes)
-├── effects_src/                 # Upstream shader sources used as port references
-│   ├── OpenNR-ReShade/upstream/ # git submodule (pinned v0.2.1)
-│   └── .../                     # Magpie HLSL sources (148 files) pending port
+├── effects_src/                 # Upstream port references: Magpie HLSL (126 files, 125 ported; ACNet pending)
+│   └── OpenNR-ReShade/upstream/ # git submodule (pinned v0.2.1)
 ├── tools/                       # Asset/tooling converters (opennr_weights.mjs)
 ├── test/                        # Test suite
 ├── docs/                        # Design docs (opennr-pass-graph.md, …)

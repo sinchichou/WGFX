@@ -40,16 +40,24 @@ All 117 HLSL sources across 13 families are ported; plus 10 effects from the ear
 
 ### 驗收紀錄 / Verification record
 
-最後一次全量驗收（2026-11-10，commit `8696c08`，真實 WebGPU / Dawn）：
+最後一次全量驗收（2026-11-11，commit `9bbb485`，真實 WebGPU / Dawn）：
 
 | 驗收項 | 結果 |
 |---|---|
-| `effects/` 全部效果逐一真跑（一檔一 process，OpenNR 2 檔除外） | **125 / 125 PASS** |
-| OpenNR 37-pass f16 U-Net 全網路 | **ALL PASS**（`test/opennr_network.mjs`） |
-| OpenNR conv spike | **PASS**（`test/opennr_spike.mjs`） |
-| 框架測試套件 `npm test` | **140 / 140** |
+| 框架測試套件 `npm test`（Test A–G；Test E 掃描 `effects/` 全樹真跑） | **140 / 140** |
 | 型別檢查 `npm run typecheck` | exit 0 |
-| 執行紀錄 | `.tmp/final-verification.txt`（未進版控） |
+| `test:dispatch`（`//! DISPATCH` AST 求值 + CSP 靜態檢查） | 30 / 30 |
+| `test:split`（CuNNy 自動拆分逐像素一致） | 24 / 24 |
+| `test:dds`（DDS 解析一致性 + LUT 格式辨識） | 21 / 21 |
+| `test:wgxp` / `test:wgxp:runtime`（.wgx 打包 / 執行期載入） | 27 / 27、13 / 13 |
+| `test:f16` / `test:scalers` / `test:external` | ALL PASS、ALL PASS、7 / 7 |
+| `test:csp`（MV3 CSP 模擬 + OpenNR 37-pass 於 CSP 下真跑） | 15 PASS / 0 FAIL |
+| `test:opennr:all`（權重轉換 / CPU oracle / conv 等價 / spike / 全網路） | ALL PASS |
+| `port_check` 抽查（`NNEDI3_nns16_win8x4`、`Sharpen/AdaptiveSharpen`） | ALL PASS |
+
+> 效果覆蓋：`effects/` 共 **127** 檔，Test E 逐一真跑；OpenNR 2 檔由 `test:opennr:all` 覆蓋。
+> 驗收結果直接記錄於本表，不再引用 `.tmp/` 下的未版控紀錄。
+> 前次全量驗收：2026-11-10，commit `8696c08`（125/125 逐一真跑 + 140/140 + typecheck exit 0）。
 
 ---
 
@@ -165,10 +173,11 @@ const device = await adapter.requestDevice({
 
 | 分支 Branch | 狀態 Status |
 |---|---|
-| `opennr-port` | **主線**：框架 + 全部 127 個效果 + 測試 + 文件 |
-| `main` | 已快進至 `opennr-port`（原為無 `effects/` 的早期線，為其祖先；純快進、無分歧） |
-| `effects-port` | 早期扁平式 Tier-1 移植，內容已被主線超集吸收（`-s ours` 記錄式合併，`6ecc28b`） |
-| `backup/before-author-fix` | 歷史快照；`git cherry` 確認 11 個 commit 的 patch 皆已等價存在於主線（刻意保留為安全網） |
+| `main` | **主線**：在 `opennr-port` 快進基礎上前進 6 個 commit（`.wgx` 套件格式與打包、執行期載入、`//! DISPATCH` AST 求值、雙語 README） |
+| `opennr-port` | 前主線；tip `d3ade00` 為 `main` 的祖先（純快進、無分歧），與 `origin/opennr-port` 同步 |
+| `effects-port` | 早期扁平式 Tier-1 移植；`-s ours` 記錄式合併 `6ecc28b`，10 個效果已搬入 `effects/` 子目錄並在主線持續改良（rename 偵測確認無內容遺失） |
+| `shader-verification-tool` | 未推送的本地分支，tip 與 `opennr-port` 相同（`d3ade00`），無獨有 commit；其驗證工具 WIP 存於 `git stash`（依賴不存在的 `src/verification/`，未完成） |
+| `backup/before-author-fix` | 歷史快照；`git cherry` 確認 11 個 commit 的 patch 皆已等價存在於 `main`（刻意保留為安全網） |
 
 > 分支整理為純快進／記錄式合併，**沒有任何 commit 被丟棄**；`backup/before-author-fix`
 > 保留原樣，如需清理可再另行決定。
