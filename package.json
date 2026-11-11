@@ -62,6 +62,7 @@
     "archiver": "^7.0.1",
     "commander": "^12.1.0",
     "glob": "^11.0.0",
+    "onnxruntime-node": "^1.31.1",
     "pngjs": "^7.0.0",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.3.1",
