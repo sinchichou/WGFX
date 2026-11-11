@@ -115,6 +115,7 @@
       case 'SORT_NAME': shaderInfo.metadata.sortName = dequote(data.id); break;
       case 'USE': data.id.split(',').forEach(f=>shaderInfo.metadata.use[f.trim().toUpperCase()]=true); break;
       case 'CAPABILITY': data.id.split(',').forEach(f=>shaderInfo.metadata.capability[f.trim().toUpperCase()]=true); break;
+      case 'MAGPIE': shaderInfo.metadata.magpie = dequote(data.id); break;
     }
     currentData = null;
   }
@@ -258,7 +259,7 @@ directive_line
 
       // Check for block-starting directives.
       // 檢查區塊起始指令。
-      if (["PARAMETER","TEXTURE","SAMPLER","BUFFER","COMMON","PASS", "VERSION","SORT_NAME","USE","CAPABILITY"].includes(directive)) {
+      if (["PARAMETER","TEXTURE","SAMPLER","BUFFER","COMMON","PASS", "VERSION","SORT_NAME","USE","CAPABILITY","MAGPIE"].includes(directive)) {
           // If we were in a PASS block, commit its code first before starting a new block.
           // 如果我們在 PASS 區塊中，則在開始新區塊之前先提交其程式碼。
           if (currentBlock === 'PASS' && passCodeBuffer.length > 0) {

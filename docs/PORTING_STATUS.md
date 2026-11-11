@@ -165,7 +165,9 @@ const device = await adapter.requestDevice({
 
 驗證輔助工具：`tools/port/check_effect.mjs`（靜態 lint）、`tools/port/wgsl_diag.mjs`
 （編譯診斷）、`test/effect_sweep.mjs`（動態批次掃描）、`tools/port/weight-integrity.mjs`
-（權重數字多重集比對）、`tools/port/analytic_check.mjs`（CPU 語意 vs GPU 實跑對照）。
+（權重數字多重集比對）、`tools/port/analytic_check.mjs`（CPU 語意 vs GPU 實跑對照）、
+`tools/verify_shaders.mjs`（Magpie HLSL 原碼 transpile 後 GPU 實跑，與移植版 WGSL
+逐像素差分驗證；工具組位於 `src/verification/`，報告輸出至 `verification_output/`）。
 
 ---
 

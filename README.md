@@ -487,6 +487,23 @@ npm run build:docs
 - **Test C**: All example effects compile + full pass execution + non-zero output verification
 - **Test D**: Missing `WIDTH`/`HEIGHT` on intermediate textures throws explicit error
 
+### Shader Verification Toolkit (`npm run verify:*`)
+
+Differential verification — runs the original Magpie HLSL through the built-in
+transpiler and compares its GPU output pixel-by-pixel against the ported WGSL:
+
+```bash
+npm run verify -- --effect Bilinear --category Scalers   # single effect pair
+npm run verify:scalers                                   # whole category (batch)
+npm run verify:all                                       # every discovered pair
+```
+
+Reports (JSON / HTML / Markdown, optional diff heatmaps) are written to
+`verification_output/` (gitignored). The reusable API lives in `src/verification/`
+(`quickVerify`, `GPUExecutor.runModules`, …); framework tests: `npm run test:verification`.
+Batch sweeps run many submits in one process — for large sets prefer one
+`verify_shaders` invocation per effect (same one-process-per-effect rule as `port_check`).
+
 ### OpenNR Acceptance (`npm run test:opennr:all`)
 
 | Check | Script | Criterion |

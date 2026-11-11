@@ -418,6 +418,23 @@ npm run build:docs
 - **Test C**：所有範例特效編譯 + 全 pass 執行 + 非零輸出驗證
 - **Test D**：中間紋理缺少 `WIDTH`/`HEIGHT` 時拋出明確錯誤
 
+### 著色器驗證工具組（`npm run verify:*`）
+
+差分驗證 — 將原始 Magpie HLSL 經內建 transpiler 轉換後在 GPU 實跑，
+與移植版 WGSL 逐像素比較：
+
+```bash
+npm run verify -- --effect Bilinear --category Scalers   # 單一效果對
+npm run verify:scalers                                   # 整個家族（批次）
+npm run verify:all                                       # 所有可配對效果
+```
+
+報告（JSON / HTML / Markdown，可選 diff 熱圖）寫入 `verification_output/`
+（已 gitignore）。可重用 API 位於 `src/verification/`（`quickVerify`、
+`GPUExecutor.runModules` 等）；框架測試：`npm run test:verification`。
+批次掃描在同一 process 內多次 submit — 大量效果請比照 `port_check`
+一檔一 process 個別執行較穩。
+
 ---
 
 ## 專案結構

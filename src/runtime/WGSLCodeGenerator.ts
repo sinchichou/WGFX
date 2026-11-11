@@ -247,11 +247,23 @@ export class WGSLCodeGenerator {
                 sceneBinding: sceneBinding,
             };
 
-            // Resolve which resources this pass needs by scanning the pass code and,
-            // transitively, the COMMON helper functions it calls (a pass calling a
-            // COMMON helper that samples a texture needs that texture declared).
-            // 以 pass 代碼為起點，沿 COMMON 輔助函式呼叫圖遞迴解析資源引用。
-            const closure = this._resolveCommonClosure(pass.code, fnBodies);
+            // Transform FIRST: HLSL syntax conversion (pre-transform), then the
+            // compute-entry transform — which may INJECT references (the Magpie-PS
+            // path adds a `textureStore(OUTPUT, …)` for return-style effects).
+            // Binding decisions below scan the TRANSFORMED code, so injected
+            // references resolve naturally; no blanket OUTPUT forcing is needed.
+            // 先轉換再解析綁定：Magpie-PS 路徑注入的 textureStore(OUTPUT,…) 會讓
+            // OUTPUT 自然進入引用集，避免對每個 pass 都強制綁 OUTPUT（會擠爆
+            // 預設 maxStorageTexturesPerShaderStage=4 的宿主）。
+            const processedPassCode = this._postProcessModule(pass.code, pass.index);
+            const transformedPassCode = this._transformPassToComputeShader({ ...pass, code: processedPassCode });
+
+            // Resolve which resources this pass needs by scanning the transformed
+            // pass code and, transitively, the COMMON helper functions it calls (a
+            // pass calling a COMMON helper that samples a texture needs that
+            // texture declared).
+            // 以轉換後的 pass 代碼為起點，沿 COMMON 輔助函式呼叫圖遞迴解析資源引用。
+            const closure = this._resolveCommonClosure(transformedPassCode, fnBodies);
             const referenced = new Set<string>();
             for (const w of closure.identifiers) {
                 if (
@@ -322,7 +334,22 @@ export class WGSLCodeGenerator {
             let textureBinding = BINDING_LAYOUT.TEXTURES_START;
             shaderInfo.textures.forEach((tex: TextureInfo) => {
                 const logical = logicalTextureName(tex.name);
-                const needed = referenced.has(tex.name) || referenced.has(logical);
+                // Textures written by this pass must be declared even when the code
+                // does not reference them (defense in depth; the //!OUT list is the
+                // authoritative write set).
+                // 本 pass 寫入的紋理即使代碼未引用也一併宣告（//!OUT 是權威寫入集）。
+                const writesLogical =
+                    pass.out.includes(tex.name) || pass.out.includes(logical);
+                // A pass never reads a texture it writes in the same pass — write→read
+                // is always cross-pass in Magpie/Anime4K graphs. Binding the sampled
+                // twin next to the write-only storage twin puts the SAME texture into
+                // one synchronization scope as both TextureBinding and
+                // Storage(write-only), which is invalid per WebGPU (flagged by Dawn).
+                // 同 pass 對同一邏輯紋理同時綁 sampled 與 write-only storage 為 spec 違規：
+                // 寫入的紋理跳過其 sampled 別名（read→write 恆為跨 pass 行為）。
+                if (writesLogical && tex.name.endsWith("_sampled")) return;
+                const isOutput = writesLogical;
+                const needed = referenced.has(tex.name) || referenced.has(logical) || isOutput;
                 if (!needed) return;
                 // Role comes from the declared name (Magpie convention: `X_storaged`
                 // is the write alias, `X_sampled` is the read alias). Storage access
@@ -402,13 +429,15 @@ export class WGSLCodeGenerator {
             wgsl += "\n";
 
             // Transform pass logic to compute shader entry point / 轉換通道邏輯為計算著色器進入點
-            let passCode = this._transformPassToComputeShader(pass);
-            wgsl += passCode;
+            // (already computed above — binding decisions scanned the transformed code)
+            wgsl += transformedPassCode;
 
-            // Module-level compat post-process / 模組層級相容後處理:
-            // HLSL 風格的殘留語法(typed local declaration、mul()、scalar swizzle)與
-            // 「引用 uniform 的 module-scope const」(WGSL 禁止)在此統一轉換。
-            wgsl = this._postProcessModule(wgsl, pass.index);
+            // Promote module-scope consts referencing uniforms AFTER the entry-point
+            // transform — the promotion anchors its initializer injection on `fn main_cs`,
+            // which only exists once the pass has been transformed.
+            // 引用 uniform 的 module-scope const → var<private>：錨點是組裝後的 main_cs，
+            // 故必須在 transform 之後執行（pre-stash 行為）。
+            wgsl = this._promoteUniformConstsToPrivate(wgsl, pass.index);
 
             generatedModules.push({
                 wgslCode: wgsl,
@@ -630,6 +659,8 @@ struct SceneInfo {
      * ---
      * 將 Pass 函式轉換為計算著色器進入點。
      * 同時支援 `fn Pass<N>(...)` 與 `fn main(...)` 兩種命名，統一改名為 main_cs 並套用 @compute 屬性。
+     * HLSL 風格的進入點參數（如 `float2 pos`）會被轉換為 WGSL 的 `@builtin(global_invocation_id)`，
+     * 並計算對應的 UV 座標。HLSL 的 return 會被轉換為 textureStore 寫入 OUTPUT。
      */
     private _transformPassToComputeShader(pass: PassInfo): string {
         // Remove meta-command comments / 移除元指令註解
@@ -642,12 +673,80 @@ struct SceneInfo {
         const numThreads = pass.numThreads || [1, 1, 1];
         code = code.replace(/@compute\s*@workgroup_size\([^)]+\)\s*/g, "");
 
-        const entryRegex = new RegExp(`fn\\s+(?:Pass${pass.index}|main)\\s*\\(`);
-        if (entryRegex.test(code)) {
-            code = code.replace(
-                entryRegex,
-                `@compute @workgroup_size(${numThreads[0]}, ${numThreads[1]}, ${numThreads[2]})\nfn main_cs(`,
-            );
+        const entryRegex = new RegExp(`fn\\s+(?:Pass${pass.index}|main)\\s*\\(([^)]*)\\)`);
+        const match = entryRegex.exec(code);
+        if (match) {
+            // Extract the original parameters
+            const originalParams = match[1].trim();
+
+            // Native compute entry — the pass declares its own @builtin parameters
+            // (effects use global_id / gid / workgroup_id + local_id / …). Preserve
+            // the parameter list VERBATIM and only rename the function to main_cs;
+            // renaming parameters would leave the body referencing unresolved names.
+            // 原生 compute 進入點：完整保留原參數列，只改函式名為 main_cs。
+            const isNativeCompute = originalParams.includes('@builtin');
+
+            // Magpie PS style — HLSL-style entry with a `pos` parameter and no
+            // @builtin: convert to a compute entry over gid and inject the UV
+            // computation plus the OUTPUT store (transpiler-only path).
+            // Magpie PS 風格：以 gid 重建進入點，注入 UV 計算與 OUTPUT 寫入。
+            const isMagpiePS = !isNativeCompute && /\bpos\b/.test(originalParams);
+
+            const nativeSignature = `@compute @workgroup_size(${numThreads[0]}, ${numThreads[1]}, ${numThreads[2]})\nfn main_cs(${originalParams})`;
+            const psSignature = `@compute @workgroup_size(${numThreads[0]}, ${numThreads[1]}, ${numThreads[2]})\nfn main_cs(@builtin(global_invocation_id) gid: vec3<u32>)`;
+
+            if (isNativeCompute) {
+                code = code.replace(entryRegex, nativeSignature);
+            } else if (!isMagpiePS) {
+                // No recognizable parameters — keep the declared parameter list
+                // as-is and only rename (pre-existing behavior).
+                code = code.replace(entryRegex, nativeSignature);
+            } else {
+                // Find the function body
+                const paramsEnd = match.index + match[0].length - 1; // Position of ')'
+                let bracePos = paramsEnd + 1;
+                while (bracePos < code.length && code[bracePos] !== '{') bracePos++;
+                if (bracePos >= code.length) {
+                    // No body found, just replace signature
+                    code = code.replace(entryRegex, psSignature);
+                } else {
+                    // Find matching closing brace
+                    let depth = 0;
+                    let bodyEnd = -1;
+                    for (let i = bracePos; i < code.length; i++) {
+                        if (code[i] === '{') depth++;
+                        else if (code[i] === '}') {
+                            depth--;
+                            if (depth === 0) {
+                                bodyEnd = i;
+                                break;
+                            }
+                        }
+                    }
+                    if (bodyEnd < 0) {
+                        code = code.replace(entryRegex, psSignature);
+                    } else {
+                        // Extract body
+                        const bodyStr = code.slice(bracePos, bodyEnd + 1);
+
+                        // Remove the return statement from the original body.
+                        // NOTE: the computed return value is currently discarded —
+                        // the injected store samples INPUT at pos directly. This is
+                        // the known transpiler fidelity gap for PS-style effects
+                        // whose return is not the raw input sample.
+                        const cleanedBody = bodyStr.replace(/\s*return\s+[^;]+;/g, '');
+
+                        // Inject UV computation and OUTPUT store at the start of the body
+                        // Magpie PS style: pos = (gid.xy + 0.5) * scene.outputPt
+                        const uvCode = `    let pos = (vec2<f32>(gid.xy) + vec2<f32>(0.5)) * scene.outputPt;\n`;
+                        const storeCode = `    textureStore(OUTPUT, vec2<i32>(gid.xy), textureSampleLevel(INPUT, sam, pos, 0));\n`;
+                        const newBody = bodyStr.slice(0, 1) + '\n' + uvCode + storeCode + cleanedBody.slice(1);
+
+                        // Replace from function start to body end
+                        code = code.slice(0, match.index) + psSignature + newBody + code.slice(bodyEnd + 1);
+                    }
+                }
+            }
         } else {
             // eslint-disable-next-line no-console
             console.warn(
@@ -670,19 +769,22 @@ struct SceneInfo {
     /**
      * Apply all module-level compat transforms, in a fixed order.
      * ---
-     * 固定順序套用全部模組層級相容轉換：
-     * 1. HLSL typed local declaration → `var NAME: TYPE = EXPR;`
-     * 2. HLSL `mul(a, b)` → `((a) * (b))`（任意巢狀位置）
-     * 3. scalar swizzle 消除（`value.x`，value 為 f32/i32/u32/bool 時 → `value`）
-     * 4. `vecN<f32>(…)` 參數內的 u32 場景尺寸運算式補 f32 轉換
-     * 5. 引用 uniform 的 module-scope const → `var<private>` + entry point 開頭初始化
+     * 固定順序套用 HLSL 語法相容轉換（uniform 提升除外 — 它需要組裝後的
+     * `fn main_cs` 作為錨點，由 generate() 在 transform 之後呼叫）：
+     * 1. HLSL function declaration → `fn NAME(PARAMS) -> RET { ... }`
+     * 2. HLSL typed local declaration → `var NAME: TYPE = EXPR;`
+     * 3. HLSL `mul(a, b)` → `((a) * (b))`（任意巢狀位置）
+     * 4. scalar swizzle 消除（`value.x`，value 為 f32/i32/u32/bool 時 → `value`）
+     * 5. `vecN<f32>(…)` 參數內的 u32 場景尺寸運算式補 f32 轉換
+     * 6. HLSL texture sampling (Texture.Sample, Texture.SampleLevel) → WGSL textureSampleLevel
      */
     private _postProcessModule(wgsl: string, passIndex: number): string {
-        let code = this._convertHlslTypedDecls(wgsl, passIndex);
+        let code = this._convertHlslFunctionDecls(wgsl, passIndex);
+        code = this._convertHlslTypedDecls(code, passIndex);
         code = this._expandHlslMul(code, passIndex);
         code = this._eliminateScalarSwizzles(code);
         code = this._wrapU32ArgsInF32VectorCtors(code);
-        code = this._promoteUniformConstsToPrivate(code, passIndex);
+        code = this._convertHlslTextureSampling(code);
         return code;
     }
 
@@ -889,7 +991,139 @@ struct SceneInfo {
     }
 
     /**
-     * Expand HLSL `mul(a, b)` into `(a) * (b)` at arbitrary nesting depth.
+     * Convert HLSL-style function declarations to WGSL `fn` declarations.
+     * ---
+     * 將 HLSL 函式宣告轉為 WGSL：
+     *   `float4 Pass1(float2 pos) { ... }`  → `fn Pass1(pos: vec2<f32>) -> vec4<f32> { ... }`
+     *   `float4 main() { ... }` → `fn main() -> vec4<f32> { ... }`
+     * 處理 HLSL 型別名稱映射到 WGSL 型別。
+     */
+    private _convertHlslFunctionDecls(code: string, passIndex: number): string {
+        // HLSL 型別到 WGSL 型別的映射
+        const hlslToWgslType: Record<string, string> = {
+            'float': 'f32',
+            'float2': 'vec2<f32>',
+            'float3': 'vec3<f32>',
+            'float4': 'vec4<f32>',
+            'int': 'i32',
+            'int2': 'vec2<i32>',
+            'int3': 'vec3<i32>',
+            'int4': 'vec4<i32>',
+            'uint': 'u32',
+            'uint2': 'vec2<u32>',
+            'uint3': 'vec3<u32>',
+            'uint4': 'vec4<u32>',
+            'bool': 'bool',
+        };
+
+        // Match HLSL function declarations: returnType name(params) { body }
+        // Pattern: returnType (identifier) ( params ) { ... }
+        // Handle both `fn Name(...)` and return type at start
+        const fnRe = /\b(?:float|float2|float3|float4|int|int2|int3|int4|uint|uint2|uint3|uint4|bool)\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
+
+        let result = "";
+        let last = 0;
+        let match: RegExpExecArray | null;
+
+        while ((match = fnRe.exec(code)) !== null) {
+            // Check if this is already a WGSL fn declaration (preceded by 'fn ')
+            const beforeMatch = code.slice(Math.max(0, match.index - 4), match.index).trim();
+            if (beforeMatch === 'fn' || beforeMatch.endsWith('fn')) {
+                // Already converted, skip
+                continue;
+            }
+
+            // Check if we're inside another function (paren depth)
+            let parenDepth = 0;
+            for (let i = 0; i < match.index; i++) {
+                if (code[i] === '{') parenDepth++;
+                else if (code[i] === '}') parenDepth--;
+            }
+            if (parenDepth > 0) {
+                // Inside another function, this is a local function or nested, skip
+                continue;
+            }
+
+            // Found a function declaration, now find the full function
+            const returnType = match[0].trim().split(/\s+/)[0];
+            const fnName = match[1];
+            const paramsStart = match.index + match[0].length - 1; // Position of '('
+
+            // Find matching closing brace for the function body
+            let depth = 0;
+            let bodyEnd = -1;
+            for (let i = paramsStart; i < code.length; i++) {
+                if (code[i] === '{') depth++;
+                else if (code[i] === '}') {
+                    depth--;
+                    if (depth === 0) {
+                        bodyEnd = i;
+                        break;
+                    }
+                }
+            }
+            if (bodyEnd < 0) continue;
+
+            // Find the parameter list
+            let paramDepth = 0;
+            let paramsEnd = -1;
+            for (let i = paramsStart; i < code.length; i++) {
+                if (code[i] === '(') paramDepth++;
+                else if (code[i] === ')') {
+                    paramDepth--;
+                    if (paramDepth === 0) {
+                        paramsEnd = i;
+                        break;
+                    }
+                }
+            }
+            if (paramsEnd < 0) continue;
+
+            const paramsStr = code.slice(paramsStart + 1, paramsEnd).trim();
+            
+            // Find the opening brace of the function body
+            let bracePos = paramsEnd + 1;
+            while (bracePos < code.length && code[bracePos] !== '{') bracePos++;
+            if (bracePos >= code.length) continue;
+            
+            const bodyStr = code.slice(bracePos, bodyEnd + 1);
+
+            // Parse parameters: type name, type name, ...
+            const wgslParams: string[] = [];
+            if (paramsStr.length > 0) {
+                // Split by comma at top level
+                const paramParts = WGSLCodeGenerator.splitTopLevelCommas(paramsStr);
+                for (const part of paramParts) {
+                    const p = part.trim();
+                    // Match HLSL parameter: type name
+                    const paramMatch = p.match(/^(\w+)\s+(\w+)$/);
+                    if (paramMatch) {
+                        const [, pType, pName] = paramMatch;
+                        const wgslType = hlslToWgslType[pType] || pType;
+                        wgslParams.push(`${pName}: ${wgslType}`);
+                    } else {
+                        // Could be just a name (rare), keep as-is
+                        wgslParams.push(p);
+                    }
+                }
+            }
+
+            const wgslReturnType = hlslToWgslType[returnType] || returnType;
+            const wgslSignature = `fn ${fnName}(${wgslParams.join(', ')}) -> ${wgslReturnType}`;
+
+            // Replace the HLSL declaration with WGSL
+            const replacement = wgslSignature + bodyStr;
+            result += code.slice(last, match.index) + replacement;
+            last = bodyEnd + 1;
+        }
+
+        if (last === 0) return code;
+        void passIndex;
+        return result + code.slice(last);
+    }
+
+    /**
+     * Convert HLSL-style typed local declarations to WGSL `var` declarations.
      * ---
      * HLSL `mul(x, y)` 與 WGSL 的 `x * y` 一致（矩陣方向由建構時的欄/列安排決定，
      * WGFX 已在轉換器層以「欄 = HLSL 的欄」重建矩陣）。以括號平衡掃描處理，
@@ -1120,5 +1354,33 @@ struct SceneInfo {
             "\n    // module-scope const(引用 uniform)→ var<private>,於進入點開頭初始化\n    " +
             inits.join("\n    ") + "\n";
         return wgsl.slice(0, braceIdx + 1) + initBlock + wgsl.slice(braceIdx + 1);
+    }
+
+    /**
+     * Convert HLSL texture sampling calls to WGSL textureSampleLevel.
+     * ---
+     * HLSL: Texture.Sample(sampler, uv) or Texture.SampleLevel(sampler, uv, lod)
+     * WGSL: textureSample(sampler, texture, uv) or textureSampleLevel(texture, sampler, uv, lod)
+     * Note: In WGSL, the texture comes as the first argument to textureSample/textureSampleLevel,
+     * then sampler, then coordinates, then level.
+     */
+    private _convertHlslTextureSampling(code: string): string {
+        // Convert Texture.SampleLevel(sam, uv, lod) -> textureSampleLevel(Texture, sam, uv, lod)
+        let result = code.replace(
+            /(\b[A-Za-z_][A-Za-z0-9_]*)\.SampleLevel\s*\(\s*([^,]+)\s*,\s*([^,]+)\s*,\s*([^)]+)\s*\)/g,
+            (match, textureName, samplerName, uv, lod) => {
+                return `textureSampleLevel(${textureName.trim()}, ${samplerName.trim()}, ${uv.trim()}, ${lod.trim()})`;
+            }
+        );
+
+        // Convert Texture.Sample(sam, uv) -> textureSample(Texture, sam, uv)
+        result = result.replace(
+            /(\b[A-Za-z_][A-Za-z0-9_]*)\.Sample\s*\(\s*([^,]+)\s*,\s*([^)]+)\s*\)/g,
+            (match, textureName, samplerName, uv) => {
+                return `textureSample(${textureName.trim()}, ${samplerName.trim()}, ${uv.trim()})`;
+            }
+        );
+
+        return result;
     }
 }
