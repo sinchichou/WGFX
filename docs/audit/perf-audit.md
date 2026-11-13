@@ -123,3 +123,31 @@ workgroup 64（1 wave64）+ 早退在 780M 上屬健康形狀，非問題；RAVU
   不可全域調高假設，需逐效果宣告。
 - 本審計未執行任何 GPU 程序（依指示），所有數字為原始碼靜態推導 + 既有 bench 結構推論；
   M1–M4 的實測是下一步的第一優先。
+
+---
+
+## 附錄：Round 3 之後的優化研究備註（2026-11-14，lead）
+
+> 使用者指示「停，研究就好」——以下為**研究結論**，未實作。
+
+### O3-lite：`outputFormat` 輸出格式選項（研究完成，未實作）
+- **收益**：OUTPUT 目前硬編 `rgba16float`（8B/texel）。升頻特效輸出像素數＝輸入×4，2x 升頻 1080p→4K 每幀輸出寫入 ≈ 33MB（16f）；改 `rgba8unorm` 減半（16.6MB），並省掉宿主呈現路徑的 16f→8unorm 轉換複製。
+- **實作點**：`WGFX.create` 的 OUTPUT 外部資源 spec（`src/WGFX.ts` 硬編 `format: 'rgba16float'`）。
+- **已發現的陷阱（實作前必解）**：codegen 的 OUTPUT 宣告格式來自效果檔 `//!TEXTURE`（無宣告才 fallback rgba16float，見 `WGSLCodeGenerator.ts` declaredFormat 邏輯）。若宿主建了 rgba8unorm 紋理但 WGSL 宣告 rgba16float → bind group layout 格式不符，Dawn 直接報錯。**必須**同步：(1) 外部資源格式覆寫進 codegen 的 declaredFormat 解析，或 (2) 在 ResourceManager 加格式一致性檢查並給出明確錯誤。
+- **正確性**：16f→8unorm 有量化（±1/255）；驗收用 PixelComparator 寬容級（ToleranceLevel），並以視覺確認無 banding。
+- **風險**：低（opt-in，預設不變）；影響面：所有直接上 canvas 的宿主（VSR 即是）。
+
+### O1（FP16 數學）現況
+- 基礎路徑已落地（`preferF16` + `shader-f16` 偵測 + `enable f16;` 注入，閘門測試 4/4，commit `1b4fb93`）——但這只是「開關」，**還沒有 f16 數學轉換**。
+- 下一步（研究結論）：f16 模式下 (a) 中介紋理 rgba8snorm→rgba16float 維持語意、(b) COMMON 輔助函式內的 f32 數學改 f16（需顯式 vecN<f16> 邊界轉換；uniform 與 textureLoad 邊界保持 f32）。**本機 4060 shader-f16=false 無法驗證**，驗收必須在 RDNA3（780M）真機 + verify 差分門檻。
+- 重大提醒：CuNNy 中介已是 rgba8snorm（頻寬紅利已拿），f16 的紅利在 **RDNA3 計算吞吐（f16 rate ×2）與佔用率**，對 OpenNR（packed f16 buffer 卻 f32 運算）收益最大。
+
+### O2（shared-memory tap 重用）研究結論
+- 主兇解法，但＝codegen 重構級工程：需偵測 pass 內取樣 tap 集合 → 發射 workgroup shared 陣列 → 協同載入 + barrier → 取樣呼叫改讀 shared。相鄰 thread 3×3 tap 重疊 2/3，理論省 2–3× 紋理讀取。
+- 前置條件：逐效果驗證（127 個效果 BLOCK_SIZE/取樣模式各異）；建議先對 CuNNy 家族（textureLoad 點取樣、tap 集合固定）做原型，用 `npm run verify` 差分 + bench 前後對照。
+- 1080p 才是主戰場（case E 實測：256² 框架 overhead 主導、GPU 才 28µs；512²→92µs 線性上升）。
+
+### 優先序建議（下次實作輪）
+1. O3-lite（半天、可本機驗證、所有效果受益）
+2. O2 原型限 CuNNy 家族（1–2 天、本機可驗證、直接打主兇）
+3. O1 f16 數學（需 780M 真機驗收；配合 VSR 實測 FPS）
