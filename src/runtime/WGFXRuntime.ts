@@ -31,6 +31,12 @@ export class WGFXRuntime {
     public shaderInfo: WGFXShaderInfo | null;
     /** @zh 生成的WGSL模組，用於除錯顯示 */
     public generatedModules: { wgslCode: string; passIndex: number; resources: any }[] | null;
+    /**
+     * @zh 半精度（f16）模式是否啟用。
+     * 只有當效果宣告 `//! CAPABILITY FP16`、宿主明確 opt-in（preferF16）、
+     * 且裝置支援 `shader-f16` feature 時才為 true。預設 false＝既有 f32 行為。
+     */
+    public f16Enabled: boolean = false;
 
     /** @zh pass 索引 → 元數據查找表（compile 時建立，dispatch 熱路徑免字串解析與線性搜尋） */
     private passInfoByIndex: Map<number, PassInfo> = new Map();
@@ -76,7 +82,7 @@ export class WGFXRuntime {
      * @returns A promise that resolves when compilation is successful
      * @throws {Error} 當語法解析、代碼產生或管線編譯失敗時拋出異常
      */
-    public async compile(effectCode: string, externalResources: any = {}, options: { honorDeclaredOutput?: boolean } = {}): Promise<void> {
+    public async compile(effectCode: string, externalResources: any = {}, options: { honorDeclaredOutput?: boolean; preferF16?: boolean } = {}): Promise<void> {
         Logger.debug("WGFXRuntime: Starting effect compilation.");
 
         try {
@@ -87,6 +93,24 @@ export class WGFXRuntime {
             this.passInfoByIndex = new Map(shaderInfo.passes.map(p => [p.index, p]));
             Logger.debug("WGFXRuntime: ShaderInfo parsed");
 
+            // 1b. Resolve the half-precision mode.
+            // f16 只在**全部**下列條件成立時啟用，否則維持既有 f32 行為：
+            //   - 效果檔宣告了 `//! CAPABILITY FP16`
+            //   - 呼叫端明確要求（preferF16）
+            //   - 裝置真的支援 `shader-f16` feature
+            // 未啟用時產生的 WGSL 與舊版逐位元組相同。
+            const declaresF16 = shaderInfo.metadata?.capability?.FP16 === true;
+            const deviceHasF16 = this.device.features?.has?.("shader-f16") === true;
+            this.f16Enabled = declaresF16 && options.preferF16 === true && deviceHasF16;
+            if (declaresF16 && !this.f16Enabled) {
+                const why = !deviceHasF16
+                    ? "device lacks the 'shader-f16' feature"
+                    : "host did not opt in (preferF16)";
+                Logger.info(`WGFXRuntime: f16 requested by effect but disabled — ${why}.`);
+            } else if (this.f16Enabled) {
+                Logger.info("WGFXRuntime: f16 enabled (shader-f16 feature present).");
+            }
+
             // 2. Generate optimized WGSL modules / 步驟 2：產生優化後的 WGSL 模組
             //    外部 defines 需在產生期就注入為 WGSL 常數（NW/NH/CIN/COUT 等），
             //    故此處直接取自 externalResources —— 早於 ResourceManager.initialize
@@ -94,6 +118,7 @@ export class WGFXRuntime {
             const generatedModules = this.wgslCodeGenerator.generate(
                 shaderInfo,
                 (externalResources && externalResources.defines) || {},
+                { f16: this.f16Enabled },
             );
             this.generatedModules = generatedModules;
 

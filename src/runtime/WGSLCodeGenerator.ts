@@ -168,12 +168,25 @@ export class WGSLCodeGenerator {
     public generate(
         shaderInfo: WGFXShaderInfo,
         defines: Record<string, number> = {},
+        options: { f16?: boolean } = {},
     ): { wgslCode: string; passIndex: number; resources: any }[] {
         const generatedModules: {
             wgslCode: string;
             passIndex: number;
             resources: any;
         }[] = [];
+
+        // f16 (half precision) enable directive.
+        // `//! CAPABILITY FP16` is a *marker* — it states the effect was authored
+        // for half-precision hardware, but WGSL still needs `enable f16;` and the
+        // device needs the `shader-f16` feature. This is opt-in and off by
+        // default: with f16 disabled the generated code is byte-identical to
+        // the previous behaviour.
+        // f16 啟用指示：CAPABILITY FP16 只是標記，WGSL 仍需 enable f16; 且裝置
+        // 需支援 shader-f16。此為 opt-in，預設關閉——關閉時產生的程式碼與
+        // 舊行為完全一致。
+        const f16Enabled = options.f16 === true;
+        const f16Directive = f16Enabled ? "enable f16;\n\n" : "";
 
         // Prepare common code sections / 準備共通代碼區段
         // COMMON 函式主體會依每個 pass 的實際呼叫進行**函式級裁剪**：
@@ -227,6 +240,7 @@ export class WGSLCodeGenerator {
             let wgsl = `// ========================================\n`;
             wgsl += `// Pass ${pass.index}\n`;
             wgsl += `// ========================================\n\n`;
+            wgsl += f16Directive;
 
             // Prepare resource tracking object / 準備資源追蹤物件
             // COMMON 自行宣告 scene 時（如舊版 Magpie 移植），主機端必須把 sceneBuffer

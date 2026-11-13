@@ -36,6 +36,17 @@ export interface WGFXOptions {
     outHeight?: number;
     /** @zh 選用的外部資源 (textures, samplers, etc.) */
     externalResources?: any;
+    /**
+     * Opt in to half-precision (f16) execution when the effect declares
+     * `//! CAPABILITY FP16` **and** the device exposes the `shader-f16`
+     * feature. Default `false` keeps the historical f32 path byte-for-byte.
+     *
+     * 當效果宣告 `//! CAPABILITY FP16` **且** 裝置支援 `shader-f16` feature 時，
+     * 啟用半精度（f16）運算。預設 `false`＝維持既有 f32 路徑完全不變。
+     *
+     * @default false
+     */
+    preferF16?: boolean;
 }
 
 /**
@@ -67,6 +78,11 @@ export interface WGFXInfo {
     }[];
     /** @zh 渲染通道總數 */
     passes: number;
+    /**
+     * Whether half-precision (f16) execution is active for this instance.
+     * @zh 此實例是否啟用了半精度（f16）運算
+     */
+    f16: boolean;
 }
 
 /**
@@ -141,7 +157,7 @@ export class WGFX {
      * @returns A promise that resolves to a WGFX instance
      * @throws {Error} 如果 WebGPU 裝置、代碼無效或編譯失敗時拋出錯誤
      */
-    public static async create({ device, effectCode, width, height, outWidth, outHeight }: WGFXOptions): Promise<WGFX> {
+    public static async create({ device, effectCode, width, height, outWidth, outHeight, preferF16 }: WGFXOptions): Promise<WGFX> {
         if (!device) {
             const error = 'Must provide a valid GPUDevice';
             Logger.error(error);
@@ -194,7 +210,10 @@ export class WGFX {
         };
 
         try {
-            await runtime.compile(effectCode, externalResources, { honorDeclaredOutput: !hostOverridesOutput });
+            await runtime.compile(effectCode, externalResources, {
+                honorDeclaredOutput: !hostOverridesOutput,
+                preferF16: preferF16 === true,
+            });
         } catch (error: any) {
             Logger.error('WGFX compilation failed:', error);
             throw new Error(`Shader compilation error: ${error.message}`);
@@ -254,7 +273,8 @@ export class WGFX {
                 step: p.step ?? 0.01,
                 label: p.label
             })),
-            passes: shaderInfo.passes.length
+            passes: shaderInfo.passes.length,
+            f16: this.runtime.f16Enabled
         };
     }
 
