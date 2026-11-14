@@ -47,12 +47,14 @@ let ROUNDS = 5;
 let FRAMES = 30;
 let EFFECT_REL = 'effects/CuNNy/CuNNy-2x4C-NVL.wgsl';
 let UPLOAD = true;
+let ADAPTER = 'auto';
 for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--size') SIZE = Math.max(16, Number(argv[++i]) | 0);
     else if (argv[i] === '--rounds') ROUNDS = Math.max(1, Number(argv[++i]) | 0);
     else if (argv[i] === '--frames') FRAMES = Math.max(1, Number(argv[++i]) | 0);
     else if (argv[i] === '--effect') EFFECT_REL = argv[++i];
     else if (argv[i] === '--no-upload') UPLOAD = false;
+    else if (argv[i] === '--adapter') ADAPTER = argv[++i];
 }
 
 // ---------------------------------------------------------------- effect file
@@ -78,9 +80,13 @@ const effect = pickEffect();
 const shaderText = fs.readFileSync(effect.abs, 'utf8');
 
 // ---------------------------------------------------------------- device
-const adapter = await nav.gpu.requestAdapter();
+// --adapter auto | high-performance | low-power：本機雙 GPU（RTX 4060 dGPU /
+// Radeon 780M iGPU）以 powerPreference 切換；auto 交由驅動決定。
+const adapter = await nav.gpu.requestAdapter(
+    ADAPTER === 'auto' ? {} : { powerPreference: ADAPTER });
 if (!adapter) {
-    console.error('FATAL: requestAdapter() returned null — no GPU adapter available.');
+    console.error(`FATAL: requestAdapter(${ADAPTER}) returned null — no GPU adapter available `
+        + `(--adapter ${ADAPTER} 不存在？可用值：auto | high-performance | low-power).`);
     process.exit(2);
 }
 const adapterInfo = adapter.info || {};
