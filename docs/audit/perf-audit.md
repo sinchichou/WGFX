@@ -191,3 +191,36 @@ workgroup 64（1 wave64）+ 早退在 780M 上屬健康形狀，非問題；RAVU
    「優化」進主線。Wall-clock 量測（框架 overhead 主導）會完全看不到 GPU 端差異。
 4. 轉換腳本保留：若 780M 實測划算，`make_smem.mjs` 的邏輯可移植進
    `tools/cunny2wgsl.mjs` 產生器，家族 20 檔一次重生成。
+
+---
+
+## 附錄 C：780M iGPU 實機基線 + O2 判定關閉（2026-11-14，main 主幹）
+
+> `bench_cnn_caseE.mjs` 新增 `--adapter low-power`（→ Radeon 780M）後補完的量測。
+> f32 路徑、`CuNNy-2x4C-NVL`，timestamp-query K-repeated，中位數。
+
+### 780M f32 基線（vs 既有 4060 數據）
+
+| 尺寸 | 4060 GPU 執行 | 780M GPU 執行 | 780M per-pass（in/conv1/conv2/out） | 780M GPU saturated |
+|---|---|---|---|---|
+| 256² | 0.028 ms | **0.147 ms（5.3× 慢）** | 18 / 39 / 39 / 51 µs | 0.219 ms/幀（~4570 FPS） |
+| 384² | 0.054 ms | **0.318 ms（5.9× 慢）** | 41 / 86 / 86 / 111 µs | 0.491 ms/幀 |
+
+- **線性確認**：256²→384² 面積比 ×2.25，GPU 時間 ×2.16 ⇒ 線性外推 **1080p 輸入 ≈ 4.7–4.9 ms/幀（780M）**——CuNNy-2x4C 單效果即吃掉 60 FPS 預算（16.6ms）的 ~30%；更大的 CuNNy 變體（8x8C ≈ 2.5× taps）將直接逼近/突破預算 ⇒ 「小 CNN 掉 FPS」在 780M + 1080p 是真實風險。
+- node-webgpu（dawn.node 0.3.8）在 `--size >= 512` 無訊息崩潰（與 writeTexture 量無關，`--no-upload --frames 1` 仍炸）⇒ ≥512 的實測必須走 Chrome（Phase 2 瀏覽器 bench）。
+- 兩張卡的 `shader-f16` 皆為 false（D3D12 後端 DXC 不可用，`allow_unsafe_apis`/`use_dxc` toggles 無效）⇒ **f16 GPU 實測必須走 Chrome WebGPU**。
+
+### O2 smem 在 780M 的判定：**負優化，關閉**
+
+| 變體（256²，780M） | GPU 執行（中位數） | per-pass |
+|---|---|---|
+| original | **0.147 ms** | 18 / 39 / 39 / 51 µs |
+| smem | **0.172 ms（+17% 慢）** | 25 / 48 / 47 / 53 µs |
+
+- 結論：**texture cache 在頻寬受限 iGPU 上同樣吸收了 tap 冗餘**（至少在 ≤384² 尺寸），barrier＋協同載入的開銷 > 節省的取樣。O2 在兩張卡皆負 ⇒ 從優化清單移除（腳本保留作量測工具）。
+- 附錄 B §2「780M 上未證明」就此關閉。若未來在 1080p Chrome 實測翻案，重開的成本是 5 分鐘（同 harness）。
+
+### 更新後的優先序
+1. ~~O3-lite outputFormat~~ ✅ 已實作（3b0b276，+11%）
+2. ~~O2 smem~~ ✅ 已實測關閉（4060 +29% / 780M +17%）
+3. **O1 f16 數學 ⇒ 唯一尚未判定的主要候選**（Phase 2：離線 f16 副本 + Chrome A/B）
