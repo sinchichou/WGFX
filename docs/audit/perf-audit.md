@@ -148,6 +148,12 @@ workgroup 64（1 wave64）+ 早退在 780M 上屬健康形狀，非問題；RAVU
 - 1080p 才是主戰場（case E 實測：256² 框架 overhead 主導、GPU 才 28µs；512²→92µs 線性上升）。
 
 ### 優先序建議（下次實作輪）
-1. O3-lite（半天、可本機驗證、所有效果受益）
-2. O2 原型限 CuNNy 家族（1–2 天、本機可驗證、直接打主兇）
+1. ~~O3-lite（半天、可本機驗證、所有效果受益）~~ ✅ **已實作**（2026-11-14，commit `e2d1b4c`）：
+   `WGFXOptions.outputFormat`／`WGFXRuntime.compile` 選項。實作要點＝新增 codegen
+   `formatOverrides` 機制（宿主格式覆寫優先於效果 `//!FORMAT`），GPUTexture 與 WGSL
+   宣告兩端一致（`storageCapableFormat` 正規化一次）。**實測**（RTX 4060，Bilinear
+   512²→1024²，5×30 幀）：rgba16float 0.128 ms/幀 vs **rgba8unorm 0.113 ms/幀（快 ~11%）**，
+   輸出寫入 8MB→4MB/幀；數值差 ≤1/255（純量化，`test/output_format.test.mjs` 5/5 全過、
+   `npm test` 140/140 無回歸）。宿主採用：`WGFX.create({..., outputFormat: 'rgba8unorm'})`。
+2. O2 原型限 CuNNy 家族（1–2 天、本機可驗證、直接打主兇）→ **下一個目標**
 3. O1 f16 數學（需 780M 真機驗收；配合 VSR 實測 FPS）
