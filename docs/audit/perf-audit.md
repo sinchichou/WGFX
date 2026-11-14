@@ -157,3 +157,37 @@ workgroup 64（1 wave64）+ 早退在 780M 上屬健康形狀，非問題；RAVU
    `npm test` 140/140 無回歸）。宿主採用：`WGFX.create({..., outputFormat: 'rgba8unorm'})`。
 2. O2 原型限 CuNNy 家族（1–2 天、本機可驗證、直接打主兇）→ **下一個目標**
 3. O1 f16 數學（需 780M 真機驗收；配合 VSR 實測 FPS）
+
+---
+
+## 附錄 B：O2 shared-memory 原型實測（2026-11-14，負結果）
+
+> 「先量測後動刀」的示範案例：原型已實作並實測，**在 RTX 4060 上是負優化**。
+
+### 實作
+`tools/experimental/smem/`：
+- `make_smem.mjs` — 把 CuNNy WGSL 的 3×3 全-texel tap pass 轉成 workgroup shared-memory
+  tile 版（10×10 tile 協同載入 + `workgroupBarrier` + `textureLoad(clamp)` 取代
+  `textureSampleLevel`；out-shuffle pass 不動）。原理：8×8 workgroup 內 9 tap
+  有 5.76× 冗餘，理論上紋理讀取可降 5.76×。
+- `verify_smem.mjs` — 像素一致性驗證：**MAE=0 / max=0**（轉換無數值差）✅
+- `bench_smem_ts.mjs` — timestamp-query 量測（K-repeated 對抗 65.536µs 粒度）
+- `CuNNy-2x4C-NVL-smem.wgsl` — 轉換後的效果檔（3/4 pass 轉換，out-shuffle 保留）
+
+### 實測（RTX 4060 Laptop，case E 的 timestamp harness，256×256）
+| 變體 | GPU 執行（中位數） | per-pass |
+|---|---|---|
+| original | **0.028 ms** | in 3µs / conv1 8µs / conv2 8µs / out 9µs |
+| smem | **0.036 ms（+29% 慢）** | in 6µs / conv1 10µs / conv2 9µs / out 9µs |
+
+### 結論
+1. **RTX 4060 上 texture cache 已吸收 tap 冗餘**——硬體 L1/L2 讓 9-tap 直線取樣的
+   實際記憶體流量遠低於理論值；barrier＋協同載入＋shared 讀取的開銷反而更貴。
+2. **780M 上未證明**：頻寬受限 iGPU 的 L2 較小、且 1080p 才進入 GPU-bound 區間
+   （本附錄 A 的 case E 數據），O2 在 780M 仍有可能划算——但必須**先在真機量測**
+   再投資。本原型讓那個量測變成 5 分鐘的事：
+   `node test/bench_cnn_caseE.mjs --effect tools/experimental/smem/CuNNy-2x4C-NVL-smem.wgsl`
+3. **工程教訓**：負結果被 timestamp 量測擋下，避免了一個會讓桌上型 GPU 變慢的
+   「優化」進主線。Wall-clock 量測（框架 overhead 主導）會完全看不到 GPU 端差異。
+4. 轉換腳本保留：若 780M 實測划算，`make_smem.mjs` 的邏輯可移植進
+   `tools/cunny2wgsl.mjs` 產生器，家族 20 檔一次重生成。
