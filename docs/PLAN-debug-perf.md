@@ -78,10 +78,11 @@
 - 優化清單：O1 FP16 codegen 雙路徑降級、O2 shared-memory 取樣重用、O3 輸出格式選項（驗收與 f16 trunc 數值風險見報告 §6–§7）。
 - 風險：FP16 數值漂移 → 一律走 verify 差分門檻，不行就退 rgba8snorm 混合策略。
 
-### 本輪（Round 4，main 主幹）待辦
-1. `bench_cnn_caseE.mjs` 加 `--adapter auto|high-performance|low-power` 旗標 → 補 **780M f32 基線**（256²/512²/1080p-tile）。
-2. 780M 上跑 O2 smem 變體 → close「780M 上未證明」的懸案。
-3. `tools/experimental/f16/`：make_f16.mjs（離線 f16 數學轉換器，仿 make_smem 工作流）+ 純 JS 誤差上界 + 瀏覽器 bench 頁（Chrome 實測 shader-f16 有無 → A/B GPU 時間 + diff-core MAE）→ 依預先寫死的判定規則（780M ≥1.2× 且 MAE ≤1e-3）決定是否落地 codegen `preferF16` 數學路徑。
+### 本輪（Round 4，main 主幹）結果（2026-11-15 完成）
+1. ✅ `bench_cnn_caseE.mjs` 加 `--adapter` 旗標 → **780M f32 基線**補完：256²=0.147ms、384²=0.318ms（線性），1080p 外推 ≈4.8ms/幀；node ≥512 崩潰確認與上傳無關（perf-audit 附錄 C）。
+2. ✅ O2 smem 在 780M 亦負優化（+17%）→ **判定關閉**。
+3. ✅ O1 f16 數學：Chrome 暴露 `shader-f16`（node 不暴露）→ 離線 f16 變體 + 純 JS RNE 理論上界 + Chrome A/B（780M/4060、256²–1024²）→ **判定不落地**（MAE 或速度皆不達 ≥1.2×+MAE≤1e-3 門檻；FP16 非掉 FPS 兇手）→ perf-audit 附錄 D。
+   ⇒ 三大候選（O3-lite ✅+11%、O2 ❌、O1 ❌）全部關閉；若宿主仍掉 FPS，下一步是 M5 宿主整合面量測（呈現路徑/更大變體/解碼競爭）。
 
 ---
 

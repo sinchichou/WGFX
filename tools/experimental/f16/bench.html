@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>WGFX f16 bench</title>
+<style>
+  body { font: 13px/1.5 Consolas, monospace; background: #111; color: #ccc; margin: 16px; }
+  h1 { font-size: 15px; color: #eee; }
+  table { border-collapse: collapse; margin: 8px 0; }
+  td, th { border: 1px solid #444; padding: 2px 10px; text-align: right; }
+  th { color: #eee; }
+  .ok { color: #7c7; } .warn { color: #fc6; } .bad { color: #f66; }
+  pre { background: #1a1a1a; padding: 8px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>WGFX O1 f16 bench — CuNNy-2x4C-NVL</h1>
+<div id="log">starting…</div>
+<pre id="out"></pre>
+<script type="module">
+// Browser A/B bench: original f32 vs f16conv (passes 2–3) vs f16 (passes 1–3).
+// Pre-registered verdict rules (docs/audit/perf-audit.md §附錄C):
+//   keep  ⇔ target GPU (780M) speedup ≥1.2× AND pixel MAE ≤1e-3
+//   (f16conv additionally expects bit-identical output: MAE=0)
+// Query: ?gpu=low|high (powerPreference)  &auto=1 (run immediately)
+const Q = new URLSearchParams(location.search);
+const PREF = Q.get('gpu') === 'low' ? 'low-power' : Q.get('gpu') === 'high' ? 'high-performance' : undefined;
+const log = (m) => { document.getElementById('log').innerHTML += m + '<br>'; };
+const LINES = [];
+const out = (m) => { LINES.push(m); document.getElementById('out').textContent = LINES.join('\n'); };
+
+// ---- minimal pixel compare (rgba float planes) ----
+function comparePixels(a, b) {
+    let max = 0, sum = 0, n = 0;
+    for (let i = 0; i < a.length; i++) {
+        const d = Math.abs(a[i] - b[i]); sum += d; if (d > max) max = d; n++;
+    }
+    return { mae: sum / n, maxAbsDiff: max };
+}
+
+// ---- WebGPU setup ----
+const nav = { gpu: navigator.gpu };
+const adapter = await nav.gpu.requestAdapter(PREF ? { powerPreference: PREF } : {});
+const info = adapter.info || {};
+const hasF16 = adapter.features.has('shader-f16');
+log(`adapter: ${[info.vendor, info.architecture, info.device || info.description].filter(Boolean).join('/')}`);
+log(`shader-f16: ${hasF16 ? '<span class="ok">YES</span>' : '<span class="bad">NO — f16 A/B cannot run; report as blocked</span>'}`);
+const wantTs = adapter.features.has('timestamp-query');
+const device = await adapter.requestDevice({
+    requiredFeatures: [
+        ...(hasF16 ? ['shader-f16'] : []),
+        ...(wantTs ? ['timestamp-query'] : []),
+    ],
+    requiredLimits: { maxStorageTexturesPerShaderStage: Math.min(8, adapter.limits.maxStorageTexturesPerShaderStage) },
+});
+const hasTs = device.features.has('timestamp-query');
+// surface async GPU failures that would otherwise silently corrupt A/B results
+device.addEventListener?.('uncapturederror', (e) => out(`GPU ERROR: ${e.error?.message || e}`));
+device.lost?.then((info) => out(`DEVICE LOST: reason=${info.reason} message=${info.message}`));
+
+const W = Number(Q.get('size') || 256), H = W, ROUNDS = 6, FRAMES = 40;
+
+// ---- effect loading ----
+const effects = {
+    original: await (await fetch('../../../effects/CuNNy/CuNNy-2x4C-NVL.wgsl')).text(),
+    f16conv: await (await fetch('./CuNNy-2x4C-NVL-f16conv.wgsl')).text(),
+    f16: await (await fetch('./CuNNy-2x4C-NVL-f16.wgsl')).text(),
+};
+
+// WGFX runtime from the repo's browser bundle
+const { WGFXRuntime } = await import('../../../dist/wgfx.browser.esm.js');
+
+async function makeRT(code, preferF16) {
+    const rt = new WGFXRuntime(device);
+    await rt.compile(code, {
+        defines: { INPUT_WIDTH: W, INPUT_HEIGHT: H },
+        textures: {
+            INPUT: { size: [W, H], format: 'rgba8unorm',
+                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST },
+            OUTPUT: { size: [W, H], format: 'rgba16float',
+                usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC },
+        },
+    }, { honorDeclaredOutput: false, preferF16 });
+    return rt;
+}
+
+const pixels = new Uint8Array(W * H * 4);
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    pixels[i] = (x * 255 / W) | 0; pixels[i + 1] = (y * 255 / H) | 0;
+    pixels[i + 2] = ((x >> 3) ^ (y >> 3)) & 1 ? 200 : 40; pixels[i + 3] = 255;
+}
+
+const rts = {};
+const f16Requested = hasF16; // gate refuses f16 without the feature (expected)
+rts.original = await makeRT(effects.original, false);
+rts.f16conv = await makeRT(effects.f16conv, f16Requested);
+rts.f16 = await makeRT(effects.f16, f16Requested);
+
+function frame(rt) {
+    const e = device.createCommandEncoder();
+    rt.dispatchAllPasses(e);
+    device.queue.submit([e.finish()]);
+    return device.queue.onSubmittedWorkDone();
+}
+
+async function readback(rt) {
+    const t = rt.resourceManager.getTexture('OUTPUT');
+    const bpr = Math.ceil(t.width * 8 / 256) * 256;
+    const buf = device.createBuffer({ size: bpr * t.height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const e = device.createCommandEncoder();
+    e.copyTextureToBuffer({ texture: t }, { buffer: buf, bytesPerRow: bpr, rowsPerImage: t.height }, [t.width, t.height]);
+    device.queue.submit([e.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const raw = new Uint16Array(buf.getMappedRange().slice(0));
+    buf.unmap(); buf.destroy();
+    const f16 = (v) => { const s = (v & 0x8000) ? -1 : 1, e = (v & 0x7c00) >> 10, m = v & 0x3ff;
+        if (e === 0) return s * m * 2 ** -24; if (e === 0x1f) return s * Infinity;
+        return s * (1 + m / 1024) * 2 ** (e - 15); };
+    const out = new Float32Array(t.width * t.height * 4);
+    for (let y = 0; y < t.height; y++) for (let x = 0; x < t.width; x++) {
+        const s = y * (bpr / 2) + x * 4, d = (y * t.width + x) * 4;
+        for (let c = 0; c < 4; c++) out[d + c] = f16(raw[s + c]);
+    }
+    return out;
+}
+
+// ---- warm up + pixels ----
+for (const k of Object.keys(rts)) {
+    device.queue.writeTexture({ texture: rts[k].resourceManager.getTexture('INPUT') }, pixels,
+        { bytesPerRow: W * 4, rowsPerImage: H }, [W, H]);
+    rts[k].resourceManager.updateSceneBuffer(W, H, W, H);
+    await frame(rts[k]);
+}
+const ref = await readback(rts.original);
+
+// ---- wall-clock bench ----
+async function bench(rt) {
+    for (let i = 0; i < 10; i++) await frame(rt);
+    const times = [];
+    for (let r = 0; r < ROUNDS; r++) {
+        const t0 = performance.now();
+        for (let i = 0; i < FRAMES; i++) await frame(rt);
+        times.push((performance.now() - t0) / FRAMES);
+    }
+    times.sort((a, b) => a - b);
+    return times[Math.floor(times.length / 2)];
+}
+
+// ---- saturated throughput: N submits without awaiting, one final await ----
+// When GPU time > CPU encode time this measures pure GPU throughput with no
+// clock-unit assumptions (cross-check for the timestamp column).
+async function benchSaturated(rt, burst = 32) {
+    for (let i = 0; i < 10; i++) await frame(rt);
+    const times = [];
+    for (let r = 0; r < ROUNDS; r++) {
+        const t0 = performance.now();
+        for (let i = 0; i < burst; i++) {
+            const e = device.createCommandEncoder();
+            rt.dispatchAllPasses(e);
+            device.queue.submit([e.finish()]);
+        }
+        await device.queue.onSubmittedWorkDone();
+        times.push((performance.now() - t0) / burst);
+    }
+    times.sort((a, b) => a - b);
+    return times[Math.floor(times.length / 2)];
+}
+
+// ---- GPU-pure time via timestamp-query (K-repeated, cf. bench_cnn_caseE) ----
+async function gpuTime(rt) {
+    if (!hasTs) return null;
+    const passIdx = rt.shaderInfo.passes.map((p) => p.index); // pipelines keyed by //!PASS number
+    const K = Math.max(4, Math.min(64, Math.floor(12_000_000 / (W * H))));
+    const CHUNK = 8;
+    const qs = device.createQuerySet({ type: 'timestamp', count: 2 });
+    const rb = device.createBuffer({ size: 256, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC });
+    const db = device.createBuffer({ size: 256, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+    async function span(k0, k1) {
+        const enc = device.createCommandEncoder();
+        for (let k = k0; k < k1; k++) {
+            const first = passIdx[0], last = passIdx[passIdx.length - 1];
+            for (const idx of passIdx) {
+                const p = rt.pipelineManager.pipelines.get(idx);
+                if (!p) return null;
+                const pe = enc.beginComputePass((k === 0 && idx === first) ? { timestampWrites: { querySet: qs, beginningOfPassWriteIndex: 0 } }
+                    : (k === k1 - 1 && idx === last) ? { timestampWrites: { querySet: qs, endOfPassWriteIndex: 1 } } : undefined);
+                pe.setPipeline(p.computePipeline); pe.setBindGroup(0, p.bindGroup);
+                pe.dispatchWorkgroups(p.gridDx, p.gridDy, 1); pe.end();
+            }
+        }
+        device.queue.submit([enc.finish()]);
+        await device.queue.onSubmittedWorkDone();
+        const e2 = device.createCommandEncoder();
+        e2.resolveQuerySet(qs, 0, 2, rb, 0); e2.copyBufferToBuffer(rb, 0, db, 0, 16);
+        device.queue.submit([e2.finish()]);
+        await db.mapAsync(GPUMapMode.READ);
+        const raw = new BigInt64Array(db.getMappedRange().slice(0));
+        db.unmap();
+        return Number(raw[1] - raw[0]) / 1e6 / (k1 - k0); // ms per frame
+    }
+    let total = 0;
+    for (let k = 0; k < K; k += CHUNK) total += await span(k, Math.min(k + CHUNK, K));
+    qs.destroy(); rb.destroy(); db.destroy();
+    return total; // span() returns per-frame ms per chunk → sum = overall average
+}
+const rows = [];
+for (const k of Object.keys(rts)) {
+    const px = await readback(rts[k]);
+    const cmp = comparePixels(ref, px);
+    const wall = await bench(rts[k]);
+    const gpu = await gpuTime(rts[k]);
+    const sat = await benchSaturated(rts[k]);
+    rows.push({ name: k, mae: cmp.mae, max: cmp.maxAbsDiff, wall, gpu, sat });
+}
+
+// ---- report ----
+out(`adapter: ${[info.vendor, info.architecture, info.device || info.description].filter(Boolean).join('/')} | shader-f16=${hasF16} | timestamp=${hasTs}`);
+out(`size ${W}x${H} → OUTPUT ${W}x${H} rgba16float | rounds=${ROUNDS} frames=${FRAMES}`);
+out('');
+out('variant    wall-clock(ms)  GPU-ts(ms)  saturated(ms)  MAE vs f32    max|Δ|     verdict');
+const base = rows[0];
+for (const r of rows) {
+    const speedSat = base.sat / r.sat; // saturated-throughput ratio (primary speed metric)
+    let verdict = '';
+    if (r.name === 'original') verdict = 'baseline';
+    else if (!hasF16) verdict = 'SKIPPED-GATE (no shader-f16)';
+    else if (r.mae <= 1e-3 && speedSat >= 1.2) verdict = '✅ KEEP (≥1.2× and MAE≤1e-3)';
+    else if (r.mae <= 1e-3) verdict = '⚠ neutral (MAE ok, speed <1.2×)';
+    else verdict = '❌ DROP (MAE > 1e-3)';
+    if (r.name === 'f16conv' && hasF16 && r.mae === 0) verdict += ' + bit-identical';
+    out(`${r.name.padEnd(9)} ${r.wall.toFixed(3).padStart(12)}  ${r.gpu == null ? '        —' : r.gpu.toFixed(3).padStart(10)}  ${r.sat.toFixed(3).padStart(13)}  ${r.mae.toExponential(2).padStart(12)}  ${r.max.toExponential(2).padStart(9)}  ${verdict}`);
+}
+if (!hasF16) out('\nNOTE: this browser/driver does not expose shader-f16 — f16 path unverifiable here.');
+log('done — results in <pre> below');
+window.__BENCH_DONE = true;
+document.title = 'BENCH-DONE';
+</script>
+</body>
+</html>

@@ -223,4 +223,40 @@ workgroup 64（1 wave64）+ 早退在 780M 上屬健康形狀，非問題；RAVU
 ### 更新後的優先序
 1. ~~O3-lite outputFormat~~ ✅ 已實作（3b0b276，+11%）
 2. ~~O2 smem~~ ✅ 已實測關閉（4060 +29% / 780M +17%）
-3. **O1 f16 數學 ⇒ 唯一尚未判定的主要候選**（Phase 2：離線 f16 副本 + Chrome A/B）
+3. ~~O1 f16 數學~~ ✅ 已實測關閉 ⇒ 見附錄 D（MAE 或速度雙雙不達門檻）
+
+---
+
+## 附錄 D：O1 f16 數學 A/B 實測（2026-11-15，main 主幹，判定＝不落地）
+
+> 「先量測後動刀」第二次擋下理論優化（繼 O2 之後）。預先寫死的判定規則：
+> **780M 上速度 ≥1.2× 且 MAE ≤1e-3 才落地**；兩者皆未達成 ⇒ 關閉。
+
+### 量測環境（`tools/experimental/f16/`）
+- **Chrome（puppeteer-core 驅動 headless）的 Dawn 暴露 `shader-f16=true`**——node-webgpu（dawn.node 0.3.8）不暴露（附錄 C 的硬限制就此繞過）。timestamp-query 亦可取得（`--enable-features=WebGPUDeveloperFeatures`）。
+- 780M 存取：headless 忽略 `powerPreference`；以 Windows 每應用 GPU 偏好（`UserGpuPreferences` 的 `GpuPreference=1;`）**暫時**切換，量完立即還原（使用者原值 `2;`）。
+- 速度量測採**飽和吞吐**（N 幀連發一次 await）：timestamp 欄位的絕對值與 wall/saturated 內部矛盾（含 submit 間隙）**不可信**，已棄用；飽和值與 node 端 GPU 執行時間同量級、自洽。
+
+### 理論上界（`verify_f16.mjs`，純 JS RNE 逐 op 模擬）
+| pass | max\|Δ\| | snorm8 桶漂移 |
+|---|---|---|
+| PASS 1（in，9 scalar taps） | 2.4e-3 | **2.8% texel ±1 LSB**（數值域大至 1.85） |
+| PASS 2/3（conv，18 matmuls） | ~1e-6 | **0**（理論位元級相同） |
+
+### 實測 A/B（原版 f32 vs 兩變體；MAE 在 4060 與 780M 完全重現 ⇒ 數值路徑穩定）
+
+| 尺寸(780M) | original 飽和 | f16conv 飽和（加速比） | f16 飽和（加速比） | f16conv MAE | f16 MAE |
+|---|---|---|---|---|---|
+| 256² | 0.197 ms | 0.206 ms（0.96×） | 0.191 ms（1.03×） | 3.8e-5 ✅ | 1.53e-3 ❌ |
+| 512² | 0.497 ms | 0.469 ms（1.06×） | 0.456 ms（1.09×） | 8.1e-5 ✅ | 1.42e-3 ❌ |
+| 1024² | 1.063 ms | 0.947 ms（1.12×） | 0.903 ms（1.18×） | 4.1e-5 ✅ | 1.22e-3 ❌ |
+
+- f16conv（只轉 conv passes）：MAE 恆 ≤1e-3 ✅，但速度隨尺寸成長仍 **≤1.12× < 1.2× 門檻**。
+- f16（含 PASS 1）：速度略高（1.18×）但 **MAE 恆 >1e-3**（pass-1 的 ±1 LSB 往下傳播放大），超過驗收門檻。
+- 4060 同 harness 結果一致（f16conv neutral、f16 MAE 不合格）。
+
+### 判定與結論
+1. **O1 f16 數學：不落地**。Dawn-on-D3D12 上 f16 紅利未兌現（≤1.2×，遠低於 RDNA3 packed-math 理論 2×）——可能是 D3D12 後端未發射 packed f16 指令，或工作負載在可測尺寸內仍屬記憶體/延遲主導。**FP16 不是掉 FPS 的兇手**（使用者的原始猜測就此有實測答案）。
+2. `preferF16` opt-in 閘門（0e38703）保留：行為正確、預設關閉、零風險；僅 f16 **數學 codegen 路徑**（原 Phase 3）不做。
+3. 優化清單狀態：O3-lite ✅ +11%；O2 ❌ 負優化；O1 ❌ 無紅利。**主要候選全部關閉**。
+4. 下一步（若宿主仍掉 FPS）：轉向 **M5 宿主整合面**——附錄 C 顯示 CuNNy-2x4C 在 780M@1080p 原生僅 ~4.8ms/幀（餘裕充足），掉幀更可能來自宿主呈現路徑/更大變體（8x8C ≈ 2.5× taps ≈ 12ms/幀逼近 60 FPS 預算）或解碼合成競爭。
