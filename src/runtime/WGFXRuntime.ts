@@ -82,7 +82,7 @@ export class WGFXRuntime {
      * @returns A promise that resolves when compilation is successful
      * @throws {Error} 當語法解析、代碼產生或管線編譯失敗時拋出異常
      */
-    public async compile(effectCode: string, externalResources: any = {}, options: { honorDeclaredOutput?: boolean; preferF16?: boolean } = {}): Promise<void> {
+    public async compile(effectCode: string, externalResources: any = {}, options: { honorDeclaredOutput?: boolean; preferF16?: boolean; outputFormat?: string } = {}): Promise<void> {
         Logger.debug("WGFXRuntime: Starting effect compilation.");
 
         try {
@@ -118,7 +118,17 @@ export class WGFXRuntime {
             const generatedModules = this.wgslCodeGenerator.generate(
                 shaderInfo,
                 (externalResources && externalResources.defines) || {},
-                { f16: this.f16Enabled },
+                {
+                    f16: this.f16Enabled,
+                    // Keep the WGSL declaration in sync with the GPUTexture the host
+                    // creates for OUTPUT (WGFXOptions.outputFormat). Otherwise a host
+                    // texture of e.g. rgba8unorm would hit a bind-group format
+                    // mismatch against a rgba16float declaration.
+                    // 與宿主建立的 OUTPUT 紋理格式同步，避免 bind group 格式不符。
+                    formatOverrides: options.outputFormat
+                        ? { OUTPUT: options.outputFormat }
+                        : undefined,
+                },
             );
             this.generatedModules = generatedModules;
 

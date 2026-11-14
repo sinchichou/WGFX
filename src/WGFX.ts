@@ -1,5 +1,6 @@
 import { ParameterInfo } from './types/shader';
 import { WGFXRuntime } from './runtime/WGFXRuntime';
+import { storageCapableFormat } from './runtime/WGSLCodeGenerator';
 import { Logger, LogLevel } from './utils/Logger';
 
 /**
@@ -34,6 +35,24 @@ export interface WGFXOptions {
      * @zh 選用的輸出高度，供升頻特效使用（預設等同 height）
      */
     outHeight?: number;
+    /**
+     * Output texture format for the declared `OUTPUT` texture.
+     * Defaults to `'rgba16float'` (the historical value). Hosts that composite
+     * the result straight onto an 8-bit canvas can pass `'rgba8unorm'` to halve
+     * the output write bandwidth (4 vs 8 bytes/texel — a 2x upscale writes 4×
+     * the input texel count) and skip the 16f→8unorm conversion in the host's
+     * presentation copy. The format is normalized to its storage-capable form
+     * and applied consistently to the GPUTexture **and** the WGSL declaration.
+     * Numbers may differ from the 16f path by ≤1/255 (8-bit quantization).
+     *
+     * 輸出紋理格式。預設 `'rgba16float'`（歷史值）。宿主若直接把結果合成到 8-bit
+     * canvas，可傳 `'rgba8unorm'`：輸出寫入頻寬減半（2x 升頻的輸出像素數是輸入的
+     * 4 倍），並省掉宿主呈現路徑的 16f→8unorm 轉換。格式會正規化為 storage-capable
+     * 形式，並一致套用在 GPUTexture 與 WGSL 宣告兩端。數值與 16f 路徑差 ≤1/255。
+     *
+     * @default 'rgba16float'
+     */
+    outputFormat?: GPUTextureFormat;
     /** @zh 選用的外部資源 (textures, samplers, etc.) */
     externalResources?: any;
     /**
@@ -157,7 +176,7 @@ export class WGFX {
      * @returns A promise that resolves to a WGFX instance
      * @throws {Error} 如果 WebGPU 裝置、代碼無效或編譯失敗時拋出錯誤
      */
-    public static async create({ device, effectCode, width, height, outWidth, outHeight, preferF16 }: WGFXOptions): Promise<WGFX> {
+    public static async create({ device, effectCode, width, height, outWidth, outHeight, preferF16, outputFormat }: WGFXOptions): Promise<WGFX> {
         if (!device) {
             const error = 'Must provide a valid GPUDevice';
             Logger.error(error);
@@ -183,6 +202,9 @@ export class WGFX {
         const outW = (outWidth && outWidth > 0) ? Math.floor(outWidth) : width;
         const outH = (outHeight && outHeight > 0) ? Math.floor(outHeight) : height;
         const hostOverridesOutput = (outWidth !== undefined && outWidth > 0) || (outHeight !== undefined && outHeight > 0);
+        // Normalize once so the GPUTexture and the WGSL declaration always agree.
+        // 一次正規化，保證紋理建立端與 WGSL 宣告端格式一致。
+        const effectiveOutputFormat = storageCapableFormat(outputFormat ?? 'rgba16float');
 
         const runtime = new WGFXRuntime(device);
 
@@ -201,7 +223,7 @@ export class WGFX {
                 },
                 OUTPUT: {
                     size: [outW, outH],
-                    format: 'rgba16float' as GPUTextureFormat,
+                    format: effectiveOutputFormat as GPUTextureFormat,
                     usage: GPUTextureUsage.STORAGE_BINDING |
                         GPUTextureUsage.COPY_SRC |
                         GPUTextureUsage.TEXTURE_BINDING
@@ -213,6 +235,10 @@ export class WGFX {
             await runtime.compile(effectCode, externalResources, {
                 honorDeclaredOutput: !hostOverridesOutput,
                 preferF16: preferF16 === true,
+                // Only override when the host explicitly asked for a format; otherwise
+                // the effect's own //!FORMAT declaration (if any) wins.
+                // 僅在宿主明確指定時覆寫；否則尊重效果檔自身的 //!FORMAT 宣告。
+                outputFormat: outputFormat ? effectiveOutputFormat : undefined,
             });
         } catch (error: any) {
             Logger.error('WGFX compilation failed:', error);

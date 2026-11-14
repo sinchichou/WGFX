@@ -168,7 +168,7 @@ export class WGSLCodeGenerator {
     public generate(
         shaderInfo: WGFXShaderInfo,
         defines: Record<string, number> = {},
-        options: { f16?: boolean } = {},
+        options: { f16?: boolean; formatOverrides?: Record<string, string> } = {},
     ): { wgslCode: string; passIndex: number; resources: any }[] {
         const generatedModules: {
             wgslCode: string;
@@ -384,6 +384,11 @@ export class WGSLCodeGenerator {
                         tex.name === "OUTPUT";
                 }
                 const declaredFormat =
+                    // Host format override wins (e.g. WGFXOptions.outputFormat for
+                    // OUTPUT) so the WGSL declaration always matches the GPUTexture
+                    // the host actually created. 宿主格式覆寫優先，保證 WGSL 宣告與
+                    // 宿主建立的 GPUTexture 一致。
+                    (logical === "OUTPUT" && options.formatOverrides?.OUTPUT) ||
                     (tex.format as string) ||
                     (logical === "INPUT" ? "rgba8unorm" : "rgba16float");
                 // storage 綁定必須使用 storage-capable 格式(r16float 等被 Dawn 拒絕);
