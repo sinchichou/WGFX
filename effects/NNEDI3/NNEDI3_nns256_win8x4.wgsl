@@ -1,12 +1,14 @@
 // NNEDI3_nns256_win8x4 — Magpie v4 → WGFX WGSL port
 // 由 tools/magpie_prescaler2wgsl.mjs 自動轉換（magpie-prescalers 模板）。
+// 來源: https://github.com/hauuau/magpie-prescalers
 //
 // Porting notes:
 //   - Magpie 的 `//!STYLE CS` pass（blockStart / threadId）改為 WGFX compute：
 //     `@builtin(workgroup_id)` / `@builtin(local_invocation_id)`，並依模板的
 //     prescalers.hlsli 定義重建 blockStart 與 gl_* 別名（數值完全一致）。
 //   - 權重以 `bitcast<f32>(整數位元)` 表示，逐字保留 HLSL 的 int 位元常數。
-//   - HLSL `mix(a, b, bool)` → WGSL `select(b, a, bool)`（HLSL 為 c ? b : a）。
+//   - HLSL `mix(a, b, bool)` → WGSL `select(a, b, bool)`（HLSL 為 c ? b : a；
+//     WGSL select(false, true, cond) 的 false/true 位置與 HLSL 相反時需對調）。
 //   - HLSL `mul(a, b)` → WGSL `(a) * (b)`；HLSL typed local declaration →
 //     `var NAME: TYPE = EXPR;`（模板 per-pass 定義 X_tex/HOOKED_* 已展開為
 //     具名 WGSL 存取函式,GET_SAMPLE 語意保留）。
@@ -106,7 +108,7 @@ fn nnedi3(samples: array<vec4<f32>, 8>) -> f32 {
 	}
 	var mstd0: f32 = sum / 32.0;
 	var mstd1: f32 = sumsq / 32.0 - mstd0 * mstd0;
-	var mstd2: f32 = select(inverseSqrt(mstd1), 0.0, mstd1 >= 1.192092896e-7);
+	var mstd2: f32 = select(0.0, inverseSqrt(mstd1), mstd1 >= 1.192092896e-7);
 	mstd1 *= mstd2;
 	var vsum: f32 = 0.0; var wsum: f32 = 0.0; var sum1: f32; var sum2: f32;
 	sum1 = dot(samples[0], vec4<f32>(bitcast<f32>(1024871952i), bitcast<f32>(-1091961907i), bitcast<f32>(1049937838i), bitcast<f32>(1023328805i))) + dot(samples[1], vec4<f32>(bitcast<f32>(1026430476i), bitcast<f32>(-1103990249i), bitcast<f32>(1052012307i), bitcast<f32>(994719130i)))
@@ -4835,7 +4837,7 @@ fn nnedi3(samples: array<vec4<f32>, 8>) -> f32 {
 	}
 	var mstd0: f32 = sum / 32.0;
 	var mstd1: f32 = sumsq / 32.0 - mstd0 * mstd0;
-	var mstd2: f32 = select(inverseSqrt(mstd1), 0.0, mstd1 >= 1.192092896e-7);
+	var mstd2: f32 = select(0.0, inverseSqrt(mstd1), mstd1 >= 1.192092896e-7);
 	mstd1 *= mstd2;
 	var vsum: f32 = 0.0; var wsum: f32 = 0.0; var sum1: f32; var sum2: f32;
 	sum1 = dot(samples[0], vec4<f32>(bitcast<f32>(1024871952i), bitcast<f32>(1026430476i), bitcast<f32>(1041094851i), bitcast<f32>(992987016i))) + dot(samples[1], vec4<f32>(bitcast<f32>(1034372511i), bitcast<f32>(1007997243i), bitcast<f32>(1038248733i), bitcast<f32>(1009484684i)))

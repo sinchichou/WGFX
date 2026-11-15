@@ -34,11 +34,20 @@
 //      pixel tile per group; the other passes use 8x8 (or 16x16 for the sub-pixel
 //      pass) with one pixel (or one 2x2 quad) per thread.
 //   2. Pass 1's `groupshared MF shPixelsY[SH_PIXELS_Y][SH_PIXELS_X]` becomes
-//      `var<workgroup> shPixelsY: array<array<f32, 28>, 36>` (SH_PIXELS_X = 32 + 4
+//      `var<workgroup> shPixelsY: array<array<f32, 36>, 28>` (SH_PIXELS_X = 32 + 4
 //      = 36, SH_PIXELS_Y = 24 + 4 = 28) and Magpie's
 //      `GroupMemoryBarrierWithGroupSync()` becomes WGSL's `workgroupBarrier()`.
 //      The barrier stays between the two loops exactly as in the HLSL, so every
 //      thread observes the same fully-populated tile.
+//      NOTE (layout): WGSL's nested array is `array<array<T, inner>, outer>`, i.e.
+//      the *inner* length is the column count. HLSL's `shPixelsY[28][36]` is
+//      28 rows x 36 columns and is indexed as `[y][x]`, so the WGSL form must be
+//      `array<array<f32, 36>, 28>` (36 columns inside, 28 rows outside).
+//      Declaring `array<array<f32, 28>, 36>` transposes the tile: the column
+//      index (x = 28..35) then exceeds the inner length (28) and every access to
+//      the right-hand halo is clamped to column 27 — the 4-pixel right halo of
+//      every 32-pixel tile becomes garbage, which shows up as vertical banding
+//      / blocky streaks every 32 px (the 5x5 convolution reads it as valid data).
 //   3. Magpie's `MP_NUM_THREADS_X` is 128 for this effect (the HLSL's
 //      `//! NUM_THREADS 128`), so the two loops of pass 1 stride by 256 and 128
 //      respectively — the same values as the HLSL.
@@ -159,7 +168,7 @@ fn Rmp8x8(a: u32) -> vec2<u32> {
 const SH_PIXELS_X: u32 = 36u;
 const SH_PIXELS_Y: u32 = 28u;
 
-var<workgroup> shPixelsY: array<array<f32, 28>, 36>;
+var<workgroup> shPixelsY: array<array<f32, 36>, 28>;
 
 fn GetLuma(rgb: vec3<f32>) -> f32 {
 	return dot(vec3<f32>(0.299, 0.587, 0.114), rgb);

@@ -7,7 +7,8 @@
 //     `@builtin(workgroup_id)` / `@builtin(local_invocation_id)`，並依模板的
 //     prescalers.hlsli 定義重建 blockStart 與 gl_* 別名（數值完全一致）。
 //   - 權重以 `bitcast<f32>(整數位元)` 表示，逐字保留 HLSL 的 int 位元常數。
-//   - HLSL `mix(a, b, bool)` → WGSL `select(b, a, bool)`（HLSL 為 c ? b : a）。
+//   - HLSL `mix(a, b, bool)` → WGSL `select(a, b, bool)`（HLSL 為 c ? b : a；
+//     WGSL select(false, true, cond) 的 false/true 位置與 HLSL 相反時需對調）。
 //   - HLSL `mul(a, b)` → WGSL `(a) * (b)`；HLSL typed local declaration →
 //     `var NAME: TYPE = EXPR;`（模板 per-pass 定義 X_tex/HOOKED_* 已展開為
 //     具名 WGSL 存取函式,GET_SAMPLE 語意保留）。
@@ -38,7 +39,7 @@
 //   - [RAVU] prescalers.hlsli 的巨集語意已逐條展開：
 //     `#define atan atan2` → HLSL `atan(y,x)` 轉 WGSL `atan2(y,x)`；
 //     `#define mod fmod` → `fmodWGSL(a,b)`（COMMON 提供）；
-//     `#define mix(a,b,bool c)` → `select(b,a,c)`（巢狀亦以括號感知遞迴展開）；
+//     `#define mix(a,b,bool c)` → `select(a,b,c)`（HLSL = c ? b : a；巢狀亦以括號感知遞迴展開）；
 //     `#define LUTPOS(x,lut_size)` 為浮點 lerp → 保持 WGSL `mix`；
 //     `#define texture(tex,pos)` → `textureSampleLevel(tex, sam_tex, pos, 0.0)`。
 //   - [RAVU] `shared float/vec3 NAME[N]` → `var<workgroup>`；`barrier()` →
@@ -48,6 +49,9 @@
 //   - [RAVU] 跨 pass 使用的 `static const`（RGB 的 color_primary）提升到 //! COMMON；
 //     其餘 `static const … = float2(GetInputSize())` 之類由框架提升為 var<private>。
 //   - [RAVU] Zoom 變體 `(uint)id / rect.x` 的 HLSL 隱式 int→uint 提升已補顯式轉換。
+//   - [RAVU] Zoom 變體補上 `//! WIDTH INPUT_WIDTH * 2` / `//! HEIGHT INPUT_HEIGHT * 2`：
+//     HLSL 端刻意不宣告輸出尺寸（任意倍率），但 WGFX 套件包需要宣告才能建立
+//     OUTPUT 紋理；2x 與 VSR 的超解析度倍率一致。
 //   - [RAVU] 3x/RGB 與 Zoom/AR/RGB 的 `mat4x3`（prescalers.hlsli 的 float4x3 別名）
 //     一律當「4 個 vec3」使用（`m[i]` 是 vec3）→ 對應 WGSL `mat4x3<f32>` 並採
 //     轉置慣例（WGSL 第 i 欄 = HLSL 第 i 列），故 `m[i]`、`+`、`+=` 語意相同。
@@ -202,12 +206,12 @@ fn Pass1(@builtin(workgroup_id) wgid: vec3<u32>, @builtin(local_invocation_id) l
 	var delta: f32 = sqrt(max(T * T / 4.0 - D, 0.0));
 	var L1: f32 = T / 2.0 + delta; var L2: f32 = T / 2.0 - delta;
 	var sqrtL1: f32 = sqrt(L1); var sqrtL2: f32 = sqrt(L2);
-	var theta: f32 = select(0.0, fmodWGSL(atan2(L1 - a, b) + 3.141592653589793, 3.141592653589793), abs(b) < 1.192092896e-7);
+	var theta: f32 = select(fmodWGSL(atan2(L1 - a, b) + 3.141592653589793, 3.141592653589793), 0.0, abs(b) < 1.192092896e-7);
 	var lambda: f32 = sqrtL1;
-	var mu: f32 = select(0.0, (sqrtL1 - sqrtL2) / (sqrtL1 + sqrtL2), sqrtL1 + sqrtL2 < 1.192092896e-7);
+	var mu: f32 = select((sqrtL1 - sqrtL2) / (sqrtL1 + sqrtL2), 0.0, sqrtL1 + sqrtL2 < 1.192092896e-7);
 	var angle: f32 = floor(theta * 24.0 / 3.141592653589793);
-	var strength: f32 = select(2.0, select(1.0, 0.0, lambda >= 0.005), lambda >= 0.02);
-	var coherence: f32 = select(2.0, select(1.0, 0.0, mu >= 0.25), mu >= 0.5);
+	var strength: f32 = select(select(0.0, 1.0, lambda >= 0.005), 2.0, lambda >= 0.02);
+	var coherence: f32 = select(select(0.0, 1.0, mu >= 0.25), 2.0, mu >= 0.5);
 	var coord_y: f32 = ((angle * 3.0 + strength) * 3.0 + coherence + 0.5) / 216.0;
 	var res0: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 0.0); var res1: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 0.0);
 	var w0: vec4<f32>; var w1: vec4<f32>;

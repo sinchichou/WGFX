@@ -50,9 +50,15 @@
 //   8. `mul`/`mad` → `a * b (+ c)`; `lerp` → `mix`; `saturate`/`min`/`max`/`abs`/
 //      `floor`/`ceil`/`round` keep their names. HLSL's integer division in
 //      `(kSupportSize - 1) / 2` is integer division here too (`kTileShift`).
-//   9. `OUTPUT` declares no WIDTH/HEIGHT — deliberately mirroring NIS.hlsl (Magpie's
-//      upscaler writes into a host-sized, scaled render target; the scale is read
-//      from `scene.scale`). The host must supply the OUTPUT texture.
+//   9. `OUTPUT` is declared `//! WIDTH INPUT_WIDTH * 2` / `//! HEIGHT INPUT_HEIGHT * 2`.
+//      NIS.hlsl itself declares no WIDTH/HEIGHT (Magpie's upscaler writes into a
+//      host-sized, scaled render target; the scale is read from `scene.scale`).
+//      WGFX needs the declaration to allocate the OUTPUT texture — without it
+//      `WGFXPackage.createInstance()` fails with "WIDTH/HEIGHT missing" and the
+//      effect cannot be used by a host at all. 2x is the scale NIS is designed
+//      for (and the scale the YouTube VSR extension renders at); the framework
+//      then reports `scene.scale = 2` to the shader, exactly like the HLSL host
+//      would when sizing its render target to 2x.
 //  10. The luma tile pitch 38 (= NIS_BLOCK_WIDTH 32 + kSupportSize 6) is Magpie's own
 //      compile-time bound and is valid for scale >= 1 (the NIS upscaling use case).
 //      The HLSL source has exactly the same fixed-size bound.
@@ -74,6 +80,8 @@ float sharpness;
 Texture2D INPUT;
 
 //! TEXTURE
+//! WIDTH INPUT_WIDTH * 2
+//! HEIGHT INPUT_HEIGHT * 2
 Texture2D OUTPUT;
 
 //! TEXTURE

@@ -14,7 +14,8 @@
 //   1. prescalers.hlsli `#define atan atan2` → HLSL `atan(y, x)` 必須轉 `atan2`。
 //   2. prescalers.hlsli `#define mod fmod`  → HLSL `mod(a, b)` 必須轉 `fmodWGSL`。
 //   3. HLSL `mix(a, b, boolCond)` 是 prescalers.hlsli 的 bool 重載（= c ? b : a）
-//      → WGSL `select(b, a, cond)`；工具的正規式在**巢狀** mix 上會產生 4 參數
+//      → WGSL `select(a, b, cond)`（WGSL select(false, true, cond) = cond ? true : false，
+//      故 false 分支放 a、true 分支放 b）；工具的正規式在**巢狀** mix 上會產生 4 參數
 //      的無效 select，故在 HLSL 端以括號感知遞迴改寫。
 //      注意 `mix(vec, vec, vec)`（LUTPOS 的浮點 lerp）必須保持 mix。
 //   4. `#define LUTPOS(x, lut_size) mix(...)` 是本模板自有巨集 → 呼叫端展開。
@@ -467,7 +468,7 @@ function fixMatrixConstructs(src) {
 }
 
 // ---------------------------------------------------------------------------
-// 前處理 4：mix(a, b, boolCond) → select(b, a, boolCond)（遞迴、括號感知）
+// 前處理 4：mix(a, b, boolCond) → select(a, b, boolCond)（遞迴、括號感知）
 // ---------------------------------------------------------------------------
 const COMPARISON_RE = /(?:==|!=|<=|>=|<|>)/;
 
@@ -491,8 +492,10 @@ function rewriteMixBool(src) {
         }
         const args = splitTopLevel(src.slice(open + 1, end)).map((a) => rewriteMixBool(a));
         const isBool = args.length === 3 && COMPARISON_RE.test(args[2]);
+        // HLSL bool mix：mix(a, b, c) = c ? b : a。
+        // WGSL select(f, t, c) = c ? t : f → false 分支 a、true 分支 b。
         const call = isBool
-            ? `select(${args[1]}, ${args[0]}, ${args[2]})`
+            ? `select(${args[0]}, ${args[1]}, ${args[2]})`
             : `mix(${args.join(', ')})`;
         out += src.slice(last, m.index) + call;
         last = end + 1;
@@ -701,7 +704,7 @@ const NOTES = [
     '//   - [RAVU] prescalers.hlsli 的巨集語意已逐條展開：',
     '//     `#define atan atan2` → HLSL `atan(y,x)` 轉 WGSL `atan2(y,x)`；',
     '//     `#define mod fmod` → `fmodWGSL(a,b)`（COMMON 提供）；',
-    '//     `#define mix(a,b,bool c)` → `select(b,a,c)`（巢狀亦以括號感知遞迴展開）；',
+    '//     `#define mix(a,b,bool c)` → `select(a,b,c)`（HLSL = c ? b : a；巢狀亦以括號感知遞迴展開）；',
     '//     `#define LUTPOS(x,lut_size)` 為浮點 lerp → 保持 WGSL `mix`；',
     '//     `#define texture(tex,pos)` → `textureSampleLevel(tex, sam_tex, pos, 0.0)`。',
     '//   - [RAVU] `shared float/vec3 NAME[N]` → `var<workgroup>`；`barrier()` →',
@@ -711,6 +714,9 @@ const NOTES = [
     '//   - [RAVU] 跨 pass 使用的 `static const`（RGB 的 color_primary）提升到 //! COMMON；',
     '//     其餘 `static const … = float2(GetInputSize())` 之類由框架提升為 var<private>。',
     '//   - [RAVU] Zoom 變體 `(uint)id / rect.x` 的 HLSL 隱式 int→uint 提升已補顯式轉換。',
+    '//   - [RAVU] Zoom 變體補上 `//! WIDTH INPUT_WIDTH * 2` / `//! HEIGHT INPUT_HEIGHT * 2`：',
+    '//     HLSL 端刻意不宣告輸出尺寸（任意倍率），但 WGFX 套件包需要宣告才能建立',
+    '//     OUTPUT 紋理；2x 與 VSR 的超解析度倍率一致。',
     '//   - [RAVU] 3x/RGB 與 Zoom/AR/RGB 的 `mat4x3`（prescalers.hlsli 的 float4x3 別名）',
     '//     一律當「4 個 vec3」使用（`m[i]` 是 vec3）→ 對應 WGSL `mat4x3<f32>` 並採',
     '//     轉置慣例（WGSL 第 i 欄 = HLSL 第 i 列），故 `m[i]`、`+`、`+=` 語意相同。',
@@ -730,10 +736,35 @@ const MATRIX_HELPERS = [
     '}',
 ];
 
+/**
+ * Zoom 變體的 OUTPUT 尺寸宣告。
+ * ---------------------------------------------------------------------------
+ * magpie-prescalers 的 RAVU-Zoom 模板在 HLSL 端刻意不宣告輸出尺寸（它支援任意
+ * 倍率，輸出大小由宿主的 render target 決定）。但在 WGFX 裡，套件包若沒有
+ * `//! WIDTH` / `//! HEIGHT`，ResourceManager 無法建立 OUTPUT 紋理 →
+ * `WGFXPackage.createInstance()` 直接丟出 "WIDTH/HEIGHT missing"，擴充套件
+ * （YouTube VSR）完全載入不了這個效果。
+ *
+ * 這裡為 Zoom 變體補上 2x 的輸出宣告（VSR 的超解析度倍率）：
+ *   - RAVU-Zoom 每個 thread 產生一個輸出像素，座標由
+ *     `HOOKED_size * HOOKED_map(id)`（= INPUT_size * OUTPUT_pt * (id+0.5)）決定；
+ *     輸出為輸入的 2 倍時即 2x zoom，與 RAVU_R2/R3/R4 的行為一致。
+ *   - 框架會依宣告建立 OUTPUT，並把 scene.scale 設為 2（updateSceneBuffer），
+ *     所以 shader 讀到的場景資訊與實際輸出尺寸一致。
+ */
+function injectOutputSize(wgsl, sourceName) {
+    if (!/^RAVU_Zoom/.test(sourceName)) return wgsl;
+    // 已有宣告就不動（避免重複注入）。
+    if (/^\/\/!\s*WIDTH\s+/m.test(wgsl)) return wgsl;
+    const decl = '//! WIDTH INPUT_WIDTH * 2\n//! HEIGHT INPUT_HEIGHT * 2\n';
+    const re = /^Texture2D\s+OUTPUT\s*;\s*$/m;
+    if (!re.test(wgsl)) die('post', `找不到 Texture2D OUTPUT;（${sourceName}）`);
+    return wgsl.replace(re, `${decl}Texture2D OUTPUT;`);
+}
+
 function postProcess(wgsl, hoisted) {
     // 0. 還原被保護的 mix（見 convertRavu 的 __MIX__ 說明）
     let out = wgsl.replace(/\b__MIX__\s*\(/g, 'mix(');
-
     // 1. 還原 workgroup 陣列
     const restored = restoreWorkgroupArrays(out);
     out = restored.out;
@@ -834,7 +865,7 @@ export function convertRavu(hlsl, sourceName) {
     if (/\bmix\s*\(/.test(wgslNoComments)) {
         die('tool', '工具的 mix 正規式仍被觸發（來源含 lerp()？）');
     }
-    return postProcess(wgsl, hoist.hoisted);
+    return injectOutputSize(postProcess(wgsl, hoist.hoisted), sourceName);
 }
 
 // ---------------------------------------------------------------------------

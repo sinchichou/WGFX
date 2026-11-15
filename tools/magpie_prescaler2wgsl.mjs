@@ -289,9 +289,13 @@ export function translateCode(src, textureNames = null) {
     s = s.replace(/\bfmod\s*\(/g, 'fmodWGSL(');
     s = s.replace(/\blerp\s*\(/g, 'mix(');
 
-    // --- mix(a, b, bool) → select(b, a, bool) ---
+    // --- mix(a, b, bool) → select(a, b, bool) ---
+    // Magpie 的 bool 重載 `mix(a, b, c)` = `c ? b : a`；WGSL `select(f, t, c)` = `c ? t : f`。
+    // 因此 false 分支是 a、true 分支是 b → 必須寫成 select(a, b, c)。
+    // （舊版誤寫成 select(b, a, c)，等於把條件反轉；NNEDI3 的 mstd2 因此恆為 0，
+    //   nns 權重被整個消掉；RAVU 的 theta/mu/strength/coherence 也全選錯分支。）
     s = s.replace(/\bmix\s*\(([^,]+),\s*([^,]+),\s*([^)]*(?:>=|<=|==|!=|>|<)[^)]*)\)/g,
-        (_m, a, b, c) => `select(${b.trim()}, ${a.trim()}, ${c.trim()})`);
+        (_m, a, b, c) => `select(${a.trim()}, ${b.trim()}, ${c.trim()})`);
 
     // --- C 風格轉型：(uint)id → u32(id) ---
     s = s.replace(/\(\s*u32\s*\)\s*([A-Za-z_][A-Za-z0-9_]*)/g, 'u32($1)');
@@ -960,7 +964,8 @@ export function convert(src, { sourceName = 'input.hlsl', sourceUrl = '' } = {})
     out.push('//     `@builtin(workgroup_id)` / `@builtin(local_invocation_id)`，並依模板的');
     out.push('//     prescalers.hlsli 定義重建 blockStart 與 gl_* 別名（數值完全一致）。');
     out.push('//   - 權重以 `bitcast<f32>(整數位元)` 表示，逐字保留 HLSL 的 int 位元常數。');
-    out.push('//   - HLSL `mix(a, b, bool)` → WGSL `select(b, a, bool)`（HLSL 為 c ? b : a）。');
+    out.push('//   - HLSL `mix(a, b, bool)` → WGSL `select(a, b, bool)`（HLSL 為 c ? b : a；');
+    out.push('//     WGSL select(false, true, cond) 的 false/true 位置與 HLSL 相反時需對調）。');
     out.push('//   - HLSL `mul(a, b)` → WGSL `(a) * (b)`；HLSL typed local declaration →');
     out.push('//     `var NAME: TYPE = EXPR;`（模板 per-pass 定義 X_tex/HOOKED_* 已展開為');
     out.push('//     具名 WGSL 存取函式,GET_SAMPLE 語意保留）。');
